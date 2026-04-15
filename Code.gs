@@ -7,6 +7,7 @@ function onOpen() {
     .addSeparator()
     .addItem('🔒 Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
+    .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
     .addToUi();
 }
 
@@ -38,6 +39,22 @@ function promptUnlock() {
     if (response.getResponseText() === ADMIN_PASS) {
       unlockRanges();
       ui.alert('✅ Sistema desbloqueado. Ahora es posible editar manualmente las hojas restringidas.');
+    } else {
+      ui.alert('❌ Contraseña incorrecta.');
+    }
+  }
+}
+
+function promptSetWebAppUrl() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.prompt('Configurar Proxy (Admin)', 'Ingrese la contraseña de administrador:', ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() == ui.Button.OK) {
+    if (response.getResponseText() === ADMIN_PASS) {
+      var urlResponse = ui.prompt('URL de Web App', 'Pegue la URL de la Web App desplegada (ejecutar como "Yo"):', ui.ButtonSet.OK_CANCEL);
+      if (urlResponse.getSelectedButton() == ui.Button.OK) {
+        PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', urlResponse.getResponseText().trim());
+        ui.alert('✅ URL configurada. La app ahora inyectará datos silenciosamente usando privilegios elevados.');
+      }
     } else {
       ui.alert('❌ Contraseña incorrecta.');
     }
@@ -235,26 +252,41 @@ function preparePrintPayload(orderNo, templateConfig) {
   return { formData: formData, pdfs: finalPdfs, coords: dynamicCoords };
 }
 
+function doPost(e) {
+  try {
+    var params = JSON.parse(e.postData.contents);
+    if (params.action === 'updateTraceability') {
+      var result = internalUpdateTraceability(params.orderNo, params.userName, params.pagesPrinted, params.printType);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: result })).setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Acción no reconocida' })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 function updateTraceability(orderNo, userName, pagesPrinted, printType) {
+  var webAppUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
+  if (!webAppUrl) throw new Error("El sistema no tiene configurada la WEB_APP_URL. Contacte al administrador.");
+  
+  var payload = { action: 'updateTraceability', orderNo: orderNo, userName: userName, pagesPrinted: pagesPrinted, printType: printType };
+  var options = { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true };
+  
+  var response = UrlFetchApp.fetch(webAppUrl, options);
+  var result = JSON.parse(response.getContentText());
+  
+  if (result.status === 'success') {
+    return result.message;
+  } else {
+    throw new Error("Proxy Error: " + result.message);
+  }
+}
+
+function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
   
-  // Permitir temporalmente que la app inyecte datos levantando el bloqueo si existe
-  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  var isProtected = false;
-  var targetProtection = null;
-  
-  for(var p = 0; p < protections.length; p++) {
-    if(protections[p].getDescription() === 'Bloqueo_Ordenes_IS') {
-      targetProtection = protections[p];
-      isProtected = true;
-      targetProtection.remove(); // Desbloqueo temporal para la app
-      break;
-    }
-  }
-
-  try {
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
     var cols = {
