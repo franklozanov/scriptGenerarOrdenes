@@ -144,53 +144,83 @@ function onEdit(e) {
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
 
 function getInitialData() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('initialData_v1');
-  if (cached) {
-    try { return JSON.parse(cached); } catch (e) {}
-  }
+  try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get('initialData_v1');
+    if (cached) {
+      try { return JSON.parse(cached); } catch (e) {
+        Logger.log("Error parsing cached data: " + e.message);
+      }
+    }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  var users = [];
-  var userSheet = ss.getSheetByName('Usuarios');
-  if (userSheet) {
-    var userData = userSheet.getDataRange().getValues();
-    if (userData.length >= 2) {
-      var colNombre = 0;
-      for (var i = 0; i < userData[0].length; i++) {
-        if (userData[0][i].toString().trim().toLowerCase() === "nombre") { colNombre = i; break; }
-      }
-      for (var j = 1; j < userData.length; j++) {
-        if (userData[j][colNombre]) users.push(userData[j][colNombre].toString().trim());
-      }
+    var users = [];
+    var userSheet = ss.getSheetByName('Usuarios');
+    if (!userSheet) {
+      throw new Error("La hoja 'Usuarios' no existe en el documento.");
     }
-  }
-
-  var templates = [];
-  var tplSheet = ss.getSheetByName('templates');
-  if (tplSheet) {
-    var tplData = tplSheet.getDataRange().getValues();
-    for (var k = 0; k < tplData.length; k++) {
-      var key = tplData[k][0].toString().trim();
-      var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
-      
-      if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
-        var displayName = key;
-        if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
-        else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
-        else if (value) {
-          try { displayName = DriveApp.getFileById(value).getName(); } 
-          catch (e) { displayName = key; }
+    
+    try {
+      var userData = userSheet.getDataRange().getValues();
+      if (userData.length >= 2) {
+        var colNombre = 0;
+        for (var i = 0; i < userData[0].length; i++) {
+          if (userData[0][i].toString().trim().toLowerCase() === "nombre") { colNombre = i; break; }
         }
-        templates.push({ key: key, fileId: value, name: displayName });
+        for (var j = 1; j < userData.length; j++) {
+          if (userData[j][colNombre]) users.push(userData[j][colNombre].toString().trim());
+        }
       }
+    } catch (e) {
+      Logger.log("Error reading Usuarios sheet: " + e.message);
+      throw new Error("Error al leer la hoja 'Usuarios': " + e.message);
     }
-  }
 
-  var result = { users: users, templates: templates };
-  try { cache.put('initialData_v1', JSON.stringify(result), 600); } catch (e) {}
-  return result;
+    var templates = [];
+    var tplSheet = ss.getSheetByName('templates');
+    if (!tplSheet) {
+      throw new Error("La hoja 'templates' no existe en el documento.");
+    }
+    
+    try {
+      var tplData = tplSheet.getDataRange().getValues();
+      for (var k = 0; k < tplData.length; k++) {
+        var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
+        var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
+      
+        if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
+          var displayName = key;
+          if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
+          else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
+          else if (value) {
+            try { 
+              var file = DriveApp.getFileById(value);
+              displayName = file.getName(); 
+            } catch (e) { 
+              Logger.log("Error accessing Drive file " + value + " for key " + key + ": " + e.message);
+              displayName = key + " (Sin acceso)";
+            }
+          }
+          templates.push({ key: key, fileId: value, name: displayName });
+        }
+      }
+    } catch (e) {
+      Logger.log("Error reading templates sheet: " + e.message);
+      throw new Error("Error al leer la hoja 'templates': " + e.message);
+    }
+
+    var result = { users: users, templates: templates };
+    try { cache.put('initialData_v1', JSON.stringify(result), 600); } catch (e) {
+      Logger.log("Error caching data: " + e.message);
+    }
+    return result;
+    
+  } catch (error) {
+    Logger.log("CRITICAL ERROR in getInitialData: " + error.message);
+    Logger.log("Stack trace: " + error.stack);
+    throw new Error("Error cargando datos iniciales: " + error.message);
+  }
 }
 
 function clearInitialDataCache() {
