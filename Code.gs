@@ -25,7 +25,7 @@ function promptLock() {
   if (response.getSelectedButton() == ui.Button.OK) {
     if (response.getResponseText() === ADMIN_PASS) {
       lockRanges();
-      ui.alert('✅ Sistema protegido. Las hojas Usuarios, templates y las columnas I:S de Ordenes han sido bloqueadas.');
+      ui.alert('✅ Sistema protegido. Las hojas Usuarios, templates y el rango I:T (excepto K) de Ordenes han sido bloqueados.');
     } else {
       ui.alert('❌ Contraseña incorrecta.');
     }
@@ -63,28 +63,33 @@ function promptSetWebAppUrl() {
 
 function lockRanges() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+  var me = Session.getEffectiveUser();
+
   // 1. Bloquear Usuarios completa
   var sheetUsuarios = ss.getSheetByName('Usuarios');
   if (sheetUsuarios) {
     var p1 = sheetUsuarios.protect().setDescription('Bloqueo_Usuarios');
     p1.removeEditors(p1.getEditors());
+    try { p1.addEditor(me); } catch (e) {}
     if (p1.canDomainEdit()) p1.setDomainEdit(false);
   }
-  
+
   // 2. Bloquear templates completa
   var sheetTemplates = ss.getSheetByName('templates');
   if (sheetTemplates) {
     var p2 = sheetTemplates.protect().setDescription('Bloqueo_Templates');
     p2.removeEditors(p2.getEditors());
+    try { p2.addEditor(me); } catch (e) {}
     if (p2.canDomainEdit()) p2.setDomainEdit(false);
   }
-  
-  // 3. Bloquear columnas I:S en Ordenes (9 a 19)
+
+  // 3. Bloquear rango I:T en Ordenes excepto columna K (edición libre)
   var sheetOrdenes = ss.getSheetByName('Ordenes');
   if (sheetOrdenes) {
-    var p3 = sheetOrdenes.getRange('I:S').protect().setDescription('Bloqueo_Ordenes_IS');
+    var p3 = sheetOrdenes.getRange('I:T').protect().setDescription('Bloqueo_Ordenes_IT');
+    p3.setUnprotectedRanges([sheetOrdenes.getRange('K:K')]);
     p3.removeEditors(p3.getEditors());
+    try { p3.addEditor(me); } catch (e) {}
     if (p3.canDomainEdit()) p3.setDomainEdit(false);
   }
 }
@@ -96,7 +101,7 @@ function unlockRanges() {
                       
   for (var i = 0; i < protections.length; i++) {
     var desc = protections[i].getDescription();
-    if (desc === 'Bloqueo_Usuarios' || desc === 'Bloqueo_Templates' || desc === 'Bloqueo_Ordenes_IS') {
+    if (desc === 'Bloqueo_Usuarios' || desc === 'Bloqueo_Templates' || desc === 'Bloqueo_Ordenes_IT' || desc === 'Bloqueo_Ordenes_IS') {
       protections[i].remove();
     }
   }
@@ -301,52 +306,43 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
-  var isProtected = false;
-  try {
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    var cols = {
-      NoOrden: headers.indexOf("NoOrden") + 1, STATUS: headers.indexOf("STATUS") + 1,
-      NoPags: headers.indexOf("NoPags") + 1, Reimpresion: headers.indexOf("Reimpresion") + 1,
-      TotalPags: headers.indexOf("TotalPags") + 1, ImpresoPor: headers.indexOf("ImpresoPor") + 1,
-      ReimpresoPor: headers.indexOf("ReimpresoPor") + 1
-    };
-    
-    for (var k in cols) if (cols[k] === 0) throw new Error("Column '" + k + "' missing.");
-    
-    var colNoOrdenData = sheet.getRange(1, cols.NoOrden, sheet.getLastRow(), 1).getValues();
-    var rowIndex = -1;
-    for (var i = 1; i < colNoOrdenData.length; i++) { if (colNoOrdenData[i][0] == orderNo) { rowIndex = i + 1; break; } }
-    
-    if (rowIndex === -1) throw new Error("Row lost during update.");
-    
-    var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-    var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
-    var newEntry = userName + " (" + pagesPrinted + ")";
 
-    if (printType === "Reimpresion") {
-      sheet.getRange(rowIndex, cols.STATUS).setValue("Reimpreso");
-      sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
-      var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
-      sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
-    } else {
-      sheet.getRange(rowIndex, cols.STATUS).setValue("Impreso");
-      sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
-      var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
-      sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry); 
-    }
-    
-    var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-    var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
-    sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-    return "Record updated successfully.";
-  } finally {
-    // Asegurar que se vuelve a aplicar el bloqueo después de inyectar, independientemente de errores
-    if (isProtected) {
-      var pRestored = sheet.getRange('I:S').protect().setDescription('Bloqueo_Ordenes_IS');
-      pRestored.removeEditors(pRestored.getEditors());
-      if (pRestored.canDomainEdit()) pRestored.setDomainEdit(false);
-    }
+  var cols = {
+    NoOrden: headers.indexOf("NoOrden") + 1, STATUS: headers.indexOf("STATUS") + 1,
+    NoPags: headers.indexOf("NoPags") + 1, Reimpresion: headers.indexOf("Reimpresion") + 1,
+    TotalPags: headers.indexOf("TotalPags") + 1, ImpresoPor: headers.indexOf("ImpresoPor") + 1,
+    ReimpresoPor: headers.indexOf("ReimpresoPor") + 1
+  };
+
+  for (var k in cols) if (cols[k] === 0) throw new Error("Column '" + k + "' missing.");
+
+  var colNoOrdenData = sheet.getRange(1, cols.NoOrden, sheet.getLastRow(), 1).getValues();
+  var rowIndex = -1;
+  for (var i = 1; i < colNoOrdenData.length; i++) { if (colNoOrdenData[i][0] == orderNo) { rowIndex = i + 1; break; } }
+
+  if (rowIndex === -1) throw new Error("Row lost during update.");
+
+  var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
+  var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
+  var newEntry = userName + " (" + pagesPrinted + ")";
+
+  if (printType === "Reimpresion") {
+    sheet.getRange(rowIndex, cols.STATUS).setValue("Reimpreso");
+    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
+    var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
+    sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
+  } else {
+    sheet.getRange(rowIndex, cols.STATUS).setValue("Impreso");
+    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
+    var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
+    sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry); 
   }
+
+  var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
+  var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
+  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
+
+  return "Record updated successfully.";
 }
