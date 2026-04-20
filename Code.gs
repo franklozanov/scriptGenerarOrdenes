@@ -63,7 +63,6 @@ function promptSetWebAppUrl() {
 
 function lockRanges() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var me = Session.getEffectiveUser();
   
   // 1. Bloquear Usuarios completa
   var sheetUsuarios = ss.getSheetByName('Usuarios');
@@ -290,7 +289,8 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
-  
+  var isProtected = false;
+  try {
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
     var cols = {
@@ -328,14 +328,13 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
     var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
     sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
 
+    return "Record updated successfully.";
   } finally {
     // Asegurar que se vuelve a aplicar el bloqueo después de inyectar, independientemente de errores
-    if(isProtected) {
+    if (isProtected) {
       var pRestored = sheet.getRange('I:S').protect().setDescription('Bloqueo_Ordenes_IS');
       pRestored.removeEditors(pRestored.getEditors());
       if (pRestored.canDomainEdit()) pRestored.setDomainEdit(false);
     }
   }
-
-  return "Record updated successfully.";
 }
