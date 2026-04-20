@@ -19,58 +19,50 @@ function openPrintDialog() {
 
 // --- SISTEMA DE SEGURIDAD Y BLOQUEO ---
 
-function promptLock() {
+function withAdminAuth(title, action) {
   var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt('Bloquear Sistema', 'Ingrese la contraseña de administrador:', ui.ButtonSet.OK_CANCEL);
+  var response = ui.prompt(title, 'Ingrese la contraseña de administrador:', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() == ui.Button.OK) {
     if (response.getResponseText() === ADMIN_PASS) {
-      lockRanges();
-      ui.alert('✅ Sistema protegido. Las hojas Usuarios, templates y el rango I:T (excepto K) de Ordenes han sido bloqueados.');
+      action(ui);
     } else {
       ui.alert('❌ Contraseña incorrecta.');
     }
   }
+}
+
+function promptLock() {
+  withAdminAuth('Bloquear Sistema', function(ui) {
+    lockRanges();
+    ui.alert('✅ Sistema protegido. Las hojas Usuarios, templates y el rango I:T (excepto K) de Ordenes han sido bloqueados.');
+  });
 }
 
 function promptUnlock() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt('Desbloquear Sistema', 'Ingrese la contraseña de administrador:', ui.ButtonSet.OK_CANCEL);
-  if (response.getSelectedButton() == ui.Button.OK) {
-    if (response.getResponseText() === ADMIN_PASS) {
-      unlockRanges();
-      ui.alert('✅ Sistema desbloqueado. Ahora es posible editar manualmente las hojas restringidas.');
-    } else {
-      ui.alert('❌ Contraseña incorrecta.');
-    }
-  }
+  withAdminAuth('Desbloquear Sistema', function(ui) {
+    unlockRanges();
+    ui.alert('✅ Sistema desbloqueado. Ahora es posible editar manualmente las hojas restringidas.');
+  });
 }
 
 function promptSetWebAppUrl() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt('Configurar Proxy (Admin)', 'Ingrese la contraseña de administrador:', ui.ButtonSet.OK_CANCEL);
-  if (response.getSelectedButton() == ui.Button.OK) {
-    if (response.getResponseText() === ADMIN_PASS) {
-      var urlResponse = ui.prompt('URL de Web App', 'Pegue la URL de la Web App desplegada (ejecutar como "Yo"):', ui.ButtonSet.OK_CANCEL);
-      if (urlResponse.getSelectedButton() == ui.Button.OK) {
-        PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', urlResponse.getResponseText().trim());
-        ui.alert('✅ URL configurada. La app ahora inyectará datos silenciosamente usando privilegios elevados.');
-      }
-    } else {
-      ui.alert('❌ Contraseña incorrecta.');
+  withAdminAuth('Configurar Proxy (Admin)', function(ui) {
+    var urlResponse = ui.prompt('URL de Web App', 'Pegue la URL de la Web App desplegada (ejecutar como "Yo"):', ui.ButtonSet.OK_CANCEL);
+    if (urlResponse.getSelectedButton() == ui.Button.OK) {
+      PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', urlResponse.getResponseText().trim());
+      ui.alert('✅ URL configurada. La app ahora inyectará datos silenciosamente usando privilegios elevados.');
     }
-  }
+  });
 }
 
 function lockRanges() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var me = Session.getEffectiveUser();
 
   // 1. Bloquear Usuarios completa
   var sheetUsuarios = ss.getSheetByName('Usuarios');
   if (sheetUsuarios) {
     var p1 = sheetUsuarios.protect().setDescription('Bloqueo_Usuarios');
     p1.removeEditors(p1.getEditors());
-    try { p1.addEditor(me); } catch (e) {}
     if (p1.canDomainEdit()) p1.setDomainEdit(false);
   }
 
@@ -79,7 +71,6 @@ function lockRanges() {
   if (sheetTemplates) {
     var p2 = sheetTemplates.protect().setDescription('Bloqueo_Templates');
     p2.removeEditors(p2.getEditors());
-    try { p2.addEditor(me); } catch (e) {}
     if (p2.canDomainEdit()) p2.setDomainEdit(false);
   }
 
@@ -89,7 +80,6 @@ function lockRanges() {
     var p3 = sheetOrdenes.getRange('I:T').protect().setDescription('Bloqueo_Ordenes_IT');
     p3.setUnprotectedRanges([sheetOrdenes.getRange('K:K')]);
     p3.removeEditors(p3.getEditors());
-    try { p3.addEditor(me); } catch (e) {}
     if (p3.canDomainEdit()) p3.setDomainEdit(false);
   }
 }
@@ -113,38 +103,41 @@ function unlockRanges() {
 function onEdit(e) {
   if (!e) return;
   
-  var sheet = e.range.getSheet();
-  var sheetName = sheet.getName();
-  var editedRange = e.range;
   var user = Session.getActiveUser().getEmail();
   var effectiveUser = Session.getEffectiveUser().getEmail();
   
   // Si el usuario que edita es el efectivo (admin/Web App), permitir
   if (user === effectiveUser) return;
   
-  var shouldRevert = false;
-  var revertMessage = "";
+  var editedRange = e.range;
+  var sheet = editedRange.getSheet();
   
-  // Verificar si la edición está en un rango protegido
-  if (sheetName === "Usuarios") {
-    shouldRevert = true;
-    revertMessage = "La hoja 'Usuarios' está protegida. Cambio revertido.";
-  } else if (sheetName === "templates") {
-    shouldRevert = true;
-    revertMessage = "La hoja 'templates' está protegida. Cambio revertido.";
-  } else if (sheetName === "Ordenes") {
-    var col = editedRange.getColumn();
-    // Columnas I:T = 9:20, excepto K = 11
-    if (col >= 9 && col <= 20 && col !== 11) {
+  // Obtener protecciones de hoja y rango
+  var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var rangeProtections = editedRange.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  
+  var allProtections = sheetProtections.concat(rangeProtections);
+  var shouldRevert = false;
+  var protectionDesc = "";
+  
+  // Verificar si el usuario puede editar según las protecciones reales
+  for (var i = 0; i < allProtections.length; i++) {
+    var protection = allProtections[i];
+    if (!protection.canEdit()) {
       shouldRevert = true;
-      revertMessage = "El rango I:T (excepto K) de 'Ordenes' está protegido. Cambio revertido.";
+      protectionDesc = protection.getDescription() || "protegido";
+      break;
     }
   }
   
   if (shouldRevert) {
     // Revertir al valor anterior
     editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
-    SpreadsheetApp.getActiveSpreadsheet().toast(revertMessage, "⚠️ Edición no permitida", 5);
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
+      "⚠️ Edición no permitida",
+      5
+    );
   }
 }
 
