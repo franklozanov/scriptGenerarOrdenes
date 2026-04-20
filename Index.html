@@ -107,6 +107,14 @@
         })).filter(c => c.copies > 0);
 
         if (!orderNo || !userName) { alert("Error: Complete los campos No. de Orden y Usuario."); return; }
+
+        const validUsers = Array.from(document.getElementById('usersList').options).map(opt => opt.value);
+        if (!validUsers.includes(userName)) {
+          alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
+          document.getElementById('userName').focus();
+          return;
+        }
+
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 
         btn.disabled = true;
