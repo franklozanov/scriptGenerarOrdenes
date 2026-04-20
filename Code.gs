@@ -2,8 +2,8 @@
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('🖨️ Printing')
-    .addItem('Print Templates', 'openPrintDialog')
+  SpreadsheetApp.getUi().createMenu('🖨️ Impresión')
+    .addItem('Imprimir Plantillas', 'openPrintDialog')
     .addSeparator()
     .addItem('🔒 Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
@@ -13,8 +13,8 @@ function onOpen() {
 
 function openPrintDialog() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
-    .setWidth(500).setHeight(650).setTitle('Print Order Templates');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Print Panel');
+    .setWidth(500).setHeight(650).setTitle('Panel de Impresión');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
 }
 
 // --- SISTEMA DE SEGURIDAD Y BLOQUEO ---
@@ -106,6 +106,12 @@ function unlockRanges() {
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
 
 function getInitialData() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('initialData_v1');
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) {}
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
   var users = [];
@@ -144,7 +150,13 @@ function getInitialData() {
     }
   }
 
-  return { users: users, templates: templates };
+  var result = { users: users, templates: templates };
+  try { cache.put('initialData_v1', JSON.stringify(result), 600); } catch (e) {}
+  return result;
+}
+
+function clearInitialDataCache() {
+  CacheService.getScriptCache().remove('initialData_v1');
 }
 
 function preparePrintPayload(orderNo, templateConfig) {
