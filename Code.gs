@@ -223,9 +223,13 @@ function preparePrintPayload(orderNo, templateConfig) {
         else throw new Error("File " + orderNo + ".pdf not found.");
       } else if (config.key === "DOC_ANALISIS") {
         if (!folderAnalysisId || !noAnalisisStr) throw new Error("DOC_ANALISIS config or NoAnalisis missing.");
-        var aFiles = DriveApp.getFolderById(folderAnalysisId).getFilesByName(noAnalisisStr + ".pdf");
-        if (aFiles.hasNext()) file = aFiles.next();
-        else throw new Error("Analysis PDF " + noAnalisisStr + ".pdf not found.");
+        var aQuery = "title contains '" + noAnalisisStr + "' and mimeType = 'application/pdf' and trashed = false";
+        var aFiles = DriveApp.getFolderById(folderAnalysisId).searchFiles(aQuery);
+        while (aFiles.hasNext()) {
+          var candidate = aFiles.next();
+          if (candidate.getName().indexOf(noAnalisisStr) === 0) { file = candidate; break; }
+        }
+        if (!file) throw new Error("Analysis PDF starting with " + noAnalisisStr + ".pdf not found.");
       } else {
         if (!config.fileId) throw new Error("File ID missing.");
         file = DriveApp.getFileById(config.fileId);
