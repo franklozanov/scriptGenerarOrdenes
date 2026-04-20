@@ -108,6 +108,46 @@ function unlockRanges() {
 }
 
 
+// --- PROTECCIÓN AUTOMÁTICA CONTRA EDICIÓN MANUAL ---
+
+function onEdit(e) {
+  if (!e) return;
+  
+  var sheet = e.range.getSheet();
+  var sheetName = sheet.getName();
+  var editedRange = e.range;
+  var user = Session.getActiveUser().getEmail();
+  var effectiveUser = Session.getEffectiveUser().getEmail();
+  
+  // Si el usuario que edita es el efectivo (admin/Web App), permitir
+  if (user === effectiveUser) return;
+  
+  var shouldRevert = false;
+  var revertMessage = "";
+  
+  // Verificar si la edición está en un rango protegido
+  if (sheetName === "Usuarios") {
+    shouldRevert = true;
+    revertMessage = "La hoja 'Usuarios' está protegida. Cambio revertido.";
+  } else if (sheetName === "templates") {
+    shouldRevert = true;
+    revertMessage = "La hoja 'templates' está protegida. Cambio revertido.";
+  } else if (sheetName === "Ordenes") {
+    var col = editedRange.getColumn();
+    // Columnas I:T = 9:20, excepto K = 11
+    if (col >= 9 && col <= 20 && col !== 11) {
+      shouldRevert = true;
+      revertMessage = "El rango I:T (excepto K) de 'Ordenes' está protegido. Cambio revertido.";
+    }
+  }
+  
+  if (shouldRevert) {
+    // Revertir al valor anterior
+    editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
+    SpreadsheetApp.getActiveSpreadsheet().toast(revertMessage, "⚠️ Edición no permitida", 5);
+  }
+}
+
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
 
 function getInitialData() {
