@@ -156,6 +156,7 @@
                 totalPages += copied.length;
 
                 // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
+                console.log(`Plantilla: ${item.key}, Copia: ${i+1}, Páginas: ${copied.length}, Es impar: ${copied.length % 2 !== 0}`);
                 if (copied.length % 2 !== 0) {
                   const blankPage = finalPdf.addPage([612, 792]);
                   const blankText = "Esta página fue dejada en blanco de manera intencional";
@@ -170,6 +171,7 @@
                     color: rgb(0.4, 0.4, 0.4)
                   });
                   totalPages += 1;
+                  console.log(`✓ Página en blanco añadida después de ${item.key}`);
                 }
               }
             }
