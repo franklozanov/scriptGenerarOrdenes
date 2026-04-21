@@ -154,24 +154,24 @@
                 const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
                 copied.forEach(p => finalPdf.addPage(p));
                 totalPages += copied.length;
-              }
-            }
 
-            // --- AGREGAR PÁGINA EN BLANCO SI EL TOTAL ES IMPAR ---
-            if (totalPages % 2 !== 0) {
-              const blankPage = finalPdf.addPage([612, 792]);
-              const blankText = "Esta página fue dejada en blanco de manera intencional";
-              const textWidth = blankText.length * 5.5;
-              const pageWidth = blankPage.getWidth();
-              const pageHeight = blankPage.getHeight();
-              
-              blankPage.drawText(blankText, {
-                x: (pageWidth - textWidth) / 2,
-                y: pageHeight / 2,
-                size: 11,
-                color: rgb(0.4, 0.4, 0.4)
-              });
-              totalPages += 1;
+                // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
+                if (copied.length % 2 !== 0) {
+                  const blankPage = finalPdf.addPage([612, 792]);
+                  const blankText = "Esta página fue dejada en blanco de manera intencional";
+                  const textWidth = blankText.length * 5.5;
+                  const pageWidth = blankPage.getWidth();
+                  const pageHeight = blankPage.getHeight();
+                  
+                  blankPage.drawText(blankText, {
+                    x: (pageWidth - textWidth) / 2,
+                    y: pageHeight / 2,
+                    size: 11,
+                    color: rgb(0.4, 0.4, 0.4)
+                  });
+                  totalPages += 1;
+                }
+              }
             }
 
             // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
