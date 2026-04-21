@@ -40,7 +40,7 @@
 
       <div class="field">
         <label>No. de Orden:</label>
-        <input type="text" id="orderNo" autocomplete="off" autofocus placeholder="Ej: 2025-0152">
+        <input type="text" id="orderNo" autocomplete="off" autofocus placeholder="Ej: 8602">
       </div>
 
       <div class="field">
@@ -155,6 +155,23 @@
                 copied.forEach(p => finalPdf.addPage(p));
                 totalPages += copied.length;
               }
+            }
+
+            // --- AGREGAR PÁGINA EN BLANCO SI EL TOTAL ES IMPAR ---
+            if (totalPages % 2 !== 0) {
+              const blankPage = finalPdf.addPage([612, 792]);
+              const blankText = "Esta página fue dejada en blanco de manera intencional";
+              const textWidth = blankText.length * 5.5;
+              const pageWidth = blankPage.getWidth();
+              const pageHeight = blankPage.getHeight();
+              
+              blankPage.drawText(blankText, {
+                x: (pageWidth - textWidth) / 2,
+                y: pageHeight / 2,
+                size: 11,
+                color: rgb(0.4, 0.4, 0.4)
+              });
+              totalPages += 1;
             }
 
             // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
