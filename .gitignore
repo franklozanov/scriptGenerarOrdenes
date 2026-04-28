@@ -1,0 +1,18 @@
+# Archivos Python (van en rama cloud-function)
+cloud-function/
+
+# Archivos temporales
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# Archivos de Apps Script antiguos
+Index_old.html
+Code_old.gs
+
+# Node modules
+node_modules/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db

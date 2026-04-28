@@ -1,0 +1,10 @@
+# Ignorar archivos que no deben ir a Apps Script
+cloud-function/
+.git/
+.gitignore
+*.md
+README.md
+SOLUCION_PLANTILLAS.md
+GUIA_CONFIGURACION_COMPLETA.md
+Index_old.html
+node_modules/
