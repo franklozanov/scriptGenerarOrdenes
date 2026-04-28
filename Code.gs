@@ -614,3 +614,35 @@ function compressPdfViaCloudFunction(base64Pdf, quality) {
     return { compressed_pdf: base64Pdf, skipped: true };
   }
 }
+
+function processPdfComplete(payload) {
+  var cloudUrl = PropertiesService.getScriptProperties().getProperty('CLOUD_FUNCTION_URL_V2');
+  
+  if (!cloudUrl) {
+    throw new Error('Cloud Function V2 no configurada. Configure la URL en el menú Admin.');
+  }
+  
+  try {
+    var options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    Logger.log('Enviando ' + payload.pdfs.length + ' PDFs a Cloud Function para procesamiento completo...');
+    var response = UrlFetchApp.fetch(cloudUrl, options);
+    var result = JSON.parse(response.getContentText());
+    
+    if (response.getResponseCode() === 200 && result.pdf_base64) {
+      Logger.log('✓ PDF procesado: ' + result.original_size_kb + 'KB → ' + result.final_size_kb + 'KB (' + result.reduction_percent + '% reducción)');
+      Logger.log('✓ Total de páginas: ' + result.total_pages);
+      return result;
+    } else {
+      throw new Error('Error en Cloud Function: ' + (result.error || 'Unknown error'));
+    }
+  } catch (e) {
+    Logger.log('⚠️ Error llamando Cloud Function V2: ' + e.message);
+    throw e;
+  }
+}
