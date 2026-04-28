@@ -163,10 +163,25 @@
                   Object.keys(payload.coords).forEach(k => {
                     firstPage.drawText(payload.formData[k] || "", { x: payload.coords[k].x, y: payload.coords[k].y, size: 10, color: rgb(0,0,0) });
                   });
+                  // Aplanar formularios si existen (optimización para impresoras)
+                  try {
+                    const form = doc.getForm();
+                    if (form.getFields().length > 0) {
+                      form.flatten();
+                    }
+                  } catch(e) { /* No hay formularios */ }
                 } else if (item.key !== "DOC_ANALISIS") {
                   const form = doc.getForm();
                   Object.keys(payload.formData).forEach(k => { try { form.getTextField(k).setText(payload.formData[k]); } catch(e){} });
                   form.flatten();
+                } else {
+                  // DOC_ANALISIS: también aplanar formularios si existen
+                  try {
+                    const form = doc.getForm();
+                    if (form.getFields().length > 0) {
+                      form.flatten();
+                    }
+                  } catch(e) { /* No hay formularios */ }
                 }
 
                 const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
@@ -235,9 +250,24 @@
               drawVisualText(footerRightText, width - 130, 20, 8);
             });
 
-            status.innerText = "⏳ Paso 4/4: Descargando documento final...";
+            status.innerText = "⏳ Paso 4/4: Optimizando PDF para impresión...";
 
-            const pdfData = await finalPdf.save();
+            // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
+            try {
+              const finalForm = finalPdf.getForm();
+              if (finalForm.getFields().length > 0) {
+                console.log(`✓ Aplanando ${finalForm.getFields().length} campos de formulario en documento final`);
+                finalForm.flatten();
+              }
+            } catch(e) {
+              console.log('No hay formularios en documento final o ya están aplanados');
+            }
+
+            // Guardar con opciones optimizadas para compatibilidad con impresoras
+            const pdfData = await finalPdf.save({
+              useObjectStreams: false,  // Mejora compatibilidad con impresoras antiguas
+              addDefaultPage: false     // No agregar páginas adicionales
+            });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(new Blob([pdfData], {type:'application/pdf'}));
             link.download = `Orden_${orderNo}.pdf`;
