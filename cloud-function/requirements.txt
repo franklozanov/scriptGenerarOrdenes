@@ -1,5 +1,0 @@
-functions-framework==3.*
-flask==3.*
-PyPDF2==3.0.1
-reportlab==4.0.7
-pdfrw==0.4
