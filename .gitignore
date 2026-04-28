@@ -1,0 +1,20 @@
+# Ignorar carpeta original de Cloud Function (bloqueada)
+cloud-function/
+
+# Ignorar archivos Python en main
+*.py
+*.pyc
+__pycache__/
+
+# Archivos temporales
+*.md
+!README.md
+Index_old.html
+Code_old.gs
+
+# Node modules
+node_modules/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
