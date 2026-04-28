@@ -6,7 +6,10 @@ El script no puede acceder a algunas plantillas configuradas en la hoja `templat
 ## Síntomas
 - En el Panel de Impresión aparecen plantillas marcadas como "(Sin acceso)"
 - Las plantillas sin acceso están deshabilitadas (en gris)
-- Al intentar generar el PDF, aparece un error
+- Al intentar generar el PDF, aparece un error como:
+  - `Error loading TPL_ORDEN: Service error: Drive`
+  - `Error loading TPL_CODIFICADO: Exception: File not found`
+  - `No se puede acceder a la carpeta ID_FOLDER`
 
 ## Diagnóstico
 1. Abra el menú **🖨️ Impresión** → **🔍 Diagnosticar Plantillas**
@@ -14,6 +17,17 @@ El script no puede acceder a algunas plantillas configuradas en la hoja `templat
 3. Anote los IDs de archivo que aparecen con error
 
 ## Soluciones
+
+### Solución específica para TPL_ORDEN
+Si el error es `Error loading TPL_ORDEN: Service error: Drive`:
+
+1. Verifique que `ID_FOLDER` esté configurado en la hoja `templates`
+2. El ID debe ser de una **carpeta** (no un archivo)
+3. Para obtener el ID de la carpeta:
+   - Abra la carpeta en Google Drive
+   - Copie el ID de la URL: `https://drive.google.com/drive/folders/ABC123xyz` → ID = `ABC123xyz`
+4. Asegúrese de que la carpeta contenga archivos PDF con nombres que coincidan exactamente con los números de orden (ej: `8602.pdf`)
+5. Comparta la carpeta con el script (permisos de Lector)
 
 ### Opción 1: Verificar IDs de archivo (Más común)
 1. Abra la hoja `templates` en Google Sheets

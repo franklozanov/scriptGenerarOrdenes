@@ -7,7 +7,7 @@ function onOpen() {
     .addSeparator()
     .addItem('� Diagnosticar Plantillas', 'diagnosticarPlantillas')
     .addSeparator()
-    .addItem('�🔒 Bloquear Hojas (Admin)', 'promptLock')
+    .addItem('� Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
     .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
     .addToUi();
@@ -262,15 +262,59 @@ function diagnosticarPlantillas() {
   var report = "📋 DIAGNÓSTICO DE PLANTILLAS\n\n";
   var errorCount = 0;
   var successCount = 0;
+  var folderId = "";
+  var folderAnalysisId = "";
+  
+  // Verificar carpetas dinámicas primero
+  for (var i = 0; i < tplData.length; i++) {
+    var k = tplData[i][0] ? tplData[i][0].toString().trim() : "";
+    var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    if (k === "ID_FOLDER") folderId = v;
+    if (k === "DOC_ANALISIS") folderAnalysisId = v;
+  }
+  
+  report += "CARPETAS DINÁMICAS:\n";
+  
+  // Verificar ID_FOLDER
+  if (folderId) {
+    try {
+      var folder = DriveApp.getFolderById(folderId);
+      report += "✓ ID_FOLDER → " + folder.getName() + "\n";
+      successCount++;
+    } catch (e) {
+      report += "✗ ID_FOLDER → ERROR: " + e.message + "\n";
+      report += "  ID: " + folderId + "\n";
+      errorCount++;
+    }
+  } else {
+    report += "⚠ ID_FOLDER → No configurado (requerido para TPL_ORDEN)\n";
+    errorCount++;
+  }
+  
+  // Verificar DOC_ANALISIS
+  if (folderAnalysisId) {
+    try {
+      var aFolder = DriveApp.getFolderById(folderAnalysisId);
+      report += "✓ DOC_ANALISIS (carpeta) → " + aFolder.getName() + "\n";
+      successCount++;
+    } catch (e) {
+      report += "✗ DOC_ANALISIS (carpeta) → ERROR: " + e.message + "\n";
+      report += "  ID: " + folderAnalysisId + "\n";
+      errorCount++;
+    }
+  } else {
+    report += "⚠ DOC_ANALISIS (carpeta) → No configurado\n";
+  }
+  
+  report += "\nPLANTILLAS ESTÁTICAS:\n";
   
   for (var i = 0; i < tplData.length; i++) {
     var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     
-    if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
-      if (key === "TPL_ORDEN" || key === "DOC_ANALISIS") {
-        report += "✓ " + key + " (Dinámico - OK)\n";
-        successCount++;
+    if (key && key !== "Clave" && key !== "ID_FOLDER" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
+      if (key === "TPL_ORDEN") {
+        report += "✓ " + key + " (Dinámico - depende de ID_FOLDER)\n";
       } else if (value) {
         try {
           var file = DriveApp.getFileById(value);
@@ -289,14 +333,14 @@ function diagnosticarPlantillas() {
   }
   
   report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-  report += "Total: " + (successCount + errorCount) + " plantillas\n";
   report += "✓ Accesibles: " + successCount + "\n";
   report += "✗ Con errores: " + errorCount + "\n";
   
   if (errorCount > 0) {
     report += "\n⚠️ ACCIÓN REQUERIDA:\n";
-    report += "Verifique los IDs de las plantillas con error.\n";
-    report += "Asegúrese de que el script tenga permisos de acceso.";
+    report += "1. Verifique los IDs de las plantillas con error\n";
+    report += "2. Asegúrese de que el script tenga permisos\n";
+    report += "3. Consulte SOLUCION_PLANTILLAS.md para ayuda";
   }
   
   SpreadsheetApp.getUi().alert(report);
@@ -372,26 +416,57 @@ function preparePrintPayload(orderNo, templateConfig) {
     var file;
     try {
       if (config.key === "TPL_ORDEN") {
-        if (!folderId) throw new Error("ID_FOLDER missing.");
-        var files = DriveApp.getFolderById(folderId).getFilesByName(orderNo + ".pdf");
-        if (files.hasNext()) file = files.next();
-        else throw new Error("File " + orderNo + ".pdf not found.");
-      } else if (config.key === "DOC_ANALISIS") {
-        if (!folderAnalysisId || !noAnalisisStr) throw new Error("DOC_ANALISIS config or NoAnalisis missing.");
-        var aQuery = "title contains '" + noAnalisisStr + "' and mimeType = 'application/pdf' and trashed = false";
-        var aFiles = DriveApp.getFolderById(folderAnalysisId).searchFiles(aQuery);
-        while (aFiles.hasNext()) {
-          var candidate = aFiles.next();
-          if (candidate.getName().indexOf(noAnalisisStr) === 0) { file = candidate; break; }
+        if (!folderId) {
+          throw new Error("ID_FOLDER no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
         }
-        if (!file) throw new Error("Analysis PDF starting with " + noAnalisisStr + ".pdf not found.");
+        try {
+          var folder = DriveApp.getFolderById(folderId);
+          var files = folder.getFilesByName(orderNo + ".pdf");
+          if (files.hasNext()) {
+            file = files.next();
+          } else {
+            throw new Error("El archivo '" + orderNo + ".pdf' no existe en la carpeta configurada (ID: " + folderId + "). Verifique que el archivo existe y el nombre coincide exactamente.");
+          }
+        } catch (driveError) {
+          if (driveError.message.indexOf("not found") !== -1 || driveError.message.indexOf("not exist") !== -1) {
+            throw new Error("No se puede acceder a la carpeta ID_FOLDER (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
+          }
+          throw driveError;
+        }
+      } else if (config.key === "DOC_ANALISIS") {
+        if (!folderAnalysisId) {
+          throw new Error("DOC_ANALISIS no está configurado en la hoja 'templates'. Configure el ID de la carpeta de análisis.");
+        }
+        if (!noAnalisisStr) {
+          throw new Error("La orden no tiene número de análisis (NoAnalisis). Complete este campo en la hoja 'Ordenes'.");
+        }
+        try {
+          var aFolder = DriveApp.getFolderById(folderAnalysisId);
+          var aQuery = "title contains '" + noAnalisisStr + "' and mimeType = 'application/pdf' and trashed = false";
+          var aFiles = aFolder.searchFiles(aQuery);
+          while (aFiles.hasNext()) {
+            var candidate = aFiles.next();
+            if (candidate.getName().indexOf(noAnalisisStr) === 0) { file = candidate; break; }
+          }
+          if (!file) {
+            throw new Error("No se encontró el PDF de análisis que comience con '" + noAnalisisStr + "' en la carpeta configurada (ID: " + folderAnalysisId + ").");
+          }
+        } catch (driveError) {
+          if (driveError.message.indexOf("not found") !== -1 || driveError.message.indexOf("not exist") !== -1) {
+            throw new Error("No se puede acceder a la carpeta DOC_ANALISIS (ID: " + folderAnalysisId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
+          }
+          throw driveError;
+        }
       } else {
-        if (!config.fileId) throw new Error("File ID missing.");
+        if (!config.fileId) {
+          throw new Error("El ID del archivo no está configurado en la hoja 'templates'.");
+        }
         file = DriveApp.getFileById(config.fileId);
       }
       pdfsToProcess.push({ key: config.key, base64: Utilities.base64Encode(file.getBlob().getBytes()), copies: config.copies });
     } catch (e) {
-      throw new Error("Error loading " + config.key + ": " + e.message);
+      Logger.log("ERROR en preparePrintPayload para " + config.key + ": " + e.message);
+      throw new Error("Error cargando " + config.key + ": " + e.message);
     }
   });
 
