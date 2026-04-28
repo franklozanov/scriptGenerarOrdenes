@@ -14,7 +14,7 @@
       .tpl-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; gap: 10px; }
       .tpl-row:last-child { border-bottom: none; }
       .tpl-row .tpl-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .tpl-row input[type="number"] { flex: 0 0 auto; width: 56px; text-align: center; padding: 6px 4px; -moz-appearance: textfield; }
+      .tpl-row input[type="number"] { flex: 0 0 auto; width: 56px; text-align: center; padding: 6px 4px; appearance: textfield; -moz-appearance: textfield; }
       .tpl-row input[type="number"]::-webkit-outer-spin-button,
       .tpl-row input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       button { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: background 0.2s; font-size: 14px; }
@@ -75,15 +75,25 @@
 
           document.getElementById('tplList').innerHTML = data.templates.map(t => {
             const defVal = defaultOnes.includes(t.key) ? "1" : "0";
+            const noAccess = t.hasAccess === false;
+            const rowStyle = noAccess ? 'opacity: 0.5;' : '';
+            const nameStyle = noAccess ? 'color: #d93025; font-style: italic;' : '';
             return `
-              <div class="tpl-row">
-                <span class="tpl-name" title="${t.name}">${t.name}</span>
-                <input type="number" id="val_${t.key}" value="${defVal}" min="0" max="999" maxlength="3">
+              <div class="tpl-row" style="${rowStyle}">
+                <span class="tpl-name" title="${t.name}" style="${nameStyle}">${t.name}</span>
+                <input type="number" id="val_${t.key}" value="${defVal}" min="0" max="999" maxlength="3" ${noAccess ? 'disabled' : ''}>
               </div>
             `;
           }).join('');
 
           document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u}">`).join('');
+
+          const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
+          if (noAccessCount > 0) {
+            const status = document.getElementById('status');
+            status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
+            status.className = "error-text";
+          }
 
           document.getElementById('loader').style.display = 'none';
           document.getElementById('goBtn').disabled = false;
@@ -102,11 +112,19 @@
         status.className = "";
 
         const config = globalTemplates.map(t => ({
-          key: t.key, fileId: t.fileId,
+          key: t.key, fileId: t.fileId, hasAccess: t.hasAccess,
           copies: parseInt(document.getElementById('val_' + t.key).value) || 0
         })).filter(c => c.copies > 0);
 
         if (!orderNo || !userName) { alert("Error: Complete los campos No. de Orden y Usuario."); return; }
+
+        // Verificar si hay plantillas sin acceso seleccionadas
+        const noAccessSelected = config.filter(c => c.hasAccess === false);
+        if (noAccessSelected.length > 0) {
+          const names = noAccessSelected.map(c => globalTemplates.find(t => t.key === c.key).name).join('\n- ');
+          alert("Error: Las siguientes plantillas no tienen acceso:\n\n- " + names + "\n\nPor favor, use el menú 'Diagnosticar Plantillas' para resolver este problema.");
+          return;
+        }
 
         const validUsers = Array.from(document.getElementById('usersList').options).map(opt => opt.value);
         if (!validUsers.includes(userName)) {

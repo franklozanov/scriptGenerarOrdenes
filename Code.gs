@@ -5,7 +5,9 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('🖨️ Impresión')
     .addItem('Imprimir Plantillas', 'openPrintDialog')
     .addSeparator()
-    .addItem('🔒 Bloquear Hojas (Admin)', 'promptLock')
+    .addItem('� Diagnosticar Plantillas', 'diagnosticarPlantillas')
+    .addSeparator()
+    .addItem('�🔒 Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
     .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
     .addToUi();
@@ -185,12 +187,16 @@ function getInitialData() {
     
     try {
       var tplData = tplSheet.getDataRange().getValues();
+      var accessErrors = [];
+      
       for (var k = 0; k < tplData.length; k++) {
         var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
         var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
       
         if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
           var displayName = key;
+          var hasAccess = true;
+          
           if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
           else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
           else if (value) {
@@ -198,12 +204,28 @@ function getInitialData() {
               var file = DriveApp.getFileById(value);
               displayName = file.getName(); 
             } catch (e) { 
-              Logger.log("Error accessing Drive file " + value + " for key " + key + ": " + e.message);
+              Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
+              Logger.log("  - ID del archivo: " + value);
+              Logger.log("  - Error: " + e.message);
               displayName = key + " (Sin acceso)";
+              hasAccess = false;
+              accessErrors.push({
+                key: key,
+                fileId: value,
+                error: e.message
+              });
             }
           }
-          templates.push({ key: key, fileId: value, name: displayName });
+          templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess });
         }
+      }
+      
+      // Si hay errores de acceso, registrarlos de forma visible
+      if (accessErrors.length > 0) {
+        Logger.log("⚠️ ADVERTENCIA: " + accessErrors.length + " plantilla(s) sin acceso:");
+        accessErrors.forEach(function(err) {
+          Logger.log("  - " + err.key + " (ID: " + err.fileId + ")");
+        });
       }
     } catch (e) {
       Logger.log("Error reading templates sheet: " + e.message);
@@ -225,6 +247,60 @@ function getInitialData() {
 
 function clearInitialDataCache() {
   CacheService.getScriptCache().remove('initialData_v1');
+}
+
+// Función de diagnóstico para verificar el estado de las plantillas
+function diagnosticarPlantillas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tplSheet = ss.getSheetByName('templates');
+  if (!tplSheet) {
+    SpreadsheetApp.getUi().alert('❌ Error: La hoja "templates" no existe.');
+    return;
+  }
+  
+  var tplData = tplSheet.getDataRange().getValues();
+  var report = "📋 DIAGNÓSTICO DE PLANTILLAS\n\n";
+  var errorCount = 0;
+  var successCount = 0;
+  
+  for (var i = 0; i < tplData.length; i++) {
+    var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
+    var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    
+    if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
+      if (key === "TPL_ORDEN" || key === "DOC_ANALISIS") {
+        report += "✓ " + key + " (Dinámico - OK)\n";
+        successCount++;
+      } else if (value) {
+        try {
+          var file = DriveApp.getFileById(value);
+          report += "✓ " + key + " → " + file.getName() + "\n";
+          successCount++;
+        } catch (e) {
+          report += "✗ " + key + " → ERROR: " + e.message + "\n";
+          report += "  ID: " + value + "\n";
+          errorCount++;
+        }
+      } else {
+        report += "⚠ " + key + " → Sin ID configurado\n";
+        errorCount++;
+      }
+    }
+  }
+  
+  report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+  report += "Total: " + (successCount + errorCount) + " plantillas\n";
+  report += "✓ Accesibles: " + successCount + "\n";
+  report += "✗ Con errores: " + errorCount + "\n";
+  
+  if (errorCount > 0) {
+    report += "\n⚠️ ACCIÓN REQUERIDA:\n";
+    report += "Verifique los IDs de las plantillas con error.\n";
+    report += "Asegúrese de que el script tenga permisos de acceso.";
+  }
+  
+  SpreadsheetApp.getUi().alert(report);
+  Logger.log(report);
 }
 
 function preparePrintPayload(orderNo, templateConfig) {
