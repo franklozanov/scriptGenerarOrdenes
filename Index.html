@@ -102,6 +102,19 @@
         }).getInitialData();
       };
 
+      // Función para comprimir PDF vía Cloud Function
+      async function compressPdfViaCloudFunction(base64Pdf) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(err => {
+              console.log('Error en compresión:', err);
+              resolve({ compressed_pdf: base64Pdf, skipped: true });
+            })
+            .compressPdfViaCloudFunction(base64Pdf, 'ebook');
+        });
+      }
+
       async function run() {
         const orderNo = document.getElementById('orderNo').value.trim();
         const userName = document.getElementById('userName').value.trim();
@@ -153,7 +166,22 @@
             for (const item of payload.pdfs) {
               status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
 
-              const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
+              // Comprimir PDFs dinámicos antes de procesar
+              let base64ToUse = item.base64;
+              if (item.key === "TPL_ORDEN" || item.key === "DOC_ANALISIS") {
+                status.innerText = `⏳ Comprimiendo ${item.key}...`;
+                try {
+                  const compressResult = await compressPdfViaCloudFunction(item.base64);
+                  if (compressResult && !compressResult.skipped) {
+                    base64ToUse = compressResult.compressed_pdf;
+                    console.log(`✓ ${item.key} comprimido: ${compressResult.original_size_kb}KB → ${compressResult.compressed_size_kb}KB`);
+                  }
+                } catch(e) {
+                  console.log(`⚠️ Error comprimiendo ${item.key}, usando original:`, e);
+                }
+              }
+
+              const bytes = Uint8Array.from(atob(base64ToUse), c => c.charCodeAt(0));
               for (let i = 0; i < item.copies; i++) {
                 const doc = await PDFDocument.load(bytes);
                 const pages = doc.getPages();
