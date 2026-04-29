@@ -1,0 +1,6 @@
+cual.gcloudignore
+.git
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
