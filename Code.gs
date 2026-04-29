@@ -1,9 +1,6 @@
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
-// URL de Cloud Function para compresión de PDFs (configurar después del despliegue)
-var CLOUD_FUNCTION_URL = PropertiesService.getScriptProperties().getProperty('CLOUD_FUNCTION_URL') || '';
-
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('🖨️ Impresión')
     .addItem('Imprimir Plantillas', 'openPrintDialog')
@@ -13,7 +10,6 @@ function onOpen() {
     .addItem('🔒 Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
     .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
-    .addItem('☁️ Configurar Cloud Function (Admin)', 'promptSetCloudFunctionUrl')
     .addToUi();
 }
 
@@ -563,86 +559,4 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
   sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
 
   return "Record updated successfully.";
-}
-
-// --- SISTEMA DE COMPRESIÓN DE PDFs ---
-
-function promptSetCloudFunctionUrl() {
-  withAdminAuth('Configurar Cloud Function (Admin)', function(ui) {
-    var urlResponse = ui.prompt('URL de Cloud Function', 'Pegue la URL de la Cloud Function desplegada para compresión de PDFs:', ui.ButtonSet.OK_CANCEL);
-    if (urlResponse.getSelectedButton() == ui.Button.OK) {
-      var url = urlResponse.getResponseText().trim();
-      PropertiesService.getScriptProperties().setProperty('CLOUD_FUNCTION_URL', url);
-      ui.alert('✅ Cloud Function configurada. Los PDFs dinámicos se comprimirán automáticamente antes de procesarse.');
-    }
-  });
-}
-
-function compressPdfViaCloudFunction(base64Pdf, quality) {
-  var cloudUrl = PropertiesService.getScriptProperties().getProperty('CLOUD_FUNCTION_URL');
-  
-  if (!cloudUrl) {
-    Logger.log('⚠️ Cloud Function no configurada. Usando PDF sin comprimir.');
-    return { compressed_pdf: base64Pdf, skipped: true };
-  }
-  
-  try {
-    var payload = {
-      pdf_base64: base64Pdf,
-      quality: quality || 'ebook'
-    };
-    
-    var options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-    
-    var response = UrlFetchApp.fetch(cloudUrl, options);
-    var result = JSON.parse(response.getContentText());
-    
-    if (response.getResponseCode() === 200 && result.compressed_pdf) {
-      Logger.log('✓ PDF comprimido: ' + result.original_size_kb + 'KB → ' + result.compressed_size_kb + 'KB (' + result.reduction_percent + '% reducción)');
-      return result;
-    } else {
-      Logger.log('⚠️ Error en compresión: ' + (result.error || 'Unknown error'));
-      return { compressed_pdf: base64Pdf, skipped: true };
-    }
-  } catch (e) {
-    Logger.log('⚠️ Error llamando Cloud Function: ' + e.message);
-    return { compressed_pdf: base64Pdf, skipped: true };
-  }
-}
-
-function processPdfComplete(payload) {
-  var cloudUrl = PropertiesService.getScriptProperties().getProperty('CLOUD_FUNCTION_URL_V2');
-  
-  if (!cloudUrl) {
-    throw new Error('Cloud Function V2 no configurada. Configure la URL en el menú Admin.');
-  }
-  
-  try {
-    var options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-    
-    Logger.log('Enviando ' + payload.pdfs.length + ' PDFs a Cloud Function para procesamiento completo...');
-    var response = UrlFetchApp.fetch(cloudUrl, options);
-    var result = JSON.parse(response.getContentText());
-    
-    if (response.getResponseCode() === 200 && result.pdf_base64) {
-      Logger.log('✓ PDF procesado: ' + result.original_size_kb + 'KB → ' + result.final_size_kb + 'KB (' + result.reduction_percent + '% reducción)');
-      Logger.log('✓ Total de páginas: ' + result.total_pages);
-      return result;
-    } else {
-      throw new Error('Error en Cloud Function: ' + (result.error || 'Unknown error'));
-    }
-  } catch (e) {
-    Logger.log('⚠️ Error llamando Cloud Function V2: ' + e.message);
-    throw e;
-  }
 }
