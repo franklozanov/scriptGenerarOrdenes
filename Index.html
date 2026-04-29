@@ -2,6 +2,7 @@
 <html>
   <head>
     <base target="_top">
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
     <style>
       body { font-family: 'Segoe UI', Roboto, sans-serif; padding: 20px; background: #f4f7f6; margin: 0; }
       .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: relative; }
@@ -28,9 +29,6 @@
       #loader { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; border-radius: 8px; }
       .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1a73e8; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 10px; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      
-      .progress-bar { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; margin-top: 10px; }
-      .progress-fill { height: 100%; background: #1a73e8; width: 0%; transition: width 0.3s; }
     </style>
   </head>
   <body>
@@ -53,27 +51,17 @@
 
       <div class="field">
         <label>Tipo de Impresión:</label>
-        <div style="display: flex; gap: 15px; margin-top: 5px;">
-          <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
-            <input type="radio" name="printType" value="Primera" checked style="margin-right: 5px;"> Primera Impresión
-          </label>
-          <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
-            <input type="radio" name="printType" value="Reimpresion" style="margin-right: 5px;"> Reimpresión
-          </label>
-        </div>
+        <label style="font-weight: normal; margin-right: 15px;"><input type="radio" name="printType" value="Adicional" checked> Impresión Inicial / Adicional</label>
+        <label style="font-weight: normal;"><input type="radio" name="printType" value="Reimpresion"> Reimpresión</label>
       </div>
 
       <div class="field">
-        <label>Plantillas a Imprimir:</label>
-        <div class="tpl-container" id="tplList"></div>
+        <label>Plantillas (cantidad de copias):</label>
+        <div class="hint">Ingrese el número de copias a imprimir para cada plantilla.</div>
+        <div id="tplList" class="tpl-container"></div>
       </div>
 
-      <button id="goBtn" onclick="run()" disabled>🖨️ Generar e Imprimir</button>
-      
-      <div class="progress-bar" id="progressBar" style="display: none;">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
-      
+      <button id="goBtn" onclick="run()" disabled>Generar PDF Combinado</button>
       <div id="status"></div>
     </div>
 
@@ -83,24 +71,22 @@
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
           globalTemplates = data.templates;
+          const defaultOnes = ["TPL_ORDEN", "TPL_CODIFICADO", "TPL_INSPECCION", "TPL_COC", "DOC_ANALISIS"];
 
-          const usersList = document.getElementById('usersList');
-          data.users.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u;
-            usersList.appendChild(opt);
-          });
-
-          const tplList = document.getElementById('tplList');
-          data.templates.forEach(t => {
-            const row = document.createElement('div');
-            row.className = 'tpl-row';
-            row.innerHTML = `
-              <span class="tpl-name" title="${t.name}">${t.name}</span>
-              <input type="number" id="val_${t.key}" min="0" max="99" value="1" ${t.hasAccess ? '' : 'disabled'}>
+          document.getElementById('tplList').innerHTML = data.templates.map(t => {
+            const defVal = defaultOnes.includes(t.key) ? "1" : "0";
+            const noAccess = t.hasAccess === false;
+            const rowStyle = noAccess ? 'opacity: 0.5;' : '';
+            const nameStyle = noAccess ? 'color: #d93025; font-style: italic;' : '';
+            return `
+              <div class="tpl-row" style="${rowStyle}">
+                <span class="tpl-name" title="${t.name}" style="${nameStyle}">${t.name}</span>
+                <input type="number" id="val_${t.key}" value="${defVal}" min="0" max="999" maxlength="3" ${noAccess ? 'disabled' : ''}>
+              </div>
             `;
-            tplList.appendChild(row);
-          });
+          }).join('');
+
+          document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u}">`).join('');
 
           const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
           if (noAccessCount > 0) {
@@ -115,17 +101,6 @@
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
         }).getInitialData();
       };
-
-      function updateProgress(percent, message) {
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
-        const status = document.getElementById('status');
-        
-        progressBar.style.display = 'block';
-        progressFill.style.width = percent + '%';
-        status.innerText = message;
-        status.className = 'info-text';
-      }
 
       async function run() {
         const orderNo = document.getElementById('orderNo').value.trim();
@@ -143,6 +118,7 @@
 
         if (!orderNo || !userName) { alert("Error: Complete los campos No. de Orden y Usuario."); return; }
 
+        // Verificar si hay plantillas sin acceso seleccionadas
         const noAccessSelected = config.filter(c => c.hasAccess === false);
         if (noAccessSelected.length > 0) {
           const names = noAccessSelected.map(c => globalTemplates.find(t => t.key === c.key).name).join('\n- ');
@@ -152,74 +128,176 @@
 
         const validUsers = Array.from(document.getElementById('usersList').options).map(opt => opt.value);
         if (!validUsers.includes(userName)) {
-          if (!confirm(`El usuario "${userName}" no está en la lista de usuarios registrados. ¿Desea continuar de todas formas?`)) return;
+          alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
+          document.getElementById('userName').focus();
+          return;
         }
 
-        if (config.length === 0) { alert("Error: Seleccione al menos una plantilla con cantidad mayor a 0."); return; }
+        if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 
         btn.disabled = true;
-        updateProgress(10, "⏳ Cargando PDFs desde Drive...");
+        status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
+        status.className = "info-text";
 
         google.script.run.withSuccessHandler(async (payload) => {
           try {
-            updateProgress(30, "⏳ Enviando a Cloud Function para procesamiento...");
+            status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
 
-            // Agregar datos adicionales al payload
-            payload.userName = userName;
-            payload.orderNo = orderNo;
+            const { PDFDocument, rgb, degrees } = PDFLib;
+            const finalPdf = await PDFDocument.create();
+            let totalPages = 0;
 
-            // Llamar a Cloud Function que procesa TODO
-            google.script.run
-              .withSuccessHandler(result => {
-                updateProgress(90, "⏳ Descargando PDF final...");
+            const now = new Date();
+            const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-                // Descargar PDF
-                const pdfBytes = Uint8Array.from(atob(result.pdf_base64), c => c.charCodeAt(0));
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(new Blob([pdfBytes], {type:'application/pdf'}));
-                link.download = `Orden_${orderNo}.pdf`;
-                link.click();
+            for (const item of payload.pdfs) {
+              status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
 
-                updateProgress(95, "🔄 Actualizando registro...");
+              const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
+              for (let i = 0; i < item.copies; i++) {
+                const doc = await PDFDocument.load(bytes);
+                const pages = doc.getPages();
 
-                // Actualizar trazabilidad
-                google.script.run.withSuccessHandler(msg => {
-                  updateProgress(100, "✅ Impresión completada exitosamente");
-                  status.className = "success-text";
+                if (item.key === "TPL_ORDEN") {
+                  const firstPage = pages[0];
+                  Object.keys(payload.coords).forEach(k => {
+                    firstPage.drawText(payload.formData[k] || "", { x: payload.coords[k].x, y: payload.coords[k].y, size: 10, color: rgb(0,0,0) });
+                  });
+                  // Aplanar formularios si existen (optimización para impresoras)
+                  try {
+                    const form = doc.getForm();
+                    if (form.getFields().length > 0) {
+                      form.flatten();
+                    }
+                  } catch(e) { /* No hay formularios */ }
+                } else if (item.key !== "DOC_ANALISIS") {
+                  const form = doc.getForm();
+                  Object.keys(payload.formData).forEach(k => { try { form.getTextField(k).setText(payload.formData[k]); } catch(e){} });
+                  form.flatten();
+                } else {
+                  // DOC_ANALISIS: también aplanar formularios si existen
+                  try {
+                    const form = doc.getForm();
+                    if (form.getFields().length > 0) {
+                      form.flatten();
+                    }
+                  } catch(e) { /* No hay formularios */ }
+                }
+
+                const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
+                copied.forEach(p => finalPdf.addPage(p));
+                totalPages += copied.length;
+
+                // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
+                console.log(`Plantilla: ${item.key}, Copia: ${i+1}, Páginas: ${copied.length}, Es impar: ${copied.length % 2 !== 0}`);
+                if (copied.length % 2 !== 0) {
+                  const blankPage = finalPdf.addPage([612, 792]);
+                  const blankText = "Esta página fue dejada en blanco de manera intencional";
+                  const textWidth = blankText.length * 5.5;
+                  const pageWidth = blankPage.getWidth();
+                  const pageHeight = blankPage.getHeight();
                   
-                  console.log(`✓ PDF generado: ${result.original_size_kb}KB → ${result.final_size_kb}KB (${result.reduction_percent}% reducción)`);
-                  console.log(`✓ Total de páginas: ${result.total_pages}`);
-                  
-                  setTimeout(() => google.script.host.close(), 2000);
-                }).withFailureHandler(err => {
-                  alert("Fallo al actualizar: " + err.message);
-                  status.innerText = "PDF descargado, pero falló el registro.";
-                  status.className = "error-text";
-                  btn.disabled = false;
-                }).updateTraceability(orderNo, userName, result.total_pages, printType);
-              })
-              .withFailureHandler(err => {
-                alert("Error procesando PDF: " + err.message);
-                status.innerText = "❌ Error: " + err.message;
-                status.className = "error-text";
-                btn.disabled = false;
-                document.getElementById('progressBar').style.display = 'none';
-              })
-              .processPdfComplete(payload);
+                  blankPage.drawText(blankText, {
+                    x: (pageWidth - textWidth) / 2,
+                    y: pageHeight / 2,
+                    size: 11,
+                    color: rgb(0.4, 0.4, 0.4)
+                  });
+                  totalPages += 1;
+                  console.log(`✓ Página en blanco añadida después de ${item.key}`);
+                }
+              }
+            }
 
-          } catch (error) {
-            alert("Error: " + error.message);
-            status.innerText = "❌ Error: " + error.message;
+            // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
+            const allPages = finalPdf.getPages();
+
+            allPages.forEach((p) => {
+              let { width, height } = p.getSize();
+              let currentRotation = p.getRotation().angle || 0;
+
+              if (width > height) {
+                currentRotation = (currentRotation + 90) % 360;
+                p.setRotation(degrees(currentRotation));
+
+                const temp = width;
+                width = height;
+                height = temp;
+              }
+
+              const footerLeftText = `Impreso por: ${userName} el ${formattedDate}   |   No. Orden: ${orderNo}`;
+              const footerRightText = "Pág. ____ de ____";
+
+              const drawVisualText = (text, vX, vY, size) => {
+                let normAngle = ((currentRotation % 360) + 360) % 360;
+                let mW = (normAngle === 90 || normAngle === 270) ? height : width;
+                let mH = (normAngle === 90 || normAngle === 270) ? width : height;
+
+                let lX, lY, tRot;
+                if (normAngle === 0) { lX = vX; lY = vY; tRot = 0; }
+                else if (normAngle === 90) { lX = mW - vY; lY = vX; tRot = 90; }
+                else if (normAngle === 180) { lX = mW - vX; lY = mH - vY; tRot = 180; }
+                else if (normAngle === 270) { lX = vY; lY = mH - vX; tRot = 270; }
+
+                p.drawText(text, {
+                  x: lX, y: lY, size: size,
+                  rotate: degrees(tRot),
+                  color: rgb(0,0,0)
+                });
+              };
+
+              drawVisualText(footerLeftText, 35, 20, 8);
+              drawVisualText(footerRightText, width - 130, 20, 8);
+            });
+
+            status.innerText = "⏳ Paso 4/4: Optimizando PDF para impresión...";
+
+            // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
+            try {
+              const finalForm = finalPdf.getForm();
+              if (finalForm.getFields().length > 0) {
+                console.log(`✓ Aplanando ${finalForm.getFields().length} campos de formulario en documento final`);
+                finalForm.flatten();
+              }
+            } catch(e) {
+              console.log('No hay formularios en documento final o ya están aplanados');
+            }
+
+            // Guardar con opciones optimizadas para compatibilidad con impresoras
+            const pdfData = await finalPdf.save({
+              useObjectStreams: false,  // Mejora compatibilidad con impresoras antiguas
+              addDefaultPage: false     // No agregar páginas adicionales
+            });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([pdfData], {type:'application/pdf'}));
+            link.download = `Orden_${orderNo}.pdf`;
+            link.click();
+
+            status.innerText = "🔄 Actualizando registro en la hoja...";
+
+            google.script.run.withSuccessHandler(msg => {
+              status.innerText = "✅ Impresión registrada correctamente.";
+              status.className = "success-text";
+              setTimeout(() => google.script.host.close(), 1500);
+            }).withFailureHandler(err => {
+              alert("Fallo al actualizar: " + err.message);
+              status.innerText = "PDF descargado, pero falló el registro.";
+              status.className = "error-text";
+              btn.disabled = false;
+            }).updateTraceability(orderNo, userName, totalPages, printType);
+
+          } catch (pdfError) {
+            alert("Error generando PDF: " + pdfError.message);
+            status.innerText = "Proceso cancelado.";
             status.className = "error-text";
             btn.disabled = false;
-            document.getElementById('progressBar').style.display = 'none';
           }
-        }).withFailureHandler(err => {
-          alert("Error preparando datos: " + err.message);
-          status.innerText = "❌ Error: " + err.message;
+
+        }).withFailureHandler(e => {
+          alert("Error del servidor: " + e.message);
+          status.innerText = "Proceso cancelado.";
           status.className = "error-text";
           btn.disabled = false;
-          document.getElementById('progressBar').style.display = 'none';
         }).preparePrintPayload(orderNo, config);
       }
     </script>

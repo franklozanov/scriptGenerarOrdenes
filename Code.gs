@@ -5,9 +5,9 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('🖨️ Impresión')
     .addItem('Imprimir Plantillas', 'openPrintDialog')
     .addSeparator()
-    .addItem('🔍 Diagnosticar Plantillas', 'diagnosticarPlantillas')
+    .addItem('� Diagnosticar Plantillas', 'diagnosticarPlantillas')
     .addSeparator()
-    .addItem('🔒 Bloquear Hojas (Admin)', 'promptLock')
+    .addItem('� Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
     .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
     .addToUi();
