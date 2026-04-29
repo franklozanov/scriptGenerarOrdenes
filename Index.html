@@ -145,6 +145,15 @@
 
             const { PDFDocument, rgb, degrees } = PDFLib;
             const finalPdf = await PDFDocument.create();
+            
+            // Configurar documento para máxima compatibilidad con impresoras
+            finalPdf.setTitle('');
+            finalPdf.setAuthor('');
+            finalPdf.setSubject('');
+            finalPdf.setKeywords([]);
+            finalPdf.setProducer('');
+            finalPdf.setCreator('Sistema QMS');
+            
             let totalPages = 0;
 
             const now = new Date();
@@ -155,34 +164,64 @@
 
               const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
               for (let i = 0; i < item.copies; i++) {
-                const doc = await PDFDocument.load(bytes);
+                // Cargar PDF sin preservar objetos innecesarios
+                const doc = await PDFDocument.load(bytes, { 
+                  ignoreEncryption: true,
+                  updateMetadata: false 
+                });
                 const pages = doc.getPages();
 
                 if (item.key === "TPL_ORDEN") {
                   const firstPage = pages[0];
                   Object.keys(payload.coords).forEach(k => {
-                    firstPage.drawText(payload.formData[k] || "", { x: payload.coords[k].x, y: payload.coords[k].y, size: 10, color: rgb(0,0,0) });
+                    firstPage.drawText(payload.formData[k] || "", { 
+                      x: payload.coords[k].x, 
+                      y: payload.coords[k].y, 
+                      size: 10, 
+                      color: rgb(0,0,0),
+                      opacity: 1.0  // Asegurar opacidad completa
+                    });
                   });
                   // Aplanar formularios si existen (optimización para impresoras)
                   try {
                     const form = doc.getForm();
                     if (form.getFields().length > 0) {
+                      console.log(`✓ Aplanando ${form.getFields().length} campos en TPL_ORDEN`);
                       form.flatten();
                     }
                   } catch(e) { /* No hay formularios */ }
                 } else if (item.key !== "DOC_ANALISIS") {
-                  const form = doc.getForm();
-                  Object.keys(payload.formData).forEach(k => { try { form.getTextField(k).setText(payload.formData[k]); } catch(e){} });
-                  form.flatten();
+                  try {
+                    const form = doc.getForm();
+                    Object.keys(payload.formData).forEach(k => { 
+                      try { 
+                        const field = form.getTextField(k);
+                        field.setText(payload.formData[k]);
+                        field.enableReadOnly();  // Marcar como solo lectura antes de aplanar
+                      } catch(e){} 
+                    });
+                    console.log(`✓ Aplanando formulario en ${item.key}`);
+                    form.flatten();
+                  } catch(e) { 
+                    console.log(`No hay formularios en ${item.key}`);
+                  }
                 } else {
                   // DOC_ANALISIS: también aplanar formularios si existen
                   try {
                     const form = doc.getForm();
                     if (form.getFields().length > 0) {
+                      console.log(`✓ Aplanando ${form.getFields().length} campos en DOC_ANALISIS`);
                       form.flatten();
                     }
                   } catch(e) { /* No hay formularios */ }
                 }
+                
+                // Eliminar metadatos innecesarios del documento fuente
+                doc.setTitle('');
+                doc.setAuthor('');
+                doc.setSubject('');
+                doc.setKeywords([]);
+                doc.setProducer('');
 
                 const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
                 copied.forEach(p => finalPdf.addPage(p));
@@ -201,7 +240,8 @@
                     x: (pageWidth - textWidth) / 2,
                     y: pageHeight / 2,
                     size: 11,
-                    color: rgb(0.4, 0.4, 0.4)
+                    color: rgb(0.4, 0.4, 0.4),
+                    opacity: 1.0
                   });
                   totalPages += 1;
                   console.log(`✓ Página en blanco añadida después de ${item.key}`);
@@ -242,7 +282,8 @@
                 p.drawText(text, {
                   x: lX, y: lY, size: size,
                   rotate: degrees(tRot),
-                  color: rgb(0,0,0)
+                  color: rgb(0,0,0),
+                  opacity: 1.0
                 });
               };
 
@@ -263,11 +304,15 @@
               console.log('No hay formularios en documento final o ya están aplanados');
             }
 
-            // Guardar con opciones optimizadas para compatibilidad con impresoras
+            // Guardar con opciones optimizadas para máxima compatibilidad con impresoras
+            console.log('✓ Guardando PDF con configuración optimizada para impresión');
             const pdfData = await finalPdf.save({
-              useObjectStreams: false,  // Mejora compatibilidad con impresoras antiguas
-              addDefaultPage: false     // No agregar páginas adicionales
+              useObjectStreams: false,        // Desactiva compresión de objetos (mejor compatibilidad)
+              addDefaultPage: false,          // No agregar páginas adicionales
+              objectsPerTick: 50,             // Procesar objetos en lotes pequeños
+              updateFieldAppearances: false   // No actualizar apariencias (ya están aplanadas)
             });
+            console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
             const link = document.createElement('a');
             link.href = URL.createObjectURL(new Blob([pdfData], {type:'application/pdf'}));
             link.download = `Orden_${orderNo}.pdf`;
