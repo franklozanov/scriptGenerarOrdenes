@@ -469,7 +469,6 @@
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
           globalTemplates = data.templates;
-          const defaultOnes = ["TPL_ORDEN", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES", "DOC_ANALISIS"];
 
           // Store preloaded static template base64 strings in memory
           data.templates.forEach(t => {
@@ -480,7 +479,13 @@
           });
 
           document.getElementById('tplList').innerHTML = data.templates.map(t => {
-            const defVal = defaultOnes.includes(t.key) ? "1" : "0";
+            let defVal = "1"; // Valor por defecto general
+            if (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") {
+              defVal = "0";
+            } else if (t.key === "TPL_CONTROLES") {
+              defVal = "2";
+            }
+            
             const noAccess = t.hasAccess === false;
             const rowStyle = noAccess ? 'opacity: 0.5;' : '';
             const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
