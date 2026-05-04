@@ -68,6 +68,90 @@
     <script>
       let globalTemplates = [];
       let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
+      let preloadState = { orderNo: null, data: null, isFetching: false, error: null }; // Background preloading state
+      let debounceTimer = null; // Timer for debounce function
+
+      // Debounce function to avoid multiple backend calls while typing
+      function debounce(func, delay) {
+        return function(...args) {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => func.apply(this, args), delay);
+        };
+      }
+
+      // Background preloading function
+      function preloadOrderData(orderNo) {
+        const currentOrderNo = orderNo.trim();
+        
+        // Clear any existing error if user is typing
+        if (preloadState.orderNo === currentOrderNo && preloadState.error) {
+          preloadState.error = null;
+        }
+        
+        // If already fetching for this order, don't start another request
+        if (preloadState.isFetching && preloadState.orderNo === currentOrderNo) {
+          return;
+        }
+        
+        // If already loaded for this order, no need to fetch again
+        if (preloadState.orderNo === currentOrderNo && preloadState.data) {
+          return;
+        }
+        
+        // Start fetching
+        preloadState.orderNo = currentOrderNo;
+        preloadState.isFetching = true;
+        preloadState.error = null;
+        
+        // Show subtle status message
+        const status = document.getElementById('status');
+        if (status && !status.innerText.includes("Impresión registrada")) {
+          status.innerText = "🔍 Buscando datos de la orden...";
+          status.className = "info-text";
+        }
+        
+        google.script.run
+          .withSuccessHandler(response => {
+            // Race condition control: only accept response if it matches current orderNo
+            const currentInput = document.getElementById('orderNo').value.trim();
+            if (currentInput !== currentOrderNo) {
+              console.log(`⚠️ Descartando respuesta obsoleta para orden ${currentOrderNo} (actual: ${currentInput})`);
+              return;
+            }
+            
+            preloadState.data = response;
+            preloadState.isFetching = false;
+            preloadState.error = null;
+            
+            console.log(`✓ Datos precargados para orden ${currentOrderNo}`);
+            
+            // Update status to show data is ready
+            if (status && !status.innerText.includes("Impresión registrada")) {
+              status.innerText = "✅ Datos de la orden listos para generar PDF";
+              status.className = "success-text";
+            }
+          })
+          .withFailureHandler(error => {
+            // Race condition control: only accept error if it matches current orderNo
+            const currentInput = document.getElementById('orderNo').value.trim();
+            if (currentInput !== currentOrderNo) {
+              console.log(`⚠️ Descartando error obsoleto para orden ${currentOrderNo} (actual: ${currentInput})`);
+              return;
+            }
+            
+            preloadState.isFetching = false;
+            preloadState.error = error.message;
+            
+            console.error(`Error precargando orden ${currentOrderNo}:`, error.message);
+            
+            // Show error in status
+            if (status) {
+              status.innerText = `⚠️ Error: ${error.message}`;
+              status.className = "error-text";
+            }
+          })
+          .fetchOrderData(currentOrderNo);
+      }
 
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
@@ -106,10 +190,270 @@
 
           document.getElementById('loader').style.display = 'none';
           document.getElementById('goBtn').disabled = false;
+          
+          // Add event listener for background preloading on orderNo input
+          const orderNoInput = document.getElementById('orderNo');
+          const debouncedPreload = debounce((value) => {
+            if (value.trim().length >= 3) { // Only preload if at least 3 characters
+              preloadOrderData(value);
+            }
+          }, 600);
+          
+          orderNoInput.addEventListener('input', (e) => {
+            debouncedPreload(e.target.value);
+          });
+          
+          orderNoInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              document.getElementById('goBtn').click();
+            }
+          });
         }).withFailureHandler(e => {
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
         }).getInitialData();
       };
+
+      // PDF generation processing function (extracted for reuse)
+      async function processPdfGeneration(payload, config, orderNo, userName, printType, btn, status) {
+        try {
+          status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
+
+          // Merge dynamic templates from payload with preloaded static templates
+          // Respect the original order and copies from config
+          const staticTemplateKeys = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
+          
+          // Build the final pdfs array by iterating through config (which has correct order and copies)
+          const finalPdfs = [];
+          config.forEach(cfg => {
+            if (staticTemplateKeys.includes(cfg.key)) {
+              // Static template - use preloaded base64
+              if (preloadedStaticPdfs[cfg.key]) {
+                finalPdfs.push({
+                  key: cfg.key,
+                  base64: preloadedStaticPdfs[cfg.key],
+                  copies: cfg.copies
+                });
+                console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+              } else {
+                throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
+              }
+            } else {
+              // Dynamic template - use from payload
+              const dynamicPdf = payload.pdfs.find(p => p.key === cfg.key);
+              if (dynamicPdf) {
+                finalPdfs.push({
+                  key: cfg.key,
+                  base64: dynamicPdf.base64,
+                  copies: cfg.copies
+                });
+                console.log(`✓ Usando plantilla dinámica del servidor: ${cfg.key}`);
+              } else {
+                throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
+              }
+            }
+          });
+          
+          // Replace payload.pdfs with the merged array
+          payload.pdfs = finalPdfs;
+
+          const { PDFDocument, rgb, degrees } = PDFLib;
+          const finalPdf = await PDFDocument.create();
+          
+          // Configurar documento para máxima compatibilidad con impresoras
+          finalPdf.setTitle('');
+          finalPdf.setAuthor('');
+          finalPdf.setSubject('');
+          finalPdf.setKeywords([]);
+          finalPdf.setProducer('');
+          finalPdf.setCreator('Sistema QMS');
+          
+          let totalPages = 0;
+
+          const now = new Date();
+          const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+          for (const item of payload.pdfs) {
+            status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
+
+            const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
+            for (let i = 0; i < item.copies; i++) {
+              // Cargar PDF sin preservar objetos innecesarios
+              const doc = await PDFDocument.load(bytes, { 
+                ignoreEncryption: true,
+                updateMetadata: false 
+              });
+              const pages = doc.getPages();
+
+              if (item.key === "TPL_ORDEN") {
+                const firstPage = pages[0];
+                Object.keys(payload.coords).forEach(k => {
+                  firstPage.drawText(payload.formData[k] || "", { 
+                    x: payload.coords[k].x, 
+                    y: payload.coords[k].y, 
+                    size: 10, 
+                    color: rgb(0,0,0),
+                    opacity: 1.0  // Asegurar opacidad completa
+                  });
+                });
+              } else if (item.key !== "DOC_ANALISIS") {
+                try {
+                  const form = doc.getForm();
+                  Object.keys(payload.formData).forEach(k => { 
+                    try { 
+                      const field = form.getTextField(k);
+                      field.setText(payload.formData[k]);
+                      field.enableReadOnly();  // Marcar como solo lectura antes de aplanar
+                    } catch(e){} 
+                  });
+                } catch(e) { 
+                  console.log(`No hay formularios en ${item.key}`);
+                }
+              }
+              
+              // Eliminar metadatos innecesarios del documento fuente
+              doc.setTitle('');
+              doc.setAuthor('');
+              doc.setSubject('');
+              doc.setKeywords([]);
+              doc.setProducer('');
+
+              const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
+              copied.forEach(p => finalPdf.addPage(p));
+              totalPages += copied.length;
+
+              // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
+              console.log(`Plantilla: ${item.key}, Copia: ${i+1}, Páginas: ${copied.length}, Es impar: ${copied.length % 2 !== 0}`);
+              if (copied.length % 2 !== 0) {
+                const blankPage = finalPdf.addPage([612, 792]);
+                const blankText = "Esta página fue dejada en blanco de manera intencional";
+                const textWidth = blankText.length * 5.5;
+                const pageWidth = blankPage.getWidth();
+                const pageHeight = blankPage.getHeight();
+                
+                blankPage.drawText(blankText, {
+                  x: (pageWidth - textWidth) / 2,
+                  y: pageHeight / 2,
+                  size: 11,
+                  color: rgb(0.4, 0.4, 0.4),
+                  opacity: 1.0
+                });
+                totalPages += 1;
+                console.log(`✓ Página en blanco añadida después de ${item.key}`);
+              }
+            }
+          }
+
+          // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
+          const allPages = finalPdf.getPages();
+
+          allPages.forEach((p) => {
+            let { width, height } = p.getSize();
+            let currentRotation = p.getRotation().angle || 0;
+
+            if (width > height) {
+              currentRotation = (currentRotation + 90) % 360;
+              p.setRotation(degrees(currentRotation));
+
+              const temp = width;
+              width = height;
+              height = temp;
+            }
+
+            const footerLeftText = `Impreso por: ${userName} el ${formattedDate}   |   No. Orden: ${orderNo}`;
+            const footerRightText = "Pág. ____ de ____";
+
+            const drawVisualText = (text, vX, vY, size) => {
+              let normAngle = ((currentRotation % 360) + 360) % 360;
+              let mW = (normAngle === 90 || normAngle === 270) ? height : width;
+              let mH = (normAngle === 90 || normAngle === 270) ? width : height;
+
+              let lX, lY, tRot;
+              if (normAngle === 0) { lX = vX; lY = vY; tRot = 0; }
+              else if (normAngle === 90) { lX = mW - vY; lY = vX; tRot = 90; }
+              else if (normAngle === 180) { lX = mW - vX; lY = mH - vY; tRot = 180; }
+              else if (normAngle === 270) { lX = vY; lY = mH - vX; tRot = 270; }
+
+              p.drawText(text, {
+                x: lX, y: lY, size: size,
+                rotate: degrees(tRot),
+                color: rgb(0,0,0),
+                opacity: 1.0
+              });
+            };
+
+            drawVisualText(footerLeftText, 35, 20, 8);
+            drawVisualText(footerRightText, width - 130, 20, 8);
+          });
+
+          status.innerText = "⏳ Paso 4/4: Optimizando PDF para impresión...";
+
+          // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
+          try {
+            const finalForm = finalPdf.getForm();
+            if (finalForm.getFields().length > 0) {
+              console.log(`✓ Aplanando ${finalForm.getFields().length} campos de formulario en documento final`);
+              finalForm.flatten();
+            }
+          } catch(e) {
+            console.log('No hay formularios en documento final o ya están aplanados');
+          }
+
+          // Purgar el diccionario AcroForm para evitar saturación de memoria en impresoras
+          try {
+            finalPdf.catalog.delete(PDFLib.PDFName.of('AcroForm'));
+            console.log('✓ Diccionario AcroForm purgado del catálogo maestro');
+          } catch(e) {
+            console.log('No se pudo purgar AcroForm:', e);
+          }
+
+          // Guardar con opciones optimizadas para máxima compatibilidad con impresoras
+          console.log('✓ Guardando PDF con configuración optimizada para impresión');
+          const pdfData = await finalPdf.save({
+            useObjectStreams: true,         // Activa compresión de objetos (FlateDecode)
+            addDefaultPage: false,          // No agregar páginas adicionales
+            objectsPerTick: 50,             // Procesar objetos en lotes pequeños
+            updateFieldAppearances: false   // No actualizar apariencias (ya están aplanadas)
+          });
+          console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(new Blob([pdfData], {type:'application/pdf'}));
+          link.download = `Orden_${orderNo}.pdf`;
+          link.click();
+
+          status.innerText = "🔄 Actualizando registro en la hoja...";
+
+          google.script.run.withSuccessHandler(msg => {
+            // Continuous workflow: don't close modal, reset for next order
+            status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
+            status.className = "success-text";
+            
+            // Reset state for next print
+            document.getElementById('orderNo').value = '';
+            preloadState = { orderNo: null, data: null, isFetching: false, error: null };
+            btn.disabled = false;
+            document.getElementById('orderNo').focus();
+            
+            // Clear status message after 3 seconds
+            setTimeout(() => {
+              if (status.innerText.includes("Listo para la siguiente orden")) {
+                status.innerText = '';
+              }
+            }, 3000);
+          }).withFailureHandler(err => {
+            alert("Fallo al actualizar: " + err.message);
+            status.innerText = "PDF descargado, pero falló el registro.";
+            status.className = "error-text";
+            btn.disabled = false;
+          }).updateTraceability(orderNo, userName, totalPages, printType);
+
+        } catch (pdfError) {
+          alert("Error generando PDF: " + pdfError.message);
+          status.innerText = "Proceso cancelado.";
+          status.className = "error-text";
+          btn.disabled = false;
+        }
+      }
 
       async function run() {
         const orderNo = document.getElementById('orderNo').value.trim();
@@ -145,250 +489,65 @@
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 
         btn.disabled = true;
-        status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
-        status.className = "info-text";
-
-        google.script.run.withSuccessHandler(async (payload) => {
-          try {
-            status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
-
-            // Merge dynamic templates from payload with preloaded static templates
-            // Respect the original order and copies from config
-            const staticTemplateKeys = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
-            
-            // Build the final pdfs array by iterating through config (which has correct order and copies)
-            const finalPdfs = [];
-            config.forEach(cfg => {
-              if (staticTemplateKeys.includes(cfg.key)) {
-                // Static template - use preloaded base64
-                if (preloadedStaticPdfs[cfg.key]) {
-                  finalPdfs.push({
-                    key: cfg.key,
-                    base64: preloadedStaticPdfs[cfg.key],
-                    copies: cfg.copies
-                  });
-                  console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
-                } else {
-                  console.warn(`⚠️ Plantilla estática ${cfg.key} no encontrada en memoria precargada`);
-                }
-              } else {
-                // Dynamic template - use from payload
-                const dynamicPdf = payload.pdfs.find(p => p.key === cfg.key);
-                if (dynamicPdf) {
-                  finalPdfs.push({
-                    key: cfg.key,
-                    base64: dynamicPdf.base64,
-                    copies: cfg.copies
-                  });
-                  console.log(`✓ Usando plantilla dinámica del servidor: ${cfg.key}`);
-                }
-              }
-            });
-            
-            // Replace payload.pdfs with the merged array
-            payload.pdfs = finalPdfs;
-
-            const { PDFDocument, rgb, degrees } = PDFLib;
-            const finalPdf = await PDFDocument.create();
-            
-            // Configurar documento para máxima compatibilidad con impresoras
-            finalPdf.setTitle('');
-            finalPdf.setAuthor('');
-            finalPdf.setSubject('');
-            finalPdf.setKeywords([]);
-            finalPdf.setProducer('');
-            finalPdf.setCreator('Sistema QMS');
-            
-            let totalPages = 0;
-
-            const now = new Date();
-            const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-            for (const item of payload.pdfs) {
-              status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
-
-              const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
-              for (let i = 0; i < item.copies; i++) {
-                // Cargar PDF sin preservar objetos innecesarios
-                const doc = await PDFDocument.load(bytes, { 
-                  ignoreEncryption: true,
-                  updateMetadata: false 
-                });
-                const pages = doc.getPages();
-
-                if (item.key === "TPL_ORDEN") {
-                  const firstPage = pages[0];
-                  Object.keys(payload.coords).forEach(k => {
-                    firstPage.drawText(payload.formData[k] || "", { 
-                      x: payload.coords[k].x, 
-                      y: payload.coords[k].y, 
-                      size: 10, 
-                      color: rgb(0,0,0),
-                      opacity: 1.0  // Asegurar opacidad completa
-                    });
-                  });
-                  // Aplanar formularios si existen (optimización para impresoras)
-                  try {
-                    const form = doc.getForm();
-                    if (form.getFields().length > 0) {
-                      console.log(`✓ Aplanando ${form.getFields().length} campos en TPL_ORDEN`);
-                      form.flatten();
-                    }
-                  } catch(e) { /* No hay formularios */ }
-                } else if (item.key !== "DOC_ANALISIS") {
-                  try {
-                    const form = doc.getForm();
-                    Object.keys(payload.formData).forEach(k => { 
-                      try { 
-                        const field = form.getTextField(k);
-                        field.setText(payload.formData[k]);
-                        field.enableReadOnly();  // Marcar como solo lectura antes de aplanar
-                      } catch(e){} 
-                    });
-                    console.log(`✓ Aplanando formulario en ${item.key}`);
-                    form.flatten();
-                  } catch(e) { 
-                    console.log(`No hay formularios en ${item.key}`);
-                  }
-                } else {
-                  // DOC_ANALISIS: también aplanar formularios si existen
-                  try {
-                    const form = doc.getForm();
-                    if (form.getFields().length > 0) {
-                      console.log(`✓ Aplanando ${form.getFields().length} campos en DOC_ANALISIS`);
-                      form.flatten();
-                    }
-                  } catch(e) { /* No hay formularios */ }
-                }
-                
-                // Eliminar metadatos innecesarios del documento fuente
-                doc.setTitle('');
-                doc.setAuthor('');
-                doc.setSubject('');
-                doc.setKeywords([]);
-                doc.setProducer('');
-
-                const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
-                copied.forEach(p => finalPdf.addPage(p));
-                totalPages += copied.length;
-
-                // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
-                console.log(`Plantilla: ${item.key}, Copia: ${i+1}, Páginas: ${copied.length}, Es impar: ${copied.length % 2 !== 0}`);
-                if (copied.length % 2 !== 0) {
-                  const blankPage = finalPdf.addPage([612, 792]);
-                  const blankText = "Esta página fue dejada en blanco de manera intencional";
-                  const textWidth = blankText.length * 5.5;
-                  const pageWidth = blankPage.getWidth();
-                  const pageHeight = blankPage.getHeight();
-                  
-                  blankPage.drawText(blankText, {
-                    x: (pageWidth - textWidth) / 2,
-                    y: pageHeight / 2,
-                    size: 11,
-                    color: rgb(0.4, 0.4, 0.4),
-                    opacity: 1.0
-                  });
-                  totalPages += 1;
-                  console.log(`✓ Página en blanco añadida después de ${item.key}`);
-                }
+        
+        // Check if preloaded data is available and matches current order
+        if (preloadState.orderNo === orderNo && preloadState.data) {
+          // Data is already preloaded - use it immediately
+          status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
+          status.className = "info-text";
+          console.log(`✓ Usando datos precargados para orden ${orderNo}`);
+          processPdfGeneration(preloadState.data, config, orderNo, userName, printType, btn, status);
+        } else if (preloadState.isFetching && preloadState.orderNo === orderNo) {
+          // Data is currently being fetched - wait for it
+          status.innerText = "⏳ Esperando datos del servidor...";
+          status.className = "info-text";
+          
+          // Poll for completion (simple approach)
+          const checkInterval = setInterval(() => {
+            if (!preloadState.isFetching) {
+              clearInterval(checkInterval);
+              if (preloadState.data && preloadState.orderNo === orderNo) {
+                status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
+                processPdfGeneration(preloadState.data, config, orderNo, userName, printType, btn, status);
+              } else if (preloadState.error) {
+                alert("Error al cargar datos: " + preloadState.error);
+                status.innerText = "Proceso cancelado.";
+                status.className = "error-text";
+                btn.disabled = false;
               }
             }
-
-            // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
-            const allPages = finalPdf.getPages();
-
-            allPages.forEach((p) => {
-              let { width, height } = p.getSize();
-              let currentRotation = p.getRotation().angle || 0;
-
-              if (width > height) {
-                currentRotation = (currentRotation + 90) % 360;
-                p.setRotation(degrees(currentRotation));
-
-                const temp = width;
-                width = height;
-                height = temp;
-              }
-
-              const footerLeftText = `Impreso por: ${userName} el ${formattedDate}   |   No. Orden: ${orderNo}`;
-              const footerRightText = "Pág. ____ de ____";
-
-              const drawVisualText = (text, vX, vY, size) => {
-                let normAngle = ((currentRotation % 360) + 360) % 360;
-                let mW = (normAngle === 90 || normAngle === 270) ? height : width;
-                let mH = (normAngle === 90 || normAngle === 270) ? width : height;
-
-                let lX, lY, tRot;
-                if (normAngle === 0) { lX = vX; lY = vY; tRot = 0; }
-                else if (normAngle === 90) { lX = mW - vY; lY = vX; tRot = 90; }
-                else if (normAngle === 180) { lX = mW - vX; lY = mH - vY; tRot = 180; }
-                else if (normAngle === 270) { lX = vY; lY = mH - vX; tRot = 270; }
-
-                p.drawText(text, {
-                  x: lX, y: lY, size: size,
-                  rotate: degrees(tRot),
-                  color: rgb(0,0,0),
-                  opacity: 1.0
-                });
-              };
-
-              drawVisualText(footerLeftText, 35, 20, 8);
-              drawVisualText(footerRightText, width - 130, 20, 8);
-            });
-
-            status.innerText = "⏳ Paso 4/4: Optimizando PDF para impresión...";
-
-            // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
-            try {
-              const finalForm = finalPdf.getForm();
-              if (finalForm.getFields().length > 0) {
-                console.log(`✓ Aplanando ${finalForm.getFields().length} campos de formulario en documento final`);
-                finalForm.flatten();
-              }
-            } catch(e) {
-              console.log('No hay formularios en documento final o ya están aplanados');
-            }
-
-            // Guardar con opciones optimizadas para máxima compatibilidad con impresoras
-            console.log('✓ Guardando PDF con configuración optimizada para impresión');
-            const pdfData = await finalPdf.save({
-              useObjectStreams: false,        // Desactiva compresión de objetos (mejor compatibilidad)
-              addDefaultPage: false,          // No agregar páginas adicionales
-              objectsPerTick: 50,             // Procesar objetos en lotes pequeños
-              updateFieldAppearances: false   // No actualizar apariencias (ya están aplanadas)
-            });
-            console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(new Blob([pdfData], {type:'application/pdf'}));
-            link.download = `Orden_${orderNo}.pdf`;
-            link.click();
-
-            status.innerText = "🔄 Actualizando registro en la hoja...";
-
-            google.script.run.withSuccessHandler(msg => {
-              status.innerText = "✅ Impresión registrada correctamente.";
-              status.className = "success-text";
-              setTimeout(() => google.script.host.close(), 1500);
-            }).withFailureHandler(err => {
-              alert("Fallo al actualizar: " + err.message);
-              status.innerText = "PDF descargado, pero falló el registro.";
+          }, 100);
+          
+          // Timeout after 10 seconds
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            if (preloadState.isFetching) {
+              alert("Tiempo de espera agotado. Por favor, intente nuevamente.");
+              status.innerText = "Proceso cancelado.";
               status.className = "error-text";
               btn.disabled = false;
-            }).updateTraceability(orderNo, userName, totalPages, printType);
-
-          } catch (pdfError) {
-            alert("Error generando PDF: " + pdfError.message);
-            status.innerText = "Proceso cancelado.";
-            status.className = "error-text";
-            btn.disabled = false;
-          }
-
-        }).withFailureHandler(e => {
-          alert("Error del servidor: " + e.message);
+            }
+          }, 10000);
+        } else if (preloadState.error && preloadState.orderNo === orderNo) {
+          // There was an error fetching this order
+          alert("Error al cargar datos: " + preloadState.error);
           status.innerText = "Proceso cancelado.";
           status.className = "error-text";
           btn.disabled = false;
-        }).preparePrintPayload(orderNo, config);
+        } else {
+          // No preloaded data - fetch normally
+          status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
+          status.className = "info-text";
+
+          google.script.run.withSuccessHandler(async (payload) => {
+            processPdfGeneration(payload, config, orderNo, userName, printType, btn, status);
+          }).withFailureHandler(e => {
+            alert("Error del servidor: " + e.message);
+            status.innerText = "Proceso cancelado.";
+            status.className = "error-text";
+            btn.disabled = false;
+          }).preparePrintPayload(orderNo, config);
+        }
       }
     </script>
   </body>

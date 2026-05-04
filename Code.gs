@@ -150,7 +150,20 @@ function getInitialData() {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v1');
     if (cached) {
-      try { return JSON.parse(cached); } catch (e) {
+      try { 
+        var parsedData = JSON.parse(cached); 
+        var staticTemplates = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
+        for (var i = 0; i < parsedData.templates.length; i++) {
+          var t = parsedData.templates[i];
+          if (staticTemplates.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
+            var file = DriveApp.getFileById(t.fileId);
+            t.base64 = Utilities.base64Encode(file.getBlob().getBytes());
+          } else {
+            t.base64 = null;
+          }
+        }
+        return parsedData; 
+      } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
       }
     }
@@ -262,7 +275,15 @@ function getInitialData() {
     }
 
     var result = { users: users, templates: templates };
-    try { cache.put('initialData_v1', JSON.stringify(result), 600); } catch (e) {
+    
+    // Clonar templates sin base64 para no exceder el límite de 100KB de CacheService
+    var dataToCache = { users: users, templates: [] };
+    for (var idx = 0; idx < templates.length; idx++) {
+      var t = templates[idx];
+      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, hasAccess: t.hasAccess });
+    }
+    
+    try { cache.put('initialData_v1', JSON.stringify(dataToCache), 600); } catch (e) {
       Logger.log("Error caching data: " + e.message);
     }
     return result;
@@ -374,6 +395,114 @@ function diagnosticarPlantillas() {
   
   SpreadsheetApp.getUi().alert(report);
   Logger.log(report);
+}
+
+function fetchOrderData(orderNo) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dataSheet = ss.getSheetByName('Ordenes');
+  if (!dataSheet) throw new Error("Sheet 'Ordenes' not found.");
+  var headers = dataSheet.getRange(1, 1, 1, dataSheet.getLastColumn()).getValues()[0];
+  
+  var tplSheet = ss.getSheetByName('templates');
+  var tplData = tplSheet.getDataRange().getValues();
+  
+  var folderId = "";
+  var folderAnalysisId = "";
+  var dynamicCoords = {
+    "Fabricante": { x: 450, y: 585 },
+    "Exp":        { x: 360, y: 495 },
+    "NoAnalisis": { x: 155, y: 385 }
+  };
+
+  function parseXY(str) {
+    var matchX = str.match(/x:\s*([0-9.]+)/i);
+    var matchY = str.match(/y:\s*([0-9.]+)/i);
+    return { x: matchX ? parseFloat(matchX[1]) : 0, y: matchY ? parseFloat(matchY[1]) : 0 };
+  }
+  
+  for (var i = 0; i < tplData.length; i++) {
+    var k = tplData[i][0].toString().trim();
+    var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    if (k === "ID_FOLDER") folderId = v;
+    if (k === "DOC_ANALISIS") folderAnalysisId = v;
+    if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);
+    if (k === "COORD_EXP" && v) dynamicCoords["Exp"] = parseXY(v);
+    if (k === "COORD_NoANALISIS" && v) dynamicCoords["NoAnalisis"] = parseXY(v);
+  }
+
+  var colNoOrden = headers.indexOf("NoOrden") + 1;
+  var orderValues = dataSheet.getRange(1, colNoOrden, dataSheet.getLastRow(), 1).getValues();
+  var targetRowIndex = -1;
+  
+  for (var idx = 1; idx < orderValues.length; idx++) {
+    if (orderValues[idx][0] == orderNo) { targetRowIndex = idx + 1; break; }
+  }
+  
+  if (targetRowIndex === -1) throw new Error("Order " + orderNo + " not found in 'Ordenes' sheet.");
+  var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
+
+  var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
+  var formData = {};
+  var noAnalisisStr = "";
+  
+  fieldNames.forEach(function(name) {
+    var hIdx = headers.indexOf(name);
+    if (hIdx !== -1) {
+      var val = targetRowData[hIdx];
+      if (name === "NoAnalisis" && val != null) noAnalisisStr = val.toString().trim();
+      
+      if (val instanceof Date) {
+        formData[name] = (name === "Exp") ? Utilities.formatDate(val, Session.getScriptTimeZone(), "MM/yyyy") 
+                                          : Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } else {
+        formData[name] = (val != null) ? val.toString() : "";
+      }
+    }
+  });
+
+  // Fetch only dynamic templates (TPL_ORDEN and DOC_ANALISIS)
+  var dynamicPdfs = [];
+  
+  // Try to fetch TPL_ORDEN
+  try {
+    if (folderId) {
+      var folder = DriveApp.getFolderById(folderId);
+      var files = folder.getFilesByName(orderNo + ".pdf");
+      if (files.hasNext()) {
+        var file = files.next();
+        dynamicPdfs.push({ key: "TPL_ORDEN", base64: Utilities.base64Encode(file.getBlob().getBytes()) });
+        Logger.log("✓ Precargado TPL_ORDEN para orden " + orderNo);
+      } else {
+        Logger.log("⚠️ No se encontró TPL_ORDEN para orden " + orderNo);
+      }
+    }
+  } catch (e) {
+    Logger.log("Error fetching TPL_ORDEN: " + e.message);
+  }
+  
+  // Try to fetch DOC_ANALISIS
+  try {
+    if (folderAnalysisId && noAnalisisStr) {
+      var aFolder = DriveApp.getFolderById(folderAnalysisId);
+      var aQuery = "title contains '" + noAnalisisStr + "' and mimeType = 'application/pdf' and trashed = false";
+      var aFiles = aFolder.searchFiles(aQuery);
+      while (aFiles.hasNext()) {
+        var candidate = aFiles.next();
+        if (candidate.getName().indexOf(noAnalisisStr) === 0) {
+          dynamicPdfs.push({ key: "DOC_ANALISIS", base64: Utilities.base64Encode(candidate.getBlob().getBytes()) });
+          Logger.log("✓ Precargado DOC_ANALISIS para orden " + orderNo);
+          break;
+        }
+      }
+      if (dynamicPdfs.filter(p => p.key === "DOC_ANALISIS").length === 0) {
+        Logger.log("⚠️ No se encontró DOC_ANALISIS para orden " + orderNo);
+      }
+    }
+  } catch (e) {
+    Logger.log("Error fetching DOC_ANALISIS: " + e.message);
+  }
+
+  return { formData: formData, coords: dynamicCoords, pdfs: dynamicPdfs };
 }
 
 function preparePrintPayload(orderNo, templateConfig) {
