@@ -4,30 +4,289 @@
     <base target="_top">
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
     <style>
-      body { font-family: 'Segoe UI', Roboto, sans-serif; padding: 20px; background: #f4f7f6; margin: 0; }
-      .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: relative; }
-      .field { margin-bottom: 15px; }
-      label { display: block; font-weight: bold; font-size: 13px; color: #555; margin-bottom: 5px; }
-      input[type="text"], input[type="number"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-      input[type="text"] { width: 100%; }
-      .tpl-container { border: 1px solid #eee; border-radius: 4px; max-height: 220px; overflow-y: auto; padding: 10px; }
-      .tpl-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; gap: 10px; }
-      .tpl-row:last-child { border-bottom: none; }
-      .tpl-row .tpl-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .tpl-row input[type="number"] { flex: 0 0 auto; width: 56px; text-align: center; padding: 6px 4px; appearance: textfield; -moz-appearance: textfield; }
-      .tpl-row input[type="number"]::-webkit-outer-spin-button,
-      .tpl-row input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-      button { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: background 0.2s; font-size: 14px; }
-      button:hover:not(:disabled) { background: #1557b0; }
-      button:disabled { background: #9aa0a6; cursor: not-allowed; }
-      #status { margin-top: 15px; font-size: 13px; text-align: center; font-weight: bold; min-height: 20px; }
-      .error-text { color: #d93025; }
-      .success-text { color: #188038; }
-      .info-text { color: #1a73e8; }
-      .hint { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; }
+      * { box-sizing: border-box; }
+      body { 
+        font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; 
+        padding: 24px; 
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 0; 
+        min-height: 100vh;
+      }
+      .card { 
+        background: white; 
+        padding: 32px; 
+        border-radius: 16px; 
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15); 
+        position: relative; 
+        max-width: 580px;
+        margin: 0 auto;
+      }
+      
+      /* Section Groups */
+      .section { margin-bottom: 28px; }
+      .section-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        margin-bottom: 12px;
+      }
+      
+      .field { margin-bottom: 20px; }
+      label { 
+        display: block; 
+        font-weight: 600; 
+        font-size: 13px; 
+        color: #334155; 
+        margin-bottom: 8px; 
+      }
+      
+      /* Modern Inputs */
+      input[type="text"] { 
+        width: 100%; 
+        padding: 12px 16px; 
+        border: 2px solid #e2e8f0; 
+        border-radius: 10px; 
+        font-size: 14px;
+        color: #1e293b;
+        transition: all 0.2s ease;
+        background: #f8fafc;
+      }
+      input[type="text"]:focus {
+        outline: none;
+        border-color: #667eea;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      input[type="text"]::placeholder {
+        color: #94a3b8;
+      }
+      
+      /* Segmented Control (Radio Pills) */
+      .segmented-control {
+        display: flex;
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 10px;
+        gap: 4px;
+      }
+      .segmented-option {
+        flex: 1;
+        position: relative;
+      }
+      .segmented-option input {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .segmented-option label {
+        display: block;
+        text-align: center;
+        padding: 10px 16px;
+        margin: 0;
+        font-size: 13px;
+        font-weight: 500;
+        color: #64748b;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        user-select: none;
+      }
+      .segmented-option input:checked + label {
+        background: white;
+        color: #667eea;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        font-weight: 600;
+      }
+      .segmented-option label:hover {
+        color: #475569;
+      }
+      .segmented-option input:checked + label:hover {
+        color: #667eea;
+      }
+      
+      /* Template Container */
+      .tpl-container { 
+        border: 2px solid #e2e8f0; 
+        border-radius: 12px; 
+        max-height: 280px; 
+        overflow-y: auto; 
+        padding: 8px;
+        background: #f8fafc;
+      }
+      .tpl-container::-webkit-scrollbar {
+        width: 8px;
+      }
+      .tpl-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      .tpl-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .tpl-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      
+      .tpl-row { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        padding: 12px 16px; 
+        margin-bottom: 4px;
+        border-radius: 8px;
+        font-size: 14px; 
+        gap: 12px;
+        transition: background 0.2s ease;
+      }
+      .tpl-row:hover {
+        background: white;
+      }
+      .tpl-row:last-child { margin-bottom: 0; }
+      .tpl-row .tpl-name { 
+        flex: 1 1 auto; 
+        min-width: 0; 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis;
+        font-weight: 500;
+        color: #334155;
+      }
+      
+      /* Custom Counter Control */
+      .counter-control {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .counter-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #e2e8f0;
+        color: #64748b;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        padding: 0;
+        margin: 0;
+      }
+      .counter-btn:hover:not(:disabled) {
+        background: #cbd5e1;
+        color: #334155;
+      }
+      .counter-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .counter-input {
+        width: 48px;
+        height: 32px;
+        text-align: center;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+        background: white;
+        padding: 0;
+        margin: 0;
+      }
+      .counter-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      
+      /* Main Button */
+      button#goBtn { 
+        width: 100%; 
+        padding: 16px 24px; 
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+        color: white; 
+        border: none; 
+        border-radius: 12px; 
+        cursor: pointer; 
+        font-weight: 700; 
+        margin-top: 8px; 
+        transition: all 0.3s ease; 
+        font-size: 15px;
+        letter-spacing: 0.5px;
+        box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+      }
+      button#goBtn:hover:not(:disabled) { 
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+      }
+      button#goBtn:active:not(:disabled) {
+        transform: translateY(0);
+      }
+      button#goBtn:disabled { 
+        background: #cbd5e1; 
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+      }
+      
+      #status { 
+        margin-top: 20px; 
+        font-size: 14px; 
+        text-align: center; 
+        font-weight: 500; 
+        min-height: 24px;
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .error-text { 
+        color: #dc2626; 
+        background: #fef2f2;
+      }
+      .success-text { 
+        color: #059669; 
+        background: #ecfdf5;
+      }
+      .info-text { 
+        color: #2563eb; 
+        background: #eff6ff;
+      }
+      .hint { 
+        font-size: 12px; 
+        color: #64748b; 
+        font-weight: 400; 
+        margin-top: 6px;
+      }
 
-      #loader { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; border-radius: 8px; }
-      .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1a73e8; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 10px; }
+      #loader { 
+        position: absolute; 
+        top: 0; 
+        left: 0; 
+        right: 0; 
+        bottom: 0; 
+        background: rgba(255,255,255,0.95); 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: center; 
+        align-items: center; 
+        z-index: 10; 
+        border-radius: 16px;
+        backdrop-filter: blur(4px);
+      }
+      .spinner { 
+        border: 4px solid #e2e8f0; 
+        border-top: 4px solid #667eea; 
+        border-radius: 50%; 
+        width: 40px; 
+        height: 40px; 
+        animation: spin 1s linear infinite; 
+        margin-bottom: 16px;
+      }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
   </head>
@@ -35,30 +294,47 @@
     <div class="card">
       <div id="loader">
         <div class="spinner"></div>
-        <div style="font-size: 13px; color: #555; font-weight: bold;">Cargando panel...</div>
+        <div style="font-size: 14px; color: #64748b; font-weight: 600;">Cargando panel...</div>
       </div>
 
-      <div class="field">
-        <label>No. de Orden:</label>
-        <input type="text" id="orderNo" autocomplete="off" autofocus placeholder="Ej: 8602">
+      <div class="section">
+        <div class="section-title">Datos de la Orden</div>
+        <div class="field">
+          <label>No. de Orden</label>
+          <input type="text" id="orderNo" autocomplete="off" autofocus placeholder="Ej: 8602">
+        </div>
+
+        <div class="field">
+          <label>Usuario</label>
+          <input type="text" id="userName" list="usersList" autocomplete="off" placeholder="Empiece a escribir su nombre...">
+          <datalist id="usersList"></datalist>
+        </div>
       </div>
 
-      <div class="field">
-        <label>Usuario:</label>
-        <input type="text" id="userName" list="usersList" autocomplete="off" placeholder="Empiece a escribir su nombre...">
-        <datalist id="usersList"></datalist>
+      <div class="section">
+        <div class="section-title">Configuración de Impresión</div>
+        <div class="field">
+          <label>Tipo de Impresión</label>
+          <div class="segmented-control">
+            <div class="segmented-option">
+              <input type="radio" name="printType" value="Adicional" checked id="printTypeAdicional">
+              <label for="printTypeAdicional">Inicial / Adicional</label>
+            </div>
+            <div class="segmented-option">
+              <input type="radio" name="printType" value="Reimpresion" id="printTypeReimpresion">
+              <label for="printTypeReimpresion">Reimpresión</label>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="field">
-        <label>Tipo de Impresión:</label>
-        <label style="font-weight: normal; margin-right: 15px;"><input type="radio" name="printType" value="Adicional" checked> Impresión Inicial / Adicional</label>
-        <label style="font-weight: normal;"><input type="radio" name="printType" value="Reimpresion"> Reimpresión</label>
-      </div>
-
-      <div class="field">
-        <label>Plantillas (cantidad de copias):</label>
-        <div class="hint">Ingrese el número de copias a imprimir para cada plantilla.</div>
-        <div id="tplList" class="tpl-container"></div>
+      <div class="section">
+        <div class="section-title">Selección de Plantillas</div>
+        <div class="field">
+          <label>Cantidad de Copias</label>
+          <div class="hint">Ajuste el número de copias para cada plantilla</div>
+          <div id="tplList" class="tpl-container"></div>
+        </div>
       </div>
 
       <button id="goBtn" onclick="run()" disabled>Generar PDF Combinado</button>
@@ -153,6 +429,43 @@
           .fetchOrderData(currentOrderNo);
       }
 
+      // Counter control functions
+      function decrementCounter(key, noAccess) {
+        if (noAccess) return;
+        const input = document.getElementById('val_' + key);
+        let value = parseInt(input.value) || 0;
+        if (value > 0) {
+          input.value = value - 1;
+        }
+      }
+
+      function incrementCounter(key, noAccess) {
+        if (noAccess) return;
+        const input = document.getElementById('val_' + key);
+        let value = parseInt(input.value) || 0;
+        if (value < 999) {
+          input.value = value + 1;
+        }
+      }
+
+      function validateCounter(input) {
+        // Permitir que el campo esté temporalmente vacío mientras se borra/escribe
+        if (input.value === '') return;
+        
+        let value = parseInt(input.value);
+        if (isNaN(value)) {
+          input.value = ''; // Borra caracteres no numéricos
+          return;
+        }
+        
+        if (value < 0) {
+          value = 0;
+        } else if (value > 999) {
+          value = 999;
+        }
+        input.value = value;
+      }
+
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
           globalTemplates = data.templates;
@@ -170,11 +483,15 @@
             const defVal = defaultOnes.includes(t.key) ? "1" : "0";
             const noAccess = t.hasAccess === false;
             const rowStyle = noAccess ? 'opacity: 0.5;' : '';
-            const nameStyle = noAccess ? 'color: #d93025; font-style: italic;' : '';
+            const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
             return `
               <div class="tpl-row" style="${rowStyle}">
                 <span class="tpl-name" title="${t.name}" style="${nameStyle}">${t.name}</span>
-                <input type="number" id="val_${t.key}" value="${defVal}" min="0" max="999" maxlength="3" ${noAccess ? 'disabled' : ''}>
+                <div class="counter-control">
+                  <button type="button" class="counter-btn" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
+                  <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
+                  <button type="button" class="counter-btn" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
+                </div>
               </div>
             `;
           }).join('');
