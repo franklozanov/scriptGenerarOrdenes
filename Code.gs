@@ -26,7 +26,7 @@ function onOpen() {
 
 function openPrintDialog() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
-    .setWidth(500).setHeight(650).setTitle('Panel de Impresión');
+    .setWidth(550).setHeight(700).setTitle('Panel de Impresión');
   SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
 }
 
@@ -267,13 +267,21 @@ function getInitialData() {
               Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
               Logger.log("  - ID del archivo: " + value);
               Logger.log("  - Error: " + e.message);
-              displayName = displayName + " (Sin acceso)";
-              hasAccess = false;
-              accessErrors.push({
-                key: key,
-                fileId: value,
-                error: e.message
-              });
+              
+              // For static templates, do NOT set hasAccess = false since base64 is handled separately
+              if (staticTemplates.indexOf(key) === -1) {
+                // Only mark as no access for dynamic templates
+                displayName = displayName + " (Sin acceso)";
+                hasAccess = false;
+                accessErrors.push({
+                  key: key,
+                  fileId: value,
+                  error: e.message
+                });
+              } else {
+                // Static templates: log error but keep hasAccess = true
+                Logger.log("  - Plantilla estática, manteniendo hasAccess = true");
+              }
             }
           }
           templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess, base64: base64 });
