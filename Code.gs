@@ -216,7 +216,7 @@ function getInitialData() {
       // Static templates to preload
       var staticTemplates = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
       
-      for (var k = 0; k < tplData.length; k++) {
+      for (var k = 1; k < tplData.length; k++) {
         var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
         var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
       
@@ -316,7 +316,7 @@ function diagnosticarPlantillas() {
   var folderAnalysisId = "";
   
   // Verificar carpetas dinámicas primero
-  for (var i = 0; i < tplData.length; i++) {
+  for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     if (k === "ID_FOLDER") folderId = v;
@@ -358,7 +358,7 @@ function diagnosticarPlantillas() {
   
   report += "\nPLANTILLAS ESTÁTICAS:\n";
   
-  for (var i = 0; i < tplData.length; i++) {
+  for (var i = 1; i < tplData.length; i++) {
     var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     
@@ -420,7 +420,7 @@ function fetchOrderData(orderNo) {
     return { x: matchX ? parseFloat(matchX[1]) : 0, y: matchY ? parseFloat(matchY[1]) : 0 };
   }
   
-  for (var i = 0; i < tplData.length; i++) {
+  for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][0].toString().trim();
     var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     if (k === "ID_FOLDER") folderId = v;
@@ -528,7 +528,7 @@ function preparePrintPayload(orderNo, templateConfig) {
     return { x: matchX ? parseFloat(matchX[1]) : 0, y: matchY ? parseFloat(matchY[1]) : 0 };
   }
   
-  for (var i = 0; i < tplData.length; i++) {
+  for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][0].toString().trim();
     var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     if (k === "ID_FOLDER") folderId = v;
