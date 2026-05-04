@@ -12,6 +12,9 @@ function onOpen() {
     .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
     .addToUi();
   
+  // Clear cache to ensure fresh NombreTemplate data is loaded
+  clearInitialDataCache();
+  
   // Cache warmup: preload data silently to improve performance
   try {
     getInitialData();
@@ -233,18 +236,25 @@ function getInitialData() {
           var hasAccess = true;
           var base64 = null;
           
-          // Try to get name from NombreTemplate column first
+          // Try to get name from NombreTemplate column first (highest priority)
           if (colNombreTemplate !== -1 && k > 0 && tplData[k][colNombreTemplate]) {
-            displayName = tplData[k][colNombreTemplate].toString().trim();
+            var nombreTemplateValue = tplData[k][colNombreTemplate].toString().trim();
+            if (nombreTemplateValue) {
+              displayName = nombreTemplateValue;
+            }
           }
           
-          if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
-          else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
-          else if (value) {
+          // Fallback to hardcoded names if NombreTemplate is empty or doesn't exist
+          if (displayName === key) {
+            if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
+            else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
+          }
+          
+          if (value) {
             try { 
               var file = DriveApp.getFileById(value);
-              // If displayName wasn't set from NombreTemplate, use file name
-              if (colNombreTemplate === -1 || k === 0 || !tplData[k][colNombreTemplate]) {
+              // If displayName is still the key, use file name as final fallback
+              if (displayName === key) {
                 displayName = file.getName();
               }
               
@@ -257,7 +267,7 @@ function getInitialData() {
               Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
               Logger.log("  - ID del archivo: " + value);
               Logger.log("  - Error: " + e.message);
-              displayName = key + " (Sin acceso)";
+              displayName = displayName + " (Sin acceso)";
               hasAccess = false;
               accessErrors.push({
                 key: key,
