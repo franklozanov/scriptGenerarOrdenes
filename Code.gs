@@ -317,6 +317,27 @@ function getInitialData() {
 
     var result = { users: users, templates: templates };
     
+    // Force hardcoded sort order for templates
+    const sortOrder = ["TPL_ORDEN", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
+    templates.sort(function(a, b) {
+      var indexA = sortOrder.indexOf(a.key);
+      var indexB = sortOrder.indexOf(b.key);
+      // If both are in sortOrder, compare their indices
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      // If only A is in sortOrder, it comes first
+      if (indexA !== -1) {
+        return -1;
+      }
+      // If only B is in sortOrder, it comes first
+      if (indexB !== -1) {
+        return 1;
+      }
+      // If neither is in sortOrder, keep original order
+      return 0;
+    });
+    
     // Clonar templates sin base64 para no exceder el límite de 100KB de CacheService
     var dataToCache = { users: users, templates: [] };
     for (var idx = 0; idx < templates.length; idx++) {
