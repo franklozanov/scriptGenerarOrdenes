@@ -231,7 +231,7 @@ function getInitialData() {
         var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
         var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
       
-        if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
+        if (key && key !== "Clave" && key !== "ID_FOLDER" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
           var displayName = key;
           var hasAccess = true;
           var base64 = null;
@@ -285,6 +285,21 @@ function getInitialData() {
             }
           }
           templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess, base64: base64 });
+        }
+        
+        // Handle DOC_ANALISIS separately - it's a folder ID, not a file ID
+        if (key === "DOC_ANALISIS") {
+          var displayName = "Cert. Análisis (Dinámico)";
+          
+          // Try to get name from NombreTemplate column first
+          if (colNombreTemplate !== -1 && k > 0 && tplData[k][colNombreTemplate]) {
+            var nombreTemplateValue = tplData[k][colNombreTemplate].toString().trim();
+            if (nombreTemplateValue) {
+              displayName = nombreTemplateValue;
+            }
+          }
+          
+          templates.push({ key: key, fileId: value, name: displayName, hasAccess: true, base64: null });
         }
       }
       
