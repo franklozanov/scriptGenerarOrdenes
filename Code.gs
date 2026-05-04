@@ -189,6 +189,20 @@ function getInitialData() {
       var tplData = tplSheet.getDataRange().getValues();
       var accessErrors = [];
       
+      // Find column index for "NombreTemplate" if it exists
+      var colNombreTemplate = -1;
+      if (tplData.length > 0) {
+        for (var i = 0; i < tplData[0].length; i++) {
+          if (tplData[0][i].toString().trim().toLowerCase() === "nombretemplate") {
+            colNombreTemplate = i;
+            break;
+          }
+        }
+      }
+      
+      // Static templates to preload
+      var staticTemplates = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
+      
       for (var k = 0; k < tplData.length; k++) {
         var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
         var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
@@ -196,13 +210,28 @@ function getInitialData() {
         if (key && key !== "Clave" && key !== "ID_FOLDER" && key.indexOf("COORD_") === -1) {
           var displayName = key;
           var hasAccess = true;
+          var base64 = null;
+          
+          // Try to get name from NombreTemplate column first
+          if (colNombreTemplate !== -1 && k > 0 && tplData[k][colNombreTemplate]) {
+            displayName = tplData[k][colNombreTemplate].toString().trim();
+          }
           
           if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
           else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
           else if (value) {
             try { 
               var file = DriveApp.getFileById(value);
-              displayName = file.getName(); 
+              // If displayName wasn't set from NombreTemplate, use file name
+              if (colNombreTemplate === -1 || k === 0 || !tplData[k][colNombreTemplate]) {
+                displayName = file.getName();
+              }
+              
+              // Preload base64 for static templates
+              if (staticTemplates.indexOf(key) !== -1) {
+                base64 = Utilities.base64Encode(file.getBlob().getBytes());
+                Logger.log("✓ Precargando base64 para " + key);
+              }
             } catch (e) { 
               Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
               Logger.log("  - ID del archivo: " + value);
@@ -216,7 +245,7 @@ function getInitialData() {
               });
             }
           }
-          templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess });
+          templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess, base64: base64 });
         }
       }
       
@@ -412,6 +441,8 @@ function preparePrintPayload(orderNo, templateConfig) {
 
   var pdfsToProcess = [];
   
+  // Only process dynamic templates (TPL_ORDEN and DOC_ANALISIS)
+  // Static templates are already preloaded on the frontend
   templateConfig.forEach(function(config) {
     var file;
     try {
@@ -433,6 +464,7 @@ function preparePrintPayload(orderNo, templateConfig) {
           }
           throw driveError;
         }
+        pdfsToProcess.push({ key: config.key, base64: Utilities.base64Encode(file.getBlob().getBytes()), copies: config.copies });
       } else if (config.key === "DOC_ANALISIS") {
         if (!folderAnalysisId) {
           throw new Error("DOC_ANALISIS no está configurado en la hoja 'templates'. Configure el ID de la carpeta de análisis.");
@@ -457,13 +489,11 @@ function preparePrintPayload(orderNo, templateConfig) {
           }
           throw driveError;
         }
+        pdfsToProcess.push({ key: config.key, base64: Utilities.base64Encode(file.getBlob().getBytes()), copies: config.copies });
       } else {
-        if (!config.fileId) {
-          throw new Error("El ID del archivo no está configurado en la hoja 'templates'.");
-        }
-        file = DriveApp.getFileById(config.fileId);
+        // Static templates are skipped - they're already preloaded on the frontend
+        Logger.log("Omitiendo plantilla estática " + config.key + " (ya precargada en el cliente)");
       }
-      pdfsToProcess.push({ key: config.key, base64: Utilities.base64Encode(file.getBlob().getBytes()), copies: config.copies });
     } catch (e) {
       Logger.log("ERROR en preparePrintPayload para " + config.key + ": " + e.message);
       throw new Error("Error cargando " + config.key + ": " + e.message);

@@ -67,11 +67,20 @@
 
     <script>
       let globalTemplates = [];
+      let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
 
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
           globalTemplates = data.templates;
-          const defaultOnes = ["TPL_ORDEN", "TPL_CODIFICADO", "TPL_INSPECCION", "TPL_COC", "DOC_ANALISIS"];
+          const defaultOnes = ["TPL_ORDEN", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES", "DOC_ANALISIS"];
+
+          // Store preloaded static template base64 strings in memory
+          data.templates.forEach(t => {
+            if (t.base64) {
+              preloadedStaticPdfs[t.key] = t.base64;
+              console.log(`✓ Precargada en memoria: ${t.key}`);
+            }
+          });
 
           document.getElementById('tplList').innerHTML = data.templates.map(t => {
             const defVal = defaultOnes.includes(t.key) ? "1" : "0";
@@ -142,6 +151,42 @@
         google.script.run.withSuccessHandler(async (payload) => {
           try {
             status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
+
+            // Merge dynamic templates from payload with preloaded static templates
+            // Respect the original order and copies from config
+            const staticTemplateKeys = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
+            
+            // Build the final pdfs array by iterating through config (which has correct order and copies)
+            const finalPdfs = [];
+            config.forEach(cfg => {
+              if (staticTemplateKeys.includes(cfg.key)) {
+                // Static template - use preloaded base64
+                if (preloadedStaticPdfs[cfg.key]) {
+                  finalPdfs.push({
+                    key: cfg.key,
+                    base64: preloadedStaticPdfs[cfg.key],
+                    copies: cfg.copies
+                  });
+                  console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+                } else {
+                  console.warn(`⚠️ Plantilla estática ${cfg.key} no encontrada en memoria precargada`);
+                }
+              } else {
+                // Dynamic template - use from payload
+                const dynamicPdf = payload.pdfs.find(p => p.key === cfg.key);
+                if (dynamicPdf) {
+                  finalPdfs.push({
+                    key: cfg.key,
+                    base64: dynamicPdf.base64,
+                    copies: cfg.copies
+                  });
+                  console.log(`✓ Usando plantilla dinámica del servidor: ${cfg.key}`);
+                }
+              }
+            });
+            
+            // Replace payload.pdfs with the merged array
+            payload.pdfs = finalPdfs;
 
             const { PDFDocument, rgb, degrees } = PDFLib;
             const finalPdf = await PDFDocument.create();
