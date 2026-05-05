@@ -204,13 +204,15 @@ function getInitialData() {
     try {
       var userData = userSheet.getDataRange().getValues();
       if (userData.length >= 2) {
-        var colNombre = 0;
+        var colNombreCorto = 2; // Índice por defecto según estructura ['UserID', 'Nombre Completo', 'NombreCorto', 'Email']
         for (var i = 0; i < userData[0].length; i++) {
           var headerValue = userData[0][i].toString().trim().toLowerCase();
-          if (headerValue === "nombre completo" || headerValue === "nombrecorto") { colNombre = i; break; }
+          if (headerValue === "nombrecorto") { colNombreCorto = i; break; }
         }
         for (var j = 1; j < userData.length; j++) {
-          if (userData[j][colNombre]) users.push(userData[j][colNombre].toString().trim());
+          var userId = userData[j][0] ? userData[j][0].toString().trim() : "N/A";
+          var nombreCorto = userData[j][colNombreCorto] ? userData[j][colNombreCorto].toString().trim() : "N/A";
+          users.push(userId + " - " + nombreCorto);
         }
       }
     } catch (e) {
@@ -1102,9 +1104,6 @@ function onEditInstalled(e) {
   
   var user = Session.getActiveUser().getEmail();
   var effectiveUser = Session.getEffectiveUser().getEmail();
-  
-  // Si el usuario que edita es el efectivo (admin/Web App), permitir sin registro
-  if (user === effectiveUser) return;
   
   var editedRange = e.range;
   var sheet = editedRange.getSheet();
