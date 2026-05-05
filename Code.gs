@@ -157,8 +157,9 @@ function getInitialData() {
         }
         for (var j = 1; j < userData.length; j++) {
           var userId = userData[j][0] ? userData[j][0].toString().trim() : "N/A";
+          var nombreCompleto = userData[j][1] ? userData[j][1].toString().trim() : "N/A";
           var nombreCorto = userData[j][colNombreCorto] ? userData[j][colNombreCorto].toString().trim() : "N/A";
-          users.push(userId + " - " + nombreCorto);
+          users.push(userId + " - " + nombreCompleto);
         }
       }
     } catch (e) {
@@ -1154,22 +1155,26 @@ function onEditInstalled(e) {
     var colOrdenIdx = headers.indexOf('NoOrden') + 1;
 
     // Si la edición fue en la columna AdjuntoOrden y la celda contenía el texto del "botón"
-    if (colAdjuntoIdx > 0 && editedRange.getColumn() === colAdjuntoIdx && e.oldValue === '⬆️ Subir Archivo') {
-      Logger.log("Detectado clic en '⬆️ Subir Archivo' para la fila " + editedRange.getRow());
-      var rowIdx = editedRange.getRow();
-      var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
+    if (colAdjuntoIdx > 0 && editedRange.getColumn() === colAdjuntoIdx) {
+      // Se verifica si el valor actual o el anterior es el texto del botón para asegurar la activación
+      var currentValue = editedRange.getValue();
+      if (currentValue === '⬆️ Subir Archivo' || e.oldValue === '⬆️ Subir Archivo') {
+        Logger.log("Detectado clic en '⬆️ Subir Archivo' para la fila " + editedRange.getRow());
+        var rowIdx = editedRange.getRow();
+        var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
 
-      // Restaurar el valor para que la celda no cambie y siga siendo un "botón"
-      editedRange.setValue(e.oldValue);
+        // Restaurar el valor para que la celda no cambie y siga siendo un "botón"
+        editedRange.setValue('⬆️ Subir Archivo');
 
-      if (!noOrden) {
-        SpreadsheetApp.getActiveSpreadsheet().toast("No hay número de orden en esta fila.", "Error", 5);
+        if (!noOrden) {
+          SpreadsheetApp.getActiveSpreadsheet().toast("No hay número de orden en esta fila.", "Error", 5);
+          return;
+        }
+
+        // Llamar al modal y detener el resto del onEdit (no auditar el clic en el "botón")
+        abrirModalSubidaDocumento(rowIdx, noOrden.toString().trim());
         return;
       }
-
-      // Llamar al modal y detener el resto del onEdit (no auditar el clic en el "botón")
-      abrirModalSubidaDocumento(rowIdx, noOrden.toString().trim());
-      return;
     }
   }
   
