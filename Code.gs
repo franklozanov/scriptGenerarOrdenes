@@ -2,18 +2,18 @@
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
 function onOpen() {
+  var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
+    .addItem('⚙️ Configurar Proxy', 'promptSetWebAppUrl')
+    .addItem('🔧 Inicializar App', 'promptInitializeApp')
+    .addItem('🛡️ Aplicar Nuevo Esquema de Protección', 'promptApplyNewProtection')
+    .addItem('▶️ Activar Auditoría', 'promptSetupAuditTrail');
+
   SpreadsheetApp.getUi().createMenu('🖨️ Impresión')
     .addItem('Imprimir Plantillas', 'openPrintDialog')
     .addSeparator()
     .addItem(' Diagnosticar Plantillas', 'diagnosticarPlantillas')
     .addSeparator()
-    .addItem(' Bloquear Hojas (Admin)', 'promptLock')
-    .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
-    .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
-    .addSeparator()
-    .addItem('🔧 Inicializar App (Admin)', 'promptInitializeApp')
-    .addItem('🛡️ Aplicar Nuevo Esquema de Protección (Admin)', 'promptApplyNewProtection')
-    .addItem('▶️ Activar Auditoría (Admin)', 'promptSetupAuditTrail')
+    .addSubMenu(adminMenu)
     .addToUi();
   
   // Clear cache to ensure fresh NombreTemplate data is loaded
@@ -48,19 +48,6 @@ function withAdminAuth(title, action) {
   }
 }
 
-function promptLock() {
-  withAdminAuth('Bloquear Sistema', function(ui) {
-    lockRanges();
-    ui.alert('✅ Sistema protegido. Las hojas Usuarios, templates y el rango I:T (excepto K) de Ordenes han sido bloqueados.');
-  });
-}
-
-function promptUnlock() {
-  withAdminAuth('Desbloquear Sistema', function(ui) {
-    unlockRanges();
-    ui.alert('✅ Sistema desbloqueado. Ahora es posible editar manualmente las hojas restringidas.');
-  });
-}
 
 function promptSetWebAppUrl() {
   withAdminAuth('Configurar Proxy (Admin)', function(ui) {
@@ -78,68 +65,6 @@ function promptInitializeApp() {
   });
 }
 
-function lockRanges() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // 1. Bloquear Usuarios completa
-  var sheetUsuarios = ss.getSheetByName('Usuarios');
-  if (sheetUsuarios) {
-    var p1 = sheetUsuarios.protect().setDescription('Bloqueo_Usuarios');
-    p1.removeEditors(p1.getEditors());
-    if (p1.canDomainEdit()) p1.setDomainEdit(false);
-  }
-
-  // 2. Bloquear templates completa
-  var sheetTemplates = ss.getSheetByName('templates');
-  if (sheetTemplates) {
-    var p2 = sheetTemplates.protect().setDescription('Bloqueo_Templates');
-    p2.removeEditors(p2.getEditors());
-    if (p2.canDomainEdit()) p2.setDomainEdit(false);
-  }
-
-  // 3. Bloquear rango I:T en Ordenes excepto columna K (edición libre)
-  var sheetOrdenes = ss.getSheetByName('Ordenes');
-  if (sheetOrdenes) {
-    var p3 = sheetOrdenes.protect().setDescription('Bloqueo_Ordenes_Dinamico');
-    p3.removeEditors(p3.getEditors());
-    if (p3.canDomainEdit()) p3.setDomainEdit(false);
-    
-    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
-    var colsToProtect = [
-      "VerifLote", "CantDispAFecha", "VerifCant. Disponible", "VerifExp", 
-      "Fabricante", "Decision", "STATUS", "ImpresoPor", "NoPags", 
-      "ReimpresoPor", "Reimpresion", "TotalPags"
-    ];
-    
-    var unprotectedRanges = [];
-    var lastRow = sheetOrdenes.getLastRow();
-    if (lastRow < 1) lastRow = 1;
-    
-    for (var i = 0; i < headers.length; i++) {
-      var header = headers[i] ? headers[i].toString().trim() : "";
-      if (colsToProtect.indexOf(header) === -1) {
-        unprotectedRanges.push(sheetOrdenes.getRange(1, i + 1, lastRow, 1));
-      }
-    }
-    
-    if (unprotectedRanges.length > 0) {
-      p3.setUnprotectedRanges(unprotectedRanges);
-    }
-  }
-}
-
-function unlockRanges() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var protections = ss.getProtections(SpreadsheetApp.ProtectionType.SHEET)
-                      .concat(ss.getProtections(SpreadsheetApp.ProtectionType.RANGE));
-                      
-  for (var i = 0; i < protections.length; i++) {
-    var desc = protections[i].getDescription();
-    if (desc === 'Bloqueo_Usuarios' || desc === 'Bloqueo_Templates' || desc === 'Bloqueo_Ordenes_IT' || desc === 'Bloqueo_Ordenes_IS' || desc === 'Bloqueo_Ordenes_Dinamico') {
-      protections[i].remove();
-    }
-  }
-}
 
 
 // --- PROTECCIÓN AUTOMÁTICA CONTRA EDICIÓN MANUAL ---
@@ -835,7 +760,8 @@ function initializeApp(ui) {
   var report = validateStructure();
   
   if (report.missingSheets.length === 0 && report.incorrectHeaders.length === 0) {
-    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos.');
+    setupAdjuntoCheckboxes(ss);
+    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos. Casillas de AdjuntoOrden configuradas.');
     return;
   }
   
@@ -856,7 +782,8 @@ function initializeApp(ui) {
   if (response === ui.Button.YES) {
     createMissingSheets(ui);
     fixHeaders(ui);
-    ui.alert('✅ Inicialización completada. Estructura corregida.');
+    setupAdjuntoCheckboxes(ss);
+    ui.alert('✅ Inicialización completada. Estructura corregida. Casillas de AdjuntoOrden configuradas.');
     
     // Registrar inicialización en Logs si existe
     logInitialization();
@@ -986,12 +913,59 @@ function logInitialization() {
   }
   
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
-  var user = Session.getActiveUser().getEmail();
+  var userEmail = Session.getActiveUser().getEmail();
+  var user = getUserIdentityString(userEmail);
   var tipoCambio = "INICIALIZACION";
   var descripcion = "Inicialización de estructura del libro de trabajo";
   
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
   Logger.log("✓ Inicialización registrada en Logs");
+}
+
+function setupAdjuntoCheckboxes(ss) {
+  var sheetOrdenes = ss.getSheetByName('Ordenes');
+  if (!sheetOrdenes) {
+    Logger.log("⚠️ Hoja 'Ordenes' no encontrada para configurar casillas de AdjuntoOrden");
+    return;
+  }
+  
+  var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+  
+  if (colAdjuntoIdx === 0) {
+    Logger.log("⚠️ Columna 'AdjuntoOrden' no encontrada en hoja 'Ordenes'");
+    return;
+  }
+  
+  var lastRow = sheetOrdenes.getLastRow();
+  if (lastRow < 2) {
+    Logger.log("⚠️ No hay filas de datos para configurar casillas en AdjuntoOrden");
+    return;
+  }
+  
+  // Insertar checkboxes desde fila 2 hasta última fila
+  var checkboxRange = sheetOrdenes.getRange(2, colAdjuntoIdx, lastRow - 1, 1);
+  checkboxRange.insertCheckboxes();
+  
+  // Limpiar validaciones solo en celdas con hipervínculo o valores no booleanos
+  var values = checkboxRange.getValues();
+  for (var i = 0; i < values.length; i++) {
+    var cellValue = values[i][0];
+    var isFormula = false;
+    
+    // Verificar si es una fórmula (hipervínculo)
+    var cellFormula = sheetOrdenes.getRange(i + 2, colAdjuntoIdx).getFormula();
+    if (cellFormula && cellFormula.indexOf('HYPERLINK') !== -1) {
+      isFormula = true;
+    }
+    
+    // Limpiar validación si es fórmula o valor no booleano/no vacío
+    if (isFormula || (cellValue !== true && cellValue !== false && cellValue !== '')) {
+      sheetOrdenes.getRange(i + 2, colAdjuntoIdx).clearDataValidations();
+    }
+  }
+  
+  Logger.log("✓ Casillas de AdjuntoOrden configuradas");
 }
 
 // --- FASE 3: GESTIÓN DE PERMISOS Y PROTECCIÓN DE HOJAS ---
@@ -1355,11 +1329,14 @@ function procesarSubidaDocumento(base64Data, mimeType, fileName, rowIdx, noOrden
       // Crear hipervínculo al archivo
       var fileUrl = newFile.getUrl();
       var hyperlinkFormula = '=HYPERLINK("' + fileUrl + '", "✅ Cargado")';
-      sheetOrdenes.getRange(rowIdx, colAdjuntoIdx).setValue(hyperlinkFormula);
+      var targetCell = sheetOrdenes.getRange(rowIdx, colAdjuntoIdx);
+      targetCell.clearDataValidations();
+      targetCell.setValue(hyperlinkFormula);
     }
     
     // Auditoría obligatoria
-    var userIdentity = Session.getActiveUser().getEmail();
+    var userEmail = Session.getActiveUser().getEmail();
+    var userIdentity = getUserIdentityString(userEmail);
     logChange('CARGA_DOCUMENTO', "Se subió el documento adjunto para la orden " + noOrden, userIdentity);
     
     return { status: 'success', message: 'Documento subido exitosamente.' };
