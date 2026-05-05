@@ -761,7 +761,7 @@ function initializeApp(ui) {
   
   if (report.missingSheets.length === 0 && report.incorrectHeaders.length === 0) {
     setupAdjuntoCheckboxes(ss);
-    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos. Casillas de AdjuntoOrden configuradas.');
+    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos. Columna AdjuntoOrden configurada.');
     return;
   }
   
@@ -783,8 +783,8 @@ function initializeApp(ui) {
     createMissingSheets(ui);
     fixHeaders(ui);
     setupAdjuntoCheckboxes(ss);
-    ui.alert('✅ Inicialización completada. Estructura corregida. Casillas de AdjuntoOrden configuradas.');
-    
+    ui.alert('✅ Inicialización completada. Estructura corregida. Columna AdjuntoOrden configurada.');
+
     // Registrar inicialización en Logs si existe
     logInitialization();
   }
@@ -923,49 +923,35 @@ function logInitialization() {
 }
 
 function setupAdjuntoCheckboxes(ss) {
-  var sheetOrdenes = ss.getSheetByName('Ordenes');
-  if (!sheetOrdenes) {
-    Logger.log("⚠️ Hoja 'Ordenes' no encontrada para configurar casillas de AdjuntoOrden");
-    return;
-  }
-  
-  var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
-  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-  
-  if (colAdjuntoIdx === 0) {
-    Logger.log("⚠️ Columna 'AdjuntoOrden' no encontrada en hoja 'Ordenes'");
-    return;
-  }
-  
-  var lastRow = sheetOrdenes.getLastRow();
-  if (lastRow < 2) {
-    Logger.log("⚠️ No hay filas de datos para configurar casillas en AdjuntoOrden");
-    return;
-  }
-  
-  // Insertar checkboxes desde fila 2 hasta última fila
-  var checkboxRange = sheetOrdenes.getRange(2, colAdjuntoIdx, lastRow - 1, 1);
-  checkboxRange.insertCheckboxes();
-  
-  // Limpiar validaciones solo en celdas con hipervínculo o valores no booleanos
-  var values = checkboxRange.getValues();
-  for (var i = 0; i < values.length; i++) {
-    var cellValue = values[i][0];
-    var isFormula = false;
-    
-    // Verificar si es una fórmula (hipervínculo)
-    var cellFormula = sheetOrdenes.getRange(i + 2, colAdjuntoIdx).getFormula();
-    if (cellFormula && cellFormula.indexOf('HYPERLINK') !== -1) {
-      isFormula = true;
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (!sheetOrdenes) {
+        Logger.log("⚠️ Hoja 'Ordenes' no encontrada para configurar la columna AdjuntoOrden");
+        return;
     }
-    
-    // Limpiar validación si es fórmula o valor no booleano/no vacío
-    if (isFormula || (cellValue !== true && cellValue !== false && cellValue !== '')) {
-      sheetOrdenes.getRange(i + 2, colAdjuntoIdx).clearDataValidations();
+
+    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+
+    if (colAdjuntoIdx === 0) {
+        Logger.log("⚠️ Columna 'AdjuntoOrden' no encontrada en hoja 'Ordenes'");
+        return;
     }
-  }
-  
-  Logger.log("✓ Casillas de AdjuntoOrden configuradas");
+
+    var lastRow = sheetOrdenes.getLastRow();
+    if (lastRow < 2) {
+        Logger.log("⚠️ No hay filas de datos para configurar en AdjuntoOrden");
+        return;
+    }
+
+    var range = sheetOrdenes.getRange(2, colAdjuntoIdx, lastRow - 1, 1);
+    var values = range.getValues();
+    for (var i = 0; i < values.length; i++) {
+        if (values[i][0] === '' || values[i][0] === false || values[i][0] === true) {
+            values[i][0] = '⬆️ Subir Archivo';
+        }
+    }
+    range.setValues(values);
+    Logger.log("✓ Columna AdjuntoOrden configurada con texto de subida.");
 }
 
 // --- FASE 3: GESTIÓN DE PERMISOS Y PROTECCIÓN DE HOJAS ---
@@ -1159,26 +1145,28 @@ function onEditInstalled(e) {
   var numRows = editedRange.getNumRows();
   var numCols = editedRange.getNumColumns();
 
-  // Lógica de Subida de Adjuntos (Interceptar Checkbox)
+  // Lógica de Subida de Adjuntos (Interceptar edición de celda con texto de botón)
   if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
     var colOrdenIdx = headers.indexOf('NoOrden') + 1;
-    
-    // Si la edición fue en AdjuntoOrden y el valor es TRUE (Checkbox marcado)
-    if (colAdjuntoIdx > 0 && editedRange.getColumn() === colAdjuntoIdx && e.value === "TRUE") {
+
+    // Si la edición fue en la columna AdjuntoOrden y la celda contenía el texto del "botón"
+    if (colAdjuntoIdx > 0 && editedRange.getColumn() === colAdjuntoIdx && e.oldValue === '⬆️ Subir Archivo') {
       var rowIdx = editedRange.getRow();
       var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
-      
+
+      // Restaurar el valor para que la celda no cambie y siga siendo un "botón"
+      editedRange.setValue(e.oldValue);
+
       if (!noOrden) {
         SpreadsheetApp.getActiveSpreadsheet().toast("No hay número de orden en esta fila.", "Error", 5);
-        editedRange.setValue(false); // Desmarcar
         return;
       }
-      
-      // Llamar al modal y detener el resto del onEdit (no auditar el checkbox)
-      abrirModalSubidaDocumento(rowIdx, noOrden);
-      return; 
+
+      // Llamar al modal y detener el resto del onEdit (no auditar el clic en el "botón")
+      abrirModalSubidaDocumento(rowIdx, noOrden.toString().trim());
+      return;
     }
   }
   
