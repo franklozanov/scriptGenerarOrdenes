@@ -10,6 +10,10 @@ function onOpen() {
     .addItem(' Bloquear Hojas (Admin)', 'promptLock')
     .addItem('🔓 Desbloquear Hojas (Admin)', 'promptUnlock')
     .addItem('⚙️ Configurar Proxy (Admin)', 'promptSetWebAppUrl')
+    .addSeparator()
+    .addItem('🔧 Inicializar App (Admin)', 'promptInitializeApp')
+    .addItem('🛡️ Aplicar Nuevo Esquema de Protección (Admin)', 'promptApplyNewProtection')
+    .addItem('▶️ Activar Auditoría (Admin)', 'promptSetupAuditTrail')
     .addToUi();
   
   // Clear cache to ensure fresh NombreTemplate data is loaded
@@ -68,6 +72,12 @@ function promptSetWebAppUrl() {
   });
 }
 
+function promptInitializeApp() {
+  withAdminAuth('Inicializar App (Admin)', function(ui) {
+    initializeApp(ui);
+  });
+}
+
 function lockRanges() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -112,7 +122,10 @@ function unlockRanges() {
 
 
 // --- PROTECCIÓN AUTOMÁTICA CONTRA EDICIÓN MANUAL ---
+// NOTA: Esta función simple onEdit(e) será migrada a un disparador instalable onEditInstalled en Fase 2
+// Se mantiene comentada como referencia durante la transición
 
+/*
 function onEdit(e) {
   if (!e) return;
   
@@ -153,6 +166,7 @@ function onEdit(e) {
     );
   }
 }
+*/
 
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
 
@@ -192,7 +206,8 @@ function getInitialData() {
       if (userData.length >= 2) {
         var colNombre = 0;
         for (var i = 0; i < userData[0].length; i++) {
-          if (userData[0][i].toString().trim().toLowerCase() === "nombre") { colNombre = i; break; }
+          var headerValue = userData[0][i].toString().trim().toLowerCase();
+          if (headerValue === "nombre completo" || headerValue === "nombrecorto") { colNombre = i; break; }
         }
         for (var j = 1; j < userData.length; j++) {
           if (userData[j][colNombre]) users.push(userData[j][colNombre].toString().trim());
@@ -780,4 +795,416 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
   sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
 
   return "Record updated successfully.";
+}
+
+// --- FASE 1: INICIALIZACIÓN Y VALIDACIÓN DE ESTRUCTURA ---
+
+// Estructura esperada del libro de trabajo
+const REQUIRED_SHEETS = {
+  'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: ID_FOLDER es valor de fila, no columna
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante'],
+  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email'],
+  'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
+};
+
+function initializeApp(ui) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var report = validateStructure();
+  
+  if (report.missingSheets.length === 0 && report.incorrectHeaders.length === 0) {
+    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos.');
+    return;
+  }
+  
+  var message = "Se detectaron discrepancias en la estructura:\n\n";
+  
+  if (report.missingSheets.length > 0) {
+    message += "❌ Hojas faltantes:\n" + report.missingSheets.join("\n") + "\n\n";
+  }
+  
+  if (report.incorrectHeaders.length > 0) {
+    message += "❌ Encabezados incorrectos:\n" + report.incorrectHeaders.join("\n") + "\n\n";
+  }
+  
+  message += "¿Desea corregir estos problemas automáticamente?";
+  
+  var response = ui.alert("Inicializar App", message, ui.ButtonSet.YES_NO);
+  
+  if (response === ui.Button.YES) {
+    createMissingSheets(ui);
+    fixHeaders(ui);
+    ui.alert('✅ Inicialización completada. Estructura corregida.');
+    
+    // Registrar inicialización en Logs si existe
+    logInitialization();
+  }
+}
+
+function validateStructure() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var missingSheets = [];
+  var incorrectHeaders = [];
+  
+  for (var sheetName in REQUIRED_SHEETS) {
+    var sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      missingSheets.push(sheetName);
+      continue;
+    }
+    
+    var expectedHeaders = REQUIRED_SHEETS[sheetName];
+    var actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Comparar encabezados (case-insensitive)
+    var headersMatch = true;
+    var missingHeaders = [];
+    
+    for (var i = 0; i < expectedHeaders.length; i++) {
+      var found = false;
+      for (var j = 0; j < actualHeaders.length; j++) {
+        if (actualHeaders[j] && actualHeaders[j].toString().toLowerCase() === expectedHeaders[i].toLowerCase()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        missingHeaders.push(expectedHeaders[i]);
+        headersMatch = false;
+      }
+    }
+    
+    if (!headersMatch) {
+      incorrectHeaders.push(sheetName + " (falta: " + missingHeaders.join(", ") + ")");
+    }
+  }
+  
+  return {
+    missingSheets: missingSheets,
+    incorrectHeaders: incorrectHeaders
+  };
+}
+
+function createMissingSheets(ui) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  for (var sheetName in REQUIRED_SHEETS) {
+    var sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.getRange(1, 1, 1, REQUIRED_SHEETS[sheetName].length).setValues([REQUIRED_SHEETS[sheetName]]);
+      Logger.log("✓ Hoja creada: " + sheetName);
+    }
+  }
+}
+
+function fixHeaders(ui) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  for (var sheetName in REQUIRED_SHEETS) {
+    var sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) continue;
+    
+    var expectedHeaders = REQUIRED_SHEETS[sheetName];
+    var actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Verificar si hay datos en la hoja (más allá de la fila de encabezados)
+    var hasData = sheet.getLastRow() > 1;
+    
+    var headersMatch = true;
+    var missingHeaders = [];
+    
+    for (var i = 0; i < expectedHeaders.length; i++) {
+      var found = false;
+      for (var j = 0; j < actualHeaders.length; j++) {
+        if (actualHeaders[j] && actualHeaders[j].toString().toLowerCase() === expectedHeaders[i].toLowerCase()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        missingHeaders.push(expectedHeaders[i]);
+        headersMatch = false;
+      }
+    }
+    
+    if (!headersMatch && hasData) {
+      // Advertencia: hoja tiene datos pero encabezados incorrectos
+      var warning = "La hoja '" + sheetName + "' tiene datos pero encabezados incorrectos.\n" +
+                   "Faltan: " + missingHeaders.join(", ") + "\n" +
+                   "¿Desea corregir los encabezados? (Esto podría afectar datos existentes)";
+      
+      var response = ui.alert("Advertencia", warning, ui.ButtonSet.YES_NO);
+      
+      if (response !== ui.Button.YES) {
+        Logger.log("⚠️ Corrección de encabezados cancelada por usuario en hoja: " + sheetName);
+        continue;
+      }
+    }
+    
+    if (!headersMatch) {
+      // Corregir encabezados
+      sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
+      Logger.log("✓ Encabezados corregidos en hoja: " + sheetName);
+    }
+  }
+}
+
+function logInitialization() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetLogs = ss.getSheetByName('Logs');
+  
+  if (!sheetLogs) {
+    // Crear hoja Logs si no existe
+    sheetLogs = ss.insertSheet('Logs');
+    sheetLogs.getRange(1, 1, 1, 4).setValues([['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']]);
+  }
+  
+  var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  var user = Session.getActiveUser().getEmail();
+  var tipoCambio = "INICIALIZACION";
+  var descripcion = "Inicialización de estructura del libro de trabajo";
+  
+  sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
+  Logger.log("✓ Inicialización registrada en Logs");
+}
+
+// --- FASE 3: GESTIÓN DE PERMISOS Y PROTECCIÓN DE HOJAS ---
+
+function removeLegacyProtections() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var protections = ss.getProtections(SpreadsheetApp.ProtectionType.SHEET)
+                      .concat(ss.getProtections(SpreadsheetApp.ProtectionType.RANGE));
+  
+  var legacyDescriptions = ['Bloqueo_Usuarios', 'Bloqueo_Templates', 'Bloqueo_Ordenes_IT', 'Bloqueo_Ordenes_IS'];
+  
+  for (var i = 0; i < protections.length; i++) {
+    if (legacyDescriptions.indexOf(protections[i].getDescription()) !== -1) {
+      protections[i].remove();
+      Logger.log("✓ Eliminada protección legacy: " + protections[i].getDescription());
+    }
+  }
+}
+
+function applyNewProtectionScheme() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Primero eliminar protecciones legacy
+  removeLegacyProtections();
+  
+  // Proteger hoja templates
+  var sheetTemplates = ss.getSheetByName('templates');
+  if (sheetTemplates) {
+    protectSheetFully(sheetTemplates, 'Proteccion_Templates');
+  }
+  
+  // Proteger hoja Usuarios
+  var sheetUsuarios = ss.getSheetByName('Usuarios');
+  if (sheetUsuarios) {
+    protectSheetFully(sheetUsuarios, 'Proteccion_Usuarios');
+  }
+  
+  // Configurar protección mixta para Ordenes
+  configureOrdenesProtection();
+  
+  // Configurar protección para Logs
+  configureLogsProtection();
+  
+  Logger.log("✓ Nuevo esquema de protección aplicado");
+}
+
+function protectSheetFully(sheet, description) {
+  var protection = sheet.protect().setDescription(description);
+  protection.removeEditors(protection.getEditors());
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+  Logger.log("✓ Hoja protegida completamente: " + sheet.getName());
+}
+
+function configureOrdenesProtection() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetOrdenes = ss.getSheetByName('Ordenes');
+  if (!sheetOrdenes) return;
+  
+  // Proteger hoja completa primero
+  var protection = sheetOrdenes.protect().setDescription('Proteccion_Ordenes_Nuevo');
+  protection.removeEditors(protection.getEditors());
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+  
+  // Desproteger rango A:H (columnas 1-8) usando setUnprotectedRanges con array
+  var lastRow = sheetOrdenes.getLastRow();
+  if (lastRow < 1) lastRow = 1;
+  var unprotectedRange = sheetOrdenes.getRange(1, 1, lastRow, 8); // A:H
+  protection.setUnprotectedRanges([unprotectedRange]); // CORRECCIÓN: usar array
+  
+  Logger.log("✓ Protección mixta configurada para Ordenes (A:H desprotegido, I-Z protegido)");
+}
+
+function configureLogsProtection() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetLogs = ss.getSheetByName('Logs');
+  if (!sheetLogs) return;
+  
+  // Proteger hoja completa
+  var protection = sheetLogs.protect().setDescription('Proteccion_Logs');
+  protection.removeEditors(protection.getEditors());
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+  
+  // Agregar permiso de escritura para el script (propietario)
+  var ownerEmail = Session.getActiveUser().getEmail();
+  if (ownerEmail) {
+    protection.addEditor(ownerEmail);
+    Logger.log("✓ Hoja Logs protegida con permisos de escritura para script");
+  }
+}
+
+function promptApplyNewProtection() {
+  withAdminAuth('Aplicar Nuevo Esquema de Protección (Admin)', function(ui) {
+    applyNewProtectionScheme();
+    ui.alert('✅ Nuevo esquema de protección aplicado. Protecciones legacy eliminadas.');
+  });
+}
+
+function promptSetupAuditTrail() {
+  withAdminAuth('Activar Auditoría (Admin)', function(ui) {
+    setupAuditTrailTrigger();
+    ui.alert('✅ Sistema de auditoría activado. Los cambios se registrarán en la hoja Logs.');
+  });
+}
+
+// --- FASE 2: SISTEMA DE TRAZABILIDAD (AUDIT TRAIL) ---
+
+function setupAuditTrailTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Verificar si el disparador ya existe
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onEditInstalled') {
+      Logger.log("⚠️ Disparador onEditInstalled ya existe");
+      return;
+    }
+  }
+  
+  // Crear el disparador instalable
+  ScriptApp.newTrigger('onEditInstalled')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+  
+  Logger.log("✓ Disparador onEditInstalled creado");
+}
+
+function onEditInstalled(e) {
+  // Guard clause: ignorar ediciones en hoja Logs para evitar bucles infinitos
+  if (e.source.getActiveSheet().getName() === 'Logs') return;
+  
+  var user = Session.getActiveUser().getEmail();
+  var effectiveUser = Session.getEffectiveUser().getEmail();
+  
+  // Si el usuario que edita es el efectivo (admin/Web App), permitir sin registro
+  if (user === effectiveUser) return;
+  
+  var editedRange = e.range;
+  var sheet = editedRange.getSheet();
+  var sheetName = sheet.getName();
+  
+  // Verificar permisos de edición (lógica migrada de onEdit original)
+  var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var rangeProtections = editedRange.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  var allProtections = sheetProtections.concat(rangeProtections);
+  var hasPermission = true;
+  var protectionDesc = "";
+  
+  for (var i = 0; i < allProtections.length; i++) {
+    var protection = allProtections[i];
+    if (!protection.canEdit()) {
+      hasPermission = false;
+      protectionDesc = protection.getDescription() || "protegido";
+      break;
+    }
+  }
+  
+  var userEmail = getUserEmail(e);
+  var userIdentity = getUserIdentityString(userEmail);
+  
+  if (!hasPermission) {
+    // Revertir al valor anterior
+    editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
+      "⚠️ Edición no permitida",
+      5
+    );
+    
+    // Registrar violación de permiso
+    var cellAddress = editedRange.getA1Notation();
+    var violationDesc = "Intento de edición denegado al usuario " + userEmail + " en la celda " + cellAddress + " de la hoja " + sheetName;
+    logChange('VIOLACION_PERMISO', violationDesc, userIdentity);
+    return;
+  }
+  
+  // Usuario tiene permiso, registrar la edición válida
+  var numRows = editedRange.getNumRows();
+  var numCols = editedRange.getNumColumns();
+  
+  if (numRows === 1 && numCols === 1) {
+    // Edición de celda única
+    var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
+    var newValue = e.value !== undefined ? e.value : "(vacío)";
+    var cellAddress = editedRange.getA1Notation();
+    var editDesc = "Cambió '" + oldValue + "' por '" + newValue + "' en la celda " + cellAddress + " de la hoja " + sheetName;
+    logChange('EDICION_CELDA', editDesc, userIdentity);
+  } else {
+    // Edición masiva (multi-celda)
+    var rangeA1 = editedRange.getA1Notation();
+    var massEditDesc = "Edición masiva en el rango " + rangeA1 + " de la hoja " + sheetName;
+    logChange('EDICION_MASIVA', massEditDesc, userIdentity);
+  }
+}
+
+function getUserEmail(e) {
+  var email = Session.getActiveUser().getEmail();
+  if (!email || email === "") {
+    email = e.user.email; // Intentar del evento
+  }
+  if (!email || email === "") {
+    email = "Usuario no identificado (requiere dominio corporativo para CFR21 Part 11)";
+  }
+  return email;
+}
+
+function getUserIdentityString(email) {
+  if (!email || email.indexOf("Usuario no identificado") !== -1) return email;
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) return email; // Fallback
+  
+  var data = sheet.getDataRange().getValues();
+  // Iterar saltando el encabezado (fila 1 / índice 0)
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][3] && data[i][3].toString().trim().toLowerCase() === email.toLowerCase()) {
+      return (data[i][0] || "N/A") + " - " + (data[i][2] || "N/A");
+    }
+  }
+  return email; // Fallback si el correo no está en la tabla
+}
+
+function logChange(tipoCambio, descripcion, userIdentity) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetLogs = ss.getSheetByName('Logs');
+  
+  if (!sheetLogs) {
+    Logger.log("⚠️ Hoja Logs no existe. Creando hoja Logs.");
+    sheetLogs = ss.insertSheet('Logs');
+    sheetLogs.getRange(1, 1, 1, 4).setValues([['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']]);
+  }
+  
+  var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  var user = userIdentity || Session.getActiveUser().getEmail(); // Usar parámetro con fallback adicional
+  
+  sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
+  Logger.log("✓ " + tipoCambio + " registrado en Logs");
 }
