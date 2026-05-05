@@ -1331,6 +1331,11 @@ function abrirModalDesdeBoton(rowIdx) {
   var colOrdenIdx = headers.indexOf('NoOrden') + 1;
   var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
   
+  if (colOrdenIdx === 0 || colAdjuntoIdx === 0) {
+    SpreadsheetApp.getActiveSpreadsheet().toast("Error: Columnas NoOrden o AdjuntoOrden no encontradas.", "Error", 5);
+    return;
+  }
+  
   // Verificar estado actual de la celda
   var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoIdx).getValue();
   var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
