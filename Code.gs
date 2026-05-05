@@ -12,6 +12,7 @@ function onOpen() {
     .addItem('Imprimir Plantillas', 'openPrintDialog')
     .addSeparator()
     .addItem('🔄 Actualizar Celdas de Subida', 'actualizarCeldasDeSubida')
+    .addItem('🧹 Limpiar Botones Residuales', 'limpiarBotonesResiduales')
     .addItem('🔍 Diagnosticar Celdas de Subida', 'diagnosticarCeldasDeSubida')
     .addSeparator()
     .addItem(' Diagnosticar Plantillas', 'diagnosticarPlantillas')
@@ -1334,6 +1335,58 @@ function actualizarCeldasDeSubida() {
   SpreadsheetApp.getUi().alert(mensaje);
 }
 
+/**
+ * Elimina todas las imágenes/botones residuales de la columna AdjuntoOrden.
+ * Esta función limpia artefactos de la implementación anterior con assignScript.
+ */
+function limpiarBotonesResiduales() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ordenes');
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('❌ La hoja "Ordenes" no fue encontrada.');
+    return;
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+  
+  if (colAdjuntoIdx === 0) {
+    SpreadsheetApp.getUi().alert('❌ No se encontró la columna "AdjuntoOrden".');
+    return;
+  }
+
+  var images = sheet.getImages();
+  var botonesEliminados = 0;
+  var ubicacionesEliminadas = [];
+  
+  for (var i = 0; i < images.length; i++) {
+    var img = images[i];
+    var imgCol = img.getAnchorCell().getColumn();
+    var imgRow = img.getAnchorCell().getRow();
+    // Eliminar únicamente imágenes en la columna AdjuntoOrden
+    if (imgCol === colAdjuntoIdx) {
+      img.remove();
+      botonesEliminados++;
+      ubicacionesEliminadas.push("Fila " + imgRow);
+    }
+  }
+
+  var mensaje = "=== Limpieza de Botones Residuales ===\n\n";
+  mensaje += "🗑️ Botones/imágenes eliminados: " + botonesEliminados + "\n";
+  
+  if (botonesEliminados > 0) {
+    mensaje += "📍 Ubicaciones: " + ubicacionesEliminadas.join(", ") + "\n\n";
+    mensaje += "✅ Se eliminaron los artefactos de la implementación anterior.\n";
+    mensaje += "ℹ️ El nuevo sistema usa celdas con texto '⬆️ Subir Archivo'.";
+  } else {
+    mensaje += "ℹ️ No se encontraron botones residuales para eliminar.\n";
+    mensaje += "ℹ️ El sistema está limpio y usa el nuevo enfoque de celdas.";
+  }
+
+  SpreadsheetApp.getUi().alert(mensaje);
+  Logger.log("✅ Limpieza completada: " + botonesEliminados + " botones eliminados");
+}
+
 function diagnosticarCeldasDeSubida() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
@@ -1357,6 +1410,28 @@ function diagnosticarCeldasDeSubida() {
   if (colAdjuntoIdx === 0 || colOrdenIdx === 0) {
     SpreadsheetApp.getUi().alert(reporte);
     return;
+  }
+  
+  // Detectar imágenes residuales en columna AdjuntoOrden
+  var images = sheet.getImages();
+  var imagenesEnColumna = 0;
+  var imagenesInfo = [];
+  for (var i = 0; i < images.length; i++) {
+    var img = images[i];
+    var imgCol = img.getAnchorCell().getColumn();
+    var imgRow = img.getAnchorCell().getRow();
+    if (imgCol === colAdjuntoIdx) {
+      imagenesEnColumna++;
+      imagenesInfo.push(`Fila ${imgRow}`);
+    }
+  }
+  
+  if (imagenesEnColumna > 0) {
+    reporte += "⚠️ IMÁGENES RESIDUALES ENCONTRADAS:\n";
+    reporte += `   - Total de imágenes en columna AdjuntoOrden: ${imagenesEnColumna}\n`;
+    reporte += `   - Ubicaciones: ${imagenesInfo.join(", ")}\n`;
+    reporte += "   - Estas imágenes son artefactos de la implementación anterior.\n";
+    reporte += "   - Deben eliminarse ejecutando '🧹 Limpiar Botones Residuales'.\n\n";
   }
   
   var lastRow = sheet.getLastRow();
@@ -1387,6 +1462,9 @@ function diagnosticarCeldasDeSubida() {
   reporte += `   - ⚠️ Sin NoOrden: ${filasSinOrden}\n\n`;
   
   reporte += "💡 Recomendaciones:\n";
+  if (imagenesEnColumna > 0) {
+    reporte += "   - ⚠️ PRIORIDAD: Ejecutar '🧹 Limpiar Botones Residuales' para eliminar imágenes obsoletas.\n";
+  }
   if (filasVacias > 0) {
     reporte += "   - Ejecutar '🔄 Actualizar Celdas de Subida' para configurar las filas vacías.\n";
   } else if (filasPendientes === 0 && filasCargadas > 0) {
