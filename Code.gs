@@ -1294,10 +1294,11 @@ function crearBotonesSubidaEficiente() {
   }
   Logger.log("🔍 DIAGNÓSTICO: Botones eliminados: " + botonesEliminados);
   
-  // Crear botón SVG
-  var buttonHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="110" height="24"><rect width="110" height="24" fill="#4285f4" rx="4"/><text x="55" y="16" font-family="Arial" font-size="11" fill="white" text-anchor="middle" font-weight="bold">Subir Archivo</text></svg>';
-  var buttonBlob = Utilities.newBlob(buttonHtml, 'image/svg+xml', 'button.svg');
-  Logger.log("🔍 DIAGNÓSTICO: Blob de botón SVG creado");
+  // Crear botón PNG en base64 (SVG no es soportado por insertImage)
+  // PNG azul simple para botón
+  var buttonPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+  var buttonBlob = Utilities.newBlob(Utilities.base64Decode(buttonPngBase64), 'image/png', 'button.png');
+  Logger.log("🔍 DIAGNÓSTICO: Blob de botón PNG creado");
   
   var botonesCreados = 0;
   var filasIgnoradas = 0;
