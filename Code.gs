@@ -1096,6 +1096,8 @@ function setupAuditTrailTrigger() {
 }
 
 function onEditInstalled(e) {
+  Logger.log("onEditInstalled Trigger ejecutado. Fuente: " + e.source.getActiveSheet().getName() + ", Rango: " + e.range.getA1Notation());
+  
   // Guard clause: ignorar ediciones en hoja Logs para evitar bucles infinitos
   if (e.source.getActiveSheet().getName() === 'Logs') return;
   
@@ -1153,6 +1155,7 @@ function onEditInstalled(e) {
 
     // Si la edición fue en la columna AdjuntoOrden y la celda contenía el texto del "botón"
     if (colAdjuntoIdx > 0 && editedRange.getColumn() === colAdjuntoIdx && e.oldValue === '⬆️ Subir Archivo') {
+      Logger.log("Detectado clic en '⬆️ Subir Archivo' para la fila " + editedRange.getRow());
       var rowIdx = editedRange.getRow();
       var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
 
