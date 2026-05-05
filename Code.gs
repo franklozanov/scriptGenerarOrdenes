@@ -12,6 +12,7 @@ function onOpen() {
     .addItem('Imprimir Plantillas', 'openPrintDialog')
     .addSeparator()
     .addItem('🔄 Actualizar Botones de Subida', 'crearBotonesSubidaEficiente')
+    .addItem('🔍 Diagnosticar Botones de Subida', 'diagnosticarBotonesSubida')
     .addSeparator()
     .addItem(' Diagnosticar Plantillas', 'diagnosticarPlantillas')
     .addSeparator()
@@ -1247,41 +1248,61 @@ function crearBotonesSubidaEficiente() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) {
-    SpreadsheetApp.getUi().alert('Hoja Ordenes no encontrada');
+    SpreadsheetApp.getUi().alert('❌ DIAGNÓSTICO: Hoja Ordenes no encontrada');
+    Logger.log("❌ DIAGNÓSTICO: Hoja Ordenes no encontrada");
     return;
   }
   
+  SpreadsheetApp.getActiveSpreadsheet().toast("🔍 DIAGNÓSTICO: Iniciando creación de botones...", "Info", 10);
+  Logger.log("🔍 DIAGNÓSTICO: Iniciando creación de botones");
+  
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  Logger.log("🔍 DIAGNÓSTICO: Headers encontrados: " + headers.join(", "));
+  
   var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
   var colOrdenIdx = headers.indexOf('NoOrden') + 1;
   
+  Logger.log("🔍 DIAGNÓSTICO: colAdjuntoIdx=" + colAdjuntoIdx + ", colOrdenIdx=" + colOrdenIdx);
+  SpreadsheetApp.getActiveSpreadsheet().toast("🔍 AdjuntoIdx: " + colAdjuntoIdx + ", OrdenIdx: " + colOrdenIdx, "Info", 5);
+  
   if (colAdjuntoIdx === 0 || colOrdenIdx === 0) {
-    SpreadsheetApp.getUi().alert('Columnas AdjuntoOrden o NoOrden no encontradas');
+    var errorMsg = "❌ DIAGNÓSTICO: Columnas no encontradas. AdjuntoIdx=" + colAdjuntoIdx + ", OrdenIdx=" + colOrdenIdx;
+    SpreadsheetApp.getUi().alert(errorMsg);
+    Logger.log(errorMsg);
     return;
   }
   
   var lastRow = sheet.getLastRow();
+  Logger.log("🔍 DIAGNÓSTICO: Última fila: " + lastRow);
+  
   if (lastRow < 2) {
-    SpreadsheetApp.getUi().alert('No hay filas de datos');
+    SpreadsheetApp.getUi().alert('❌ DIAGNÓSTICO: No hay filas de datos (lastRow=' + lastRow + ')');
     return;
   }
   
   // Limpiar botones existentes en columna AdjuntoOrden
   var images = sheet.getImages();
+  Logger.log("🔍 DIAGNÓSTICO: Imágenes existentes: " + images.length);
+  var botonesEliminados = 0;
   for (var i = 0; i < images.length; i++) {
     var img = images[i];
     var imgCol = img.getAnchorCell().getColumn();
     if (imgCol === colAdjuntoIdx) {
       img.remove();
+      botonesEliminados++;
     }
   }
+  Logger.log("🔍 DIAGNÓSTICO: Botones eliminados: " + botonesEliminados);
   
   // Crear botón SVG
   var buttonHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="110" height="24"><rect width="110" height="24" fill="#4285f4" rx="4"/><text x="55" y="16" font-family="Arial" font-size="11" fill="white" text-anchor="middle" font-weight="bold">Subir Archivo</text></svg>';
   var buttonBlob = Utilities.newBlob(buttonHtml, 'image/svg+xml', 'button.svg');
+  Logger.log("🔍 DIAGNÓSTICO: Blob de botón SVG creado");
   
   var botonesCreados = 0;
   var filasIgnoradas = 0;
+  var filasSinOrden = 0;
+  var errores = [];
   
   // Solo crear botones para filas pendientes
   for (var row = 2; row <= lastRow; row++) {
@@ -1291,13 +1312,16 @@ function crearBotonesSubidaEficiente() {
     // EFICIENCIA: Ignorar filas ya cargadas
     if (adjuntoStr.indexOf("Cargado") !== -1 || adjuntoStr.indexOf("✅") !== -1) {
       filasIgnoradas++;
-      continue; // Skip loaded rows
+      continue;
     }
     
     // Solo crear botón si es "⬆️ Subir Archivo" o está vacío
     if (adjuntoStr === "⬆️ Subir Archivo" || adjuntoStr === "") {
       var noOrden = sheet.getRange(row, colOrdenIdx).getValue();
-      if (!noOrden) continue;
+      if (!noOrden) {
+        filasSinOrden++;
+        continue;
+      }
       
       // Configurar celda como "⬆️ Subir Archivo" si está vacía
       if (adjuntoStr === "") {
@@ -1308,31 +1332,57 @@ function crearBotonesSubidaEficiente() {
         var img = sheet.insertImage(buttonBlob, colAdjuntoIdx, row);
         img.setWidth(110);
         img.setHeight(24);
-        img.assignScript('abrirModalDesdeBoton(' + row + ')');
+        var scriptName = 'abrirModalDesdeBoton(' + row + ')';
+        img.assignScript(scriptName);
         botonesCreados++;
+        Logger.log("✅ Botón creado en fila " + row + " con script: " + scriptName);
       } catch (e) {
-        Logger.log("Error creando botón en fila " + row + ": " + e.message);
+        var errorStr = "Error fila " + row + ": " + e.message;
+        errores.push(errorStr);
+        Logger.log("❌ " + errorStr);
       }
     }
   }
   
-  var mensaje = "Botones creados: " + botonesCreados + "\n";
-  mensaje += "Filas ignoradas (ya cargadas): " + filasIgnoradas;
+  var mensaje = "=== DIAGNÓSTICO COMPLETO ===\n\n";
+  mensaje += "✅ Botones creados: " + botonesCreados + "\n";
+  mensaje += "⏭️ Filas ignoradas (ya cargadas): " + filasIgnoradas + "\n";
+  mensaje += "⚠️ Filas sin NoOrden: " + filasSinOrden + "\n";
+  mensaje += "🗑️ Botones eliminados: " + botonesEliminados + "\n";
+  if (errores.length > 0) {
+    mensaje += "\n❌ ERRORES:\n" + errores.join("\n");
+  }
+  
   SpreadsheetApp.getUi().alert(mensaje);
-  Logger.log("✓ Botones creados: " + botonesCreados + ", Ignoradas: " + filasIgnoradas);
+  Logger.log("✅ DIAGNÓSTICO FINAL: Creados=" + botonesCreados + ", Ignoradas=" + filasIgnoradas + ", SinOrden=" + filasSinOrden);
 }
 
 function abrirModalDesdeBoton(rowIdx) {
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: abrirModalDesdeBoton llamado con rowIdx=" + rowIdx);
+  SpreadsheetApp.getActiveSpreadsheet().toast("🔍 DIAGNÓSTICO: Botón clickeado fila " + rowIdx, "Info", 5);
+  
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
-  if (!sheet) return;
+  if (!sheet) {
+    Logger.log("❌ DIAGNÓSTICO BOTÓN: Hoja Ordenes no encontrada");
+    SpreadsheetApp.getActiveSpreadsheet().toast("❌ Hoja Ordenes no encontrada", "Error", 5);
+    return;
+  }
+  
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: Hoja Ordenes encontrada");
   
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: Headers: " + headers.join(", "));
+  
   var colOrdenIdx = headers.indexOf('NoOrden') + 1;
   var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
   
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: colOrdenIdx=" + colOrdenIdx + ", colAdjuntoIdx=" + colAdjuntoIdx);
+  
   if (colOrdenIdx === 0 || colAdjuntoIdx === 0) {
-    SpreadsheetApp.getActiveSpreadsheet().toast("Error: Columnas NoOrden o AdjuntoOrden no encontradas.", "Error", 5);
+    var errorMsg = "❌ Columnas no encontradas. OrdenIdx=" + colOrdenIdx + ", AdjuntoIdx=" + colAdjuntoIdx;
+    Logger.log("❌ DIAGNÓSTICO BOTÓN: " + errorMsg);
+    SpreadsheetApp.getActiveSpreadsheet().toast(errorMsg, "Error", 5);
     return;
   }
   
@@ -1340,20 +1390,152 @@ function abrirModalDesdeBoton(rowIdx) {
   var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoIdx).getValue();
   var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
   
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: Valor AdjuntoOrden fila " + rowIdx + ": '" + adjuntoStr + "'");
+  
   // EFICIENCIA: No abrir modal si ya está cargado
   if (adjuntoStr.indexOf("Cargado") !== -1 || adjuntoStr.indexOf("✅") !== -1) {
+    Logger.log("⏭️ DIAGNÓSTICO BOTÓN: Fila ya cargada, ignorando");
     SpreadsheetApp.getActiveSpreadsheet().toast("Esta orden ya tiene archivo cargado.", "Info", 3);
     return;
   }
   
   var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: NoOrden fila " + rowIdx + ": " + noOrden);
   
   if (!noOrden) {
+    Logger.log("❌ DIAGNÓSTICO BOTÓN: NoOrden vacío en fila " + rowIdx);
     SpreadsheetApp.getActiveSpreadsheet().toast("No hay número de orden en esta fila.", "Error", 5);
     return;
   }
   
+  Logger.log("✅ DIAGNÓSTICO BOTÓN: Llamando a abrirModalSubidaDocumento con rowIdx=" + rowIdx + ", noOrden=" + noOrden);
   abrirModalSubidaDocumento(rowIdx, noOrden.toString().trim());
+}
+
+function diagnosticarBotonesSubida() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ordenes');
+  
+  var reporte = "=== DIAGNÓSTICO COMPLETO DE BOTONES DE SUBIDA ===\n\n";
+  
+  // 1. Verificar hoja
+  if (!sheet) {
+    reporte += "❌ Hoja 'Ordenes' NO encontrada\n";
+    SpreadsheetApp.getUi().alert(reporte);
+    return;
+  }
+  reporte += "✅ Hoja 'Ordenes' encontrada\n";
+  
+  // 2. Verificar estructura
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  reporte += "📋 Headers encontrados: " + headers.join(", ") + "\n\n";
+  
+  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+  var colOrdenIdx = headers.indexOf('NoOrden') + 1;
+  
+  reporte += "📍 Índices de columnas:\n";
+  reporte += "   - AdjuntoOrden: " + colAdjuntoIdx + (colAdjuntoIdx === 0 ? " (❌ NO ENCONTRADA)" : " (✅ OK)") + "\n";
+  reporte += "   - NoOrden: " + colOrdenIdx + (colOrdenIdx === 0 ? " (❌ NO ENCONTRADA)" : " (✅ OK)") + "\n\n";
+  
+  if (colAdjuntoIdx === 0 || colOrdenIdx === 0) {
+    SpreadsheetApp.getUi().alert(reporte);
+    return;
+  }
+  
+  // 3. Analizar filas
+  var lastRow = sheet.getLastRow();
+  reporte += "📊 Total de filas de datos: " + (lastRow - 1) + "\n\n";
+  
+  var filasPendientes = 0;
+  var filasCargadas = 0;
+  var filasVacias = 0;
+  var filasSinOrden = 0;
+  var detallesFilas = [];
+  
+  for (var row = 2; row <= lastRow; row++) {
+    var adjuntoValue = sheet.getRange(row, colAdjuntoIdx).getValue();
+    var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
+    var noOrden = sheet.getRange(row, colOrdenIdx).getValue();
+    
+    if (!noOrden) {
+      filasSinOrden++;
+      detallesFilas.push("Fila " + row + ": Sin NoOrden - Adjunto='" + adjuntoStr + "'");
+    } else if (adjuntoStr.indexOf("Cargado") !== -1 || adjuntoStr.indexOf("✅") !== -1) {
+      filasCargadas++;
+    } else if (adjuntoStr === "⬆️ Subir Archivo") {
+      filasPendientes++;
+    } else if (adjuntoStr === "") {
+      filasVacias++;
+    } else {
+      detallesFilas.push("Fila " + row + ": Estado desconocido - Adjunto='" + adjuntoStr + "'");
+    }
+  }
+  
+  reporte += "📈 Estado de filas:\n";
+  reporte += "   - Pendientes de subida (⬆️ Subir Archivo): " + filasPendientes + "\n";
+  reporte += "   - Ya cargadas (✅ Cargado): " + filasCargadas + "\n";
+  reporte += "   - Vacías: " + filasVacias + "\n";
+  reporte += "   - Sin NoOrden: " + filasSinOrden + "\n\n";
+  
+  if (detallesFilas.length > 0) {
+    reporte += "⚠️ Detalles de filas con problemas:\n";
+    for (var i = 0; i < Math.min(detallesFilas.length, 10); i++) {
+      reporte += "   " + detallesFilas[i] + "\n";
+    }
+    if (detallesFilas.length > 10) {
+      reporte += "   ... y " + (detallesFilas.length - 10) + " más\n";
+    }
+    reporte += "\n";
+  }
+  
+  // 4. Analizar imágenes/botones
+  var images = sheet.getImages();
+  reporte += "🖼️ Imágenes/botones en la hoja: " + images.length + "\n";
+  
+  var botonesEnColumna = 0;
+  var botonesInfo = [];
+  for (var i = 0; i < images.length; i++) {
+    var img = images[i];
+    var imgCol = img.getAnchorCell().getColumn();
+    var imgRow = img.getAnchorCell().getRow();
+    if (imgCol === colAdjuntoIdx) {
+      botonesEnColumna++;
+      botonesInfo.push("Botón en fila " + imgRow);
+    }
+  }
+  
+  reporte += "   - Botones en columna AdjuntoOrden: " + botonesEnColumna + "\n";
+  if (botonesInfo.length > 0) {
+    reporte += "   - Ubicaciones: " + botonesInfo.join(", ") + "\n";
+  }
+  reporte += "\n";
+  
+  // 5. Comparación esperado vs actual
+  reporte += "🔍 Análisis de consistencia:\n";
+  if (botonesEnColumna === filasPendientes) {
+    reporte += "   ✅ Botones coinciden con filas pendientes\n";
+  } else {
+    reporte += "   ⚠️ Inconsistencia: " + botonesEnColumna + " botones vs " + filasPendientes + " filas pendientes\n";
+  }
+  
+  if (filasVacias > 0) {
+    reporte += "   ⚠️ Hay " + filasVacias + " filas vacías que deberían configurarse\n";
+  }
+  
+  // 6. Recomendaciones
+  reporte += "\n💡 Recomendaciones:\n";
+  if (filasVacias > 0) {
+    reporte += "   - Ejecutar '🔄 Actualizar Botones de Subida' para configurar filas vacías\n";
+  }
+  if (botonesEnColumna !== filasPendientes) {
+    reporte += "   - Ejecutar '🔄 Actualizar Botones de Subida' para sincronizar botones\n";
+  }
+  if (filasPendientes === 0 && filasVacias === 0 && filasCargadas > 0) {
+    reporte += "   - Todas las filas están cargadas. No se requieren botones.\n";
+  }
+  
+  SpreadsheetApp.getUi().alert(reporte);
+  Logger.log(reporte);
 }
 
 // --- FUNCIÓN PARA PROCESAR LA SUBIDA DEL DOCUMENTO ---
