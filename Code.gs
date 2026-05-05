@@ -1333,10 +1333,10 @@ function crearBotonesSubidaEficiente() {
         var img = sheet.insertImage(buttonBlob, colAdjuntoIdx, row);
         img.setWidth(110);
         img.setHeight(24);
-        var scriptName = 'abrirModalDesdeBoton(' + row + ')';
-        img.assignScript(scriptName);
+        img.setAltTextTitle('button_row_' + row);  // Store row index in alt text
+        img.assignScript('abrirModalDesdeBoton');
         botonesCreados++;
-        Logger.log("✅ Botón creado en fila " + row + " con script: " + scriptName);
+        Logger.log("✅ Botón creado en fila " + row + " con alt text: button_row_" + row);
       } catch (e) {
         var errorStr = "Error fila " + row + ": " + e.message;
         errores.push(errorStr);
@@ -1358,10 +1358,8 @@ function crearBotonesSubidaEficiente() {
   Logger.log("✅ DIAGNÓSTICO FINAL: Creados=" + botonesCreados + ", Ignoradas=" + filasIgnoradas + ", SinOrden=" + filasSinOrden);
 }
 
-function abrirModalDesdeBoton(rowIdx) {
-  Logger.log("🔍 DIAGNÓSTICO BOTÓN: abrirModalDesdeBoton llamado con rowIdx=" + rowIdx);
-  SpreadsheetApp.getActiveSpreadsheet().toast("🔍 DIAGNÓSTICO: Botón clickeado fila " + rowIdx, "Info", 5);
-  
+function abrirModalDesdeBoton() {
+  // Find the clicked image by looking for images with button_row_ prefix in alt text
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) {
@@ -1369,6 +1367,27 @@ function abrirModalDesdeBoton(rowIdx) {
     SpreadsheetApp.getActiveSpreadsheet().toast("❌ Hoja Ordenes no encontrada", "Error", 5);
     return;
   }
+
+  // Get all images and find the one with button_row_ prefix
+  var images = sheet.getImages();
+  var rowIdx = null;
+  for (var i = 0; i < images.length; i++) {
+    var altText = images[i].getAltTextTitle();
+    if (altText && altText.indexOf('button_row_') === 0) {
+      rowIdx = parseInt(altText.replace('button_row_', ''));
+      Logger.log("🔍 DIAGNÓSTICO BOTÓN: Imagen encontrada con alt text: " + altText + ", fila: " + rowIdx);
+      break;
+    }
+  }
+
+  if (!rowIdx) {
+    Logger.log("❌ DIAGNÓSTICO BOTÓN: No se pudo determinar la fila desde la imagen");
+    SpreadsheetApp.getActiveSpreadsheet().toast("❌ Error: No se pudo identificar la fila del botón", "Error", 5);
+    return;
+  }
+
+  Logger.log("🔍 DIAGNÓSTICO BOTÓN: abrirModalDesdeBoton llamado con rowIdx=" + rowIdx);
+  SpreadsheetApp.getActiveSpreadsheet().toast("🔍 DIAGNÓSTICO: Botón clickeado fila " + rowIdx, "Info", 5);
   
   Logger.log("🔍 DIAGNÓSTICO BOTÓN: Hoja Ordenes encontrada");
   
