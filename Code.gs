@@ -100,10 +100,31 @@ function lockRanges() {
   // 3. Bloquear rango I:T en Ordenes excepto columna K (edición libre)
   var sheetOrdenes = ss.getSheetByName('Ordenes');
   if (sheetOrdenes) {
-    var p3 = sheetOrdenes.getRange('I:T').protect().setDescription('Bloqueo_Ordenes_IT');
-    p3.setUnprotectedRanges([sheetOrdenes.getRange('K:K')]);
+    var p3 = sheetOrdenes.protect().setDescription('Bloqueo_Ordenes_Dinamico');
     p3.removeEditors(p3.getEditors());
     if (p3.canDomainEdit()) p3.setDomainEdit(false);
+    
+    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+    var colsToProtect = [
+      "VerifLote", "CantDispAFecha", "VerifCant. Disponible", "VerifExp", 
+      "Fabricante", "Decision", "STATUS", "ImpresoPor", "NoPags", 
+      "ReimpresoPor", "Reimpresion", "TotalPags"
+    ];
+    
+    var unprotectedRanges = [];
+    var lastRow = sheetOrdenes.getLastRow();
+    if (lastRow < 1) lastRow = 1;
+    
+    for (var i = 0; i < headers.length; i++) {
+      var header = headers[i] ? headers[i].toString().trim() : "";
+      if (colsToProtect.indexOf(header) === -1) {
+        unprotectedRanges.push(sheetOrdenes.getRange(1, i + 1, lastRow, 1));
+      }
+    }
+    
+    if (unprotectedRanges.length > 0) {
+      p3.setUnprotectedRanges(unprotectedRanges);
+    }
   }
 }
 
@@ -114,7 +135,7 @@ function unlockRanges() {
                       
   for (var i = 0; i < protections.length; i++) {
     var desc = protections[i].getDescription();
-    if (desc === 'Bloqueo_Usuarios' || desc === 'Bloqueo_Templates' || desc === 'Bloqueo_Ordenes_IT' || desc === 'Bloqueo_Ordenes_IS') {
+    if (desc === 'Bloqueo_Usuarios' || desc === 'Bloqueo_Templates' || desc === 'Bloqueo_Ordenes_IT' || desc === 'Bloqueo_Ordenes_IS' || desc === 'Bloqueo_Ordenes_Dinamico') {
       protections[i].remove();
     }
   }
@@ -804,7 +825,7 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
 // Estructura esperada del libro de trabajo
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: ID_FOLDER es valor de fila, no columna
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
 };
@@ -980,7 +1001,7 @@ function removeLegacyProtections() {
   var protections = ss.getProtections(SpreadsheetApp.ProtectionType.SHEET)
                       .concat(ss.getProtections(SpreadsheetApp.ProtectionType.RANGE));
   
-  var legacyDescriptions = ['Bloqueo_Usuarios', 'Bloqueo_Templates', 'Bloqueo_Ordenes_IT', 'Bloqueo_Ordenes_IS'];
+  var legacyDescriptions = ['Bloqueo_Usuarios', 'Bloqueo_Templates', 'Bloqueo_Ordenes_IT', 'Bloqueo_Ordenes_IS', 'Bloqueo_Ordenes_Dinamico'];
   
   for (var i = 0; i < protections.length; i++) {
     if (legacyDescriptions.indexOf(protections[i].getDescription()) !== -1) {
@@ -1034,13 +1055,29 @@ function configureOrdenesProtection() {
   protection.removeEditors(protection.getEditors());
   if (protection.canDomainEdit()) protection.setDomainEdit(false);
   
-  // Desproteger rango A:H (columnas 1-8) usando setUnprotectedRanges con array
+  var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+  var colsToProtect = [
+    "VerifLote", "CantDispAFecha", "VerifCant. Disponible", "VerifExp", 
+    "Fabricante", "Decision", "STATUS", "ImpresoPor", "NoPags", 
+    "ReimpresoPor", "Reimpresion", "TotalPags"
+  ];
+  
+  var unprotectedRanges = [];
   var lastRow = sheetOrdenes.getLastRow();
   if (lastRow < 1) lastRow = 1;
-  var unprotectedRange = sheetOrdenes.getRange(1, 1, lastRow, 8); // A:H
-  protection.setUnprotectedRanges([unprotectedRange]); // CORRECCIÓN: usar array
   
-  Logger.log("✓ Protección mixta configurada para Ordenes (A:H desprotegido, I-Z protegido)");
+  for (var i = 0; i < headers.length; i++) {
+    var header = headers[i] ? headers[i].toString().trim() : "";
+    if (colsToProtect.indexOf(header) === -1) {
+      unprotectedRanges.push(sheetOrdenes.getRange(1, i + 1, lastRow, 1));
+    }
+  }
+  
+  if (unprotectedRanges.length > 0) {
+    protection.setUnprotectedRanges(unprotectedRanges);
+  }
+  
+  Logger.log("✓ Protección mixta configurada para Ordenes (basada en encabezados dinámicos)");
 }
 
 function configureLogsProtection() {
@@ -1144,9 +1181,34 @@ function onEditInstalled(e) {
     return;
   }
   
-  // Usuario tiene permiso, registrar la edición válida
+  // Usuario tiene permiso, obtener dimensiones de edición
   var numRows = editedRange.getNumRows();
   var numCols = editedRange.getNumColumns();
+
+  // Lógica de Subida de Adjuntos (Interceptar Checkbox)
+  if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+    var colOrdenIdx = headers.indexOf('NoOrden') + 1;
+    
+    // Si la edición fue en AdjuntoOrden y el valor es TRUE (Checkbox marcado)
+    if (colAdjuntoIdx > 0 && editedRange.getColumn() === colAdjuntoIdx && e.value === "TRUE") {
+      var rowIdx = editedRange.getRow();
+      var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
+      
+      if (!noOrden) {
+        SpreadsheetApp.getActiveSpreadsheet().toast("No hay número de orden en esta fila.", "Error", 5);
+        editedRange.setValue(false); // Desmarcar
+        return;
+      }
+      
+      // Llamar al modal y detener el resto del onEdit (no auditar el checkbox)
+      abrirModalSubidaDocumento(rowIdx, noOrden);
+      return; 
+    }
+  }
+  
+  // Registrar la edición válida
   
   if (numRows === 1 && numCols === 1) {
     // Edición de celda única
@@ -1206,4 +1268,104 @@ function logChange(tipoCambio, descripcion, userIdentity) {
   
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
   Logger.log("✓ " + tipoCambio + " registrado en Logs");
+}
+
+// --- FUNCIÓN PARA ABRIR MODAL DE SUBIDA DE DOCUMENTO ---
+
+function abrirModalSubidaDocumento(rowIdx, noOrden) {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('UploadModal')
+      .setWidth(500)
+      .setHeight(350)
+      .setTitle('Subir Adjunto - Orden ' + noOrden);
+    
+    // Inyectar variables en el HTML
+    html = html.setContent(html.getContent()
+      .replace(/{{ROW_IDX}}/g, rowIdx)
+      .replace(/{{NO_ORDEN}}/g, noOrden)
+    );
+    
+    SpreadsheetApp.getUi().showModalDialog(html, 'Subir Adjunto - Orden ' + noOrden);
+  } catch (e) {
+    Logger.log("Error al abrir modal de subida: " + e.message);
+    SpreadsheetApp.getActiveSpreadsheet().toast("Error al abrir el modal de subida.", "Error", 5);
+  }
+}
+
+// --- FUNCIÓN PARA PROCESAR LA SUBIDA DEL DOCUMENTO ---
+
+function procesarSubidaDocumento(base64Data, mimeType, fileName, rowIdx, noOrden) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var tplSheet = ss.getSheetByName('templates');
+    
+    if (!tplSheet) {
+      throw new Error("La hoja 'templates' no existe.");
+    }
+    
+    // Buscar ID_FOLDER en la hoja templates
+    var tplData = tplSheet.getDataRange().getValues();
+    var folderId = "";
+    
+    for (var i = 1; i < tplData.length; i++) {
+      var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
+      if (key === "ID_FOLDER") {
+        folderId = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+        break;
+      }
+    }
+    
+    if (!folderId) {
+      throw new Error("No se encontró la clave ID_FOLDER en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
+    }
+    
+    // Obtener la carpeta destino
+    var folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+    } catch (e) {
+      throw new Error("No se puede acceder a la carpeta ID_FOLDER (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
+    }
+    
+    // Manejo de Históricos (Sobreescritura segura)
+    var targetFileName = noOrden + ".pdf";
+    var existingFiles = folder.getFilesByName(targetFileName);
+    
+    while (existingFiles.hasNext()) {
+      var oldFile = existingFiles.next();
+      Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
+      oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
+    }
+    
+    // Decodificar base64 y crear el archivo
+    var decodedData = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
+    var newFile = folder.createFile(blob);
+    
+    // Actualizar UI en la hoja Ordenes
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (!sheetOrdenes) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+    
+    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+    
+    if (colAdjuntoIdx > 0) {
+      // Crear hipervínculo al archivo
+      var fileUrl = newFile.getUrl();
+      var hyperlinkFormula = '=HYPERLINK("' + fileUrl + '", "✅ Cargado")';
+      sheetOrdenes.getRange(rowIdx, colAdjuntoIdx).setValue(hyperlinkFormula);
+    }
+    
+    // Auditoría obligatoria
+    var userIdentity = Session.getActiveUser().getEmail();
+    logChange('CARGA_DOCUMENTO', "Se subió el documento adjunto para la orden " + noOrden, userIdentity);
+    
+    return { status: 'success', message: 'Documento subido exitosamente.' };
+    
+  } catch (e) {
+    Logger.log("Error en procesarSubidaDocumento: " + e.message);
+    return { status: 'error', message: e.message };
+  }
 }

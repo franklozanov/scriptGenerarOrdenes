@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subir Adjunto</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    body {
+      background-color: #f5f5f5;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      width: 100%;
+      max-width: 450px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #1976d2;
+      font-size: 20px;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      color: #333;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      border: 2px dashed #ccc;
+      border-radius: 4px;
+      padding: 32px 16px;
+      text-align: center;
+      transition: border-color 0.3s;
+      cursor: pointer;
+    }
+
+    .file-input-wrapper:hover {
+      border-color: #1976d2;
+    }
+
+    .file-input-wrapper.dragover {
+      border-color: #1976d2;
+      background-color: #e3f2fd;
+    }
+
+    input[type="file"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .file-icon {
+      font-size: 48px;
+      color: #999;
+      margin-bottom: 12px;
+    }
+
+    .file-text {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .file-name {
+      color: #1976d2;
+      font-weight: 500;
+      margin-top: 8px;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    .file-size {
+      color: #999;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .btn {
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: #1565c0;
+    }
+
+    .btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background-color: white;
+      color: #666;
+      border: 1px solid #ccc;
+      margin-top: 12px;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background-color: #f5f5f5;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1976d2;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 8px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .error {
+      color: #d32f2f;
+      font-size: 14px;
+      margin-top: 12px;
+      padding: 12px;
+      background-color: #ffebee;
+      border-radius: 4px;
+      display: none;
+    }
+
+    .success {
+      color: #388e3c;
+      font-size: 14px;
+      margin-top: 12px;
+      padding: 12px;
+      background-color: #e8f5e9;
+      border-radius: 4px;
+      display: none;
+    }
+
+    .info {
+      background-color: #e3f2fd;
+      border-left: 4px solid #1976d2;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Subir Adjunto de Orden</h2>
+    <div class="subtitle">Orden No: <span id="ordenDisplay">{{NO_ORDEN}}</span></div>
+    
+    <div class="info">
+      El archivo se guardará como <strong>{{NO_ORDEN}}.pdf</strong> en la carpeta configurada.
+    </div>
+
+    <div class="form-group">
+      <label>Seleccionar archivo PDF (Máximo 10MB)</label>
+      <div class="file-input-wrapper" id="dropZone">
+        <input type="file" id="fileInput" accept="application/pdf">
+        <div class="file-icon">📄</div>
+        <div class="file-text">Arrastra un archivo aquí o haz clic para seleccionar</div>
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+    </div>
+
+    <button class="btn" id="uploadBtn" disabled onclick="uploadFile()">Subir Documento</button>
+    <button class="btn btn-secondary" onclick="cancel()">Cancelar</button>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text">Subiendo documento...</div>
+    </div>
+
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
+  </div>
+
+  <script>
+    var ROW_IDX = "{{ROW_IDX}}";
+    var NO_ORDEN = "{{NO_ORDEN}}";
+    var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+    var fileInput = document.getElementById('fileInput');
+    var fileNameDisplay = document.getElementById('fileName');
+    var fileSizeDisplay = document.getElementById('fileSize');
+    var uploadBtn = document.getElementById('uploadBtn');
+    var loading = document.getElementById('loading');
+    var errorDiv = document.getElementById('error');
+    var successDiv = document.getElementById('success');
+    var dropZone = document.getElementById('dropZone');
+
+    // File input change handler
+    fileInput.addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (file) {
+        validateAndDisplayFile(file);
+      }
+    });
+
+    // Drag and drop handlers
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      var file = e.dataTransfer.files[0];
+      if (file) {
+        fileInput.files = e.dataTransfer.files;
+        validateAndDisplayFile(file);
+      }
+    });
+
+    function validateAndDisplayFile(file) {
+      // Reset displays
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        showError('Por favor, selecciona un archivo PDF válido.');
+        uploadBtn.disabled = true;
+        fileNameDisplay.textContent = '';
+        fileSizeDisplay.textContent = '';
+        return;
+      }
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        var sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        showError('El archivo es demasiado grande (' + sizeMB + 'MB). El tamaño máximo es 10MB.');
+        uploadBtn.disabled = true;
+        fileNameDisplay.textContent = '';
+        fileSizeDisplay.textContent = '';
+        return;
+      }
+
+      // Display file info
+      fileNameDisplay.textContent = file.name;
+      var sizeKB = (file.size / 1024).toFixed(2);
+      fileSizeDisplay.textContent = sizeKB + ' KB';
+      uploadBtn.disabled = false;
+    }
+
+    function uploadFile() {
+      var file = fileInput.files[0];
+      if (!file) {
+        showError('Por favor, selecciona un archivo.');
+        return;
+      }
+
+      // Show loading state
+      loading.style.display = 'block';
+      uploadBtn.disabled = true;
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+
+      // Read file as base64
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var base64Data = e.target.result;
+        
+        // Remove data URI prefix
+        var base64Content = base64Data.split(',')[1];
+        
+        // Call server function
+        google.script.run
+          .withSuccessHandler(handleUploadSuccess)
+          .withFailureHandler(handleUploadError)
+          .procesarSubidaDocumento(base64Content, file.type, file.name, ROW_IDX, NO_ORDEN);
+      };
+      reader.onerror = function() {
+        loading.style.display = 'none';
+        uploadBtn.disabled = false;
+        showError('Error al leer el archivo. Por favor, intenta nuevamente.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleUploadSuccess(result) {
+      loading.style.display = 'none';
+      
+      if (result.status === 'success') {
+        successDiv.textContent = result.message;
+        successDiv.style.display = 'block';
+        
+        // Close modal after short delay
+        setTimeout(function() {
+          google.script.host.close();
+        }, 1500);
+      } else {
+        showError(result.message);
+        uploadBtn.disabled = false;
+      }
+    }
+
+    function handleUploadError(error) {
+      loading.style.display = 'none';
+      uploadBtn.disabled = false;
+      showError('Error del servidor: ' + error.message);
+    }
+
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    function cancel() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>
