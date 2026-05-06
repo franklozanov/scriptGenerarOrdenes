@@ -17,7 +17,7 @@ function onOpen() {
 
   // 3. Menú Principal (Gestionar OA)
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
-    .addItem('📤 Subir Orden SAP', 'abrirModalSubidaGeneral')
+    .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addSeparator()
     .addSubMenu(configMenu)
@@ -1155,6 +1155,13 @@ function onEditInstalled(e) {
           SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. El estado del adjunto ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
           return; // No continuar con el log normal de edición
         }
+        
+        // Si AdjuntoOrden está vacío, asignar automáticamente "Pendiente"
+        if (adjuntoStr === "" && e.value !== undefined && e.value !== "") {
+          sheet.getRange(rowIdx, colAdjuntoIdx).setValue("Pendiente");
+          logChange('ASIGNACION_PENDIENTE', 'NoOrden asignado. Estado de AdjuntoOrden establecido a Pendiente.', userIdentity);
+          return; // No continuar con el log normal de edición
+        }
       }
     }
     
@@ -1294,8 +1301,8 @@ function getPendingOrdersList() {
         ordenes.push(noOrdenStr);
       }
       
-      // Obtener todos los NoAnalisis con valor (excluyendo vacíos)
-      if (noAnalisisStr) {
+      // Obtener NoAnalisis solo para filas con AdjuntoOrden == "Pendiente"
+      if (noAnalisisStr && adjuntoStr === "Pendiente") {
         analisis.push(noAnalisisStr);
       }
     }
@@ -1337,9 +1344,10 @@ function abrirModalSubidaGeneral() {
  * @param {string} fileName - Nombre original del archivo
  * @param {string} referenceNo - Número de referencia (NoOrden o NoAnalisis)
  * @param {string} docType - Tipo de documento ("Orden de Acondicionamiento" o "Registro de Inspeccion Base")
+ * @param {boolean} overwriteConfirmed - Indica si el usuario confirmó la sobrescritura del archivo existente
  * @returns {Object} Resultado de la operación
  */
-function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType) {
+function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed) {
   try {
     // Validación de seguridad: solo permitir PDF
     if (mimeType !== 'application/pdf') {
@@ -1449,11 +1457,20 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var existingFiles = folder.getFilesByName(targetFileName);
     var archivoReemplazado = false;
     
-    while (existingFiles.hasNext()) {
-      var oldFile = existingFiles.next();
-      Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
-      oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
-      archivoReemplazado = true;
+    // Verificar si el archivo ya existe
+    if (existingFiles.hasNext()) {
+      if (!overwriteConfirmed) {
+        // Retornar status 'exists' para que el frontend pida confirmación
+        return { status: 'exists', fileName: targetFileName };
+      }
+      
+      // Si overwriteConfirmed es true, proceder con el reemplazo
+      while (existingFiles.hasNext()) {
+        var oldFile = existingFiles.next();
+        Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
+        oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
+        archivoReemplazado = true;
+      }
     }
 
     // Decodificar base64 y crear el archivo

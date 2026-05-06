@@ -719,9 +719,34 @@
         statusIndicator.className = 'status-indicator loading';
 
         try {
-          var result = await uploadFileAsync(file, referenceNo, docType);
+          var result = await uploadFileAsync(file, referenceNo, docType, false);
           
-          if (result.status === 'success') {
+          if (result.status === 'exists') {
+            // Archivo existe, pedir confirmación al usuario
+            var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
+            
+            if (confirmOverwrite) {
+              // Usuario aceptó, reintentar con overwriteConfirmed = true
+              result = await uploadFileAsync(file, referenceNo, docType, true);
+              
+              if (result.status === 'success') {
+                statusIndicator.textContent = '✅ Completado';
+                statusIndicator.className = 'status-indicator success';
+                successCounter++;
+              } else {
+                statusIndicator.textContent = '❌ Error';
+                statusIndicator.className = 'status-indicator error';
+                statusIndicator.title = result.message;
+                errorCounter++;
+              }
+            } else {
+              // Usuario canceló - marcar como subido
+              statusIndicator.textContent = '✅ Subido';
+              statusIndicator.className = 'status-indicator success';
+              statusIndicator.title = 'Archivo ya existe, considerado como subido';
+              successCounter++;
+            }
+          } else if (result.status === 'success') {
             statusIndicator.textContent = '✅ Completado';
             statusIndicator.className = 'status-indicator success';
             successCounter++;
@@ -762,7 +787,7 @@
       progressContainer.classList.remove('active');
     }
 
-    function uploadFileAsync(file, referenceNo, docType) {
+    function uploadFileAsync(file, referenceNo, docType, overwriteConfirmed) {
       return new Promise(function(resolve, reject) {
         var reader = new FileReader();
         
@@ -777,7 +802,7 @@
             .withFailureHandler(function(error) {
               reject(error);
             })
-            .procesarSubidaDocumentoCentral(base64Content, file.type, file.name, referenceNo, docType);
+            .procesarSubidaDocumentoCentral(base64Content, file.type, file.name, referenceNo, docType, overwriteConfirmed);
         };
         
         reader.onerror = function() {
