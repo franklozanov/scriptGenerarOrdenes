@@ -1361,54 +1361,41 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       throw new Error("La hoja 'Ordenes' no existe.");
     }
 
-    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
-    var colNoOrdenIdx = headers.indexOf('NoOrden') + 1;
-    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-    var colNoAnalisisIdx = headers.indexOf('NoAnalisis') + 1;
-
-    if (colNoOrdenIdx === 0) {
-      throw new Error("No se encontró la columna 'NoOrden'.");
-    }
-
-    // Determinar carpeta destino y columnas según tipo de documento
-    var folderKey = "";
-    var targetColIdx = 0;
-    var targetColName = "";
+    // Leer toda la data incluyendo encabezados
+    var data = sheetOrdenes.getDataRange().getValues();
+    var headers = data[0]; // La primera fila son los encabezados
+    
+    // Determinar índice de columna dinámicamente según docType
+    var targetColIdx = -1;
+    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden');
     
     if (docType === "Orden de Acondicionamiento") {
-      folderKey = "DOC_ORDENES";
-      targetColIdx = colAdjuntoIdx;
-      targetColName = "AdjuntoOrden";
-      
-      if (colAdjuntoIdx === 0) {
-        throw new Error("No se encontró la columna 'AdjuntoOrden'.");
-      }
+      targetColIdx = headers.indexOf('NoOrden');
     } else if (docType === "Registro de Inspeccion Base") {
-      folderKey = "DOC_ANALISIS";
-      targetColIdx = colNoAnalisisIdx;
-      targetColName = "NoAnalisis";
-      
-      if (colNoAnalisisIdx === 0) {
-        throw new Error("No se encontró la columna 'NoAnalisis'.");
-      }
-    } else {
-      return { status: 'error', message: 'Tipo de documento no válido: ' + docType };
+      targetColIdx = headers.indexOf('NoAnalisis');
     }
-
-    // Buscar la fila por referencia (NoOrden o NoAnalisis)
-    Logger.log("Buscando referencia: " + referenceNo);
-    var lastRow = sheetOrdenes.getLastRow();
-    var dataRange = sheetOrdenes.getRange(2, 1, lastRow - 1, sheetOrdenes.getLastColumn());
-    var data = dataRange.getValues();
     
+    // Validación de seguridad vital
+    if (targetColIdx === -1) {
+      return { status: 'error', message: "No se encontró la columna de encabezado para el tipo: " + docType };
+    }
+    
+    // Logs de auditoría críticos
+    Logger.log("--- AUDITORIA DE BUSQUEDA ---");
+    Logger.log("DocType: " + docType);
+    Logger.log("Indice de Columna Objetivo (0-based): " + targetColIdx);
+    Logger.log("Referencia a buscar: " + String(referenceNo).trim().toLowerCase());
+    
+    // Bucle de búsqueda de la fila (empezamos en 1 para saltar el encabezado)
     var targetRowIndex = -1;
-    for (var i = 0; i < data.length; i++) {
-      var cellValue = data[i][targetColIdx - 1];
+    var referenceNoStr = String(referenceNo).trim().toLowerCase();
+    
+    for (var i = 1; i < data.length; i++) {
+      var cellValue = data[i][targetColIdx];
       var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
-      var referenceNoStr = String(referenceNo).trim().toLowerCase();
       
       if (cellValueStr === referenceNoStr) {
-        targetRowIndex = i + 2; // +2 porque data empieza en fila 2
+        targetRowIndex = i + 1; // +1 porque el array es base 0, y las filas de la hoja son base 1
         break;
       }
     }
@@ -1419,7 +1406,10 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
 
     // Validación específica para Orden de Acondicionamiento: verificar que AdjuntoOrden sea "Pendiente"
     if (docType === "Orden de Acondicionamiento") {
-      var currentAdjunto = data[targetRowIndex - 2][colAdjuntoIdx - 1];
+      if (colAdjuntoIdx === -1) {
+        return { status: 'error', message: "No se encontró la columna 'AdjuntoOrden' en los encabezados." };
+      }
+      var currentAdjunto = data[targetRowIndex - 1][colAdjuntoIdx];
       if (currentAdjunto && currentAdjunto.toString().trim() !== "Pendiente") {
         return { status: 'error', message: 'La orden "' + referenceNo + '" ya no está en estado "Pendiente". Puede haber sido cargada por otro usuario. Actualice el modal.' };
       }
