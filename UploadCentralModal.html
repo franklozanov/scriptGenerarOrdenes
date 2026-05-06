@@ -15,58 +15,111 @@
 
     body {
       background-color: #f5f5f5;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      padding: 20px;
+      overflow-x: hidden;
       min-height: 100vh;
     }
 
     .container {
       background: white;
       border-radius: 8px;
-      padding: 24px;
+      padding: 20px;
       width: 100%;
-      max-width: 800px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
     h2 {
       color: #1976d2;
-      font-size: 22px;
-      margin-bottom: 8px;
+      font-size: 20px;
+      margin-bottom: 6px;
       font-weight: 500;
     }
 
     .subtitle {
       color: #666;
-      font-size: 14px;
-      margin-bottom: 24px;
+      font-size: 13px;
+      margin-bottom: 16px;
     }
 
     .info {
       background-color: #e3f2fd;
       border-left: 4px solid #1976d2;
-      padding: 12px;
-      margin-bottom: 20px;
-      font-size: 13px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      font-size: 12px;
       color: #333;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .loading-overlay.hidden {
+      display: none;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1976d2;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #1976d2;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .no-orders {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
+
+    .no-orders-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .no-orders-text {
+      font-size: 14px;
+      margin-bottom: 16px;
     }
 
     .rows-container {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .upload-row {
       display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 16px;
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 12px;
       background: #fafafa;
       border: 1px solid #e0e0e0;
       border-radius: 6px;
-      margin-bottom: 12px;
-      transition: all 0.3s;
     }
 
     .upload-row:hover {
@@ -80,20 +133,23 @@
     }
 
     .upload-row .order-select {
-      flex: 1;
-      min-width: 150px;
+      flex: 0 0 140px;
+      min-width: 140px;
     }
 
     .upload-row .file-input-wrapper {
       flex: 2;
-      min-width: 250px;
       position: relative;
       border: 2px dashed #ccc;
       border-radius: 4px;
-      padding: 12px;
+      padding: 10px;
       text-align: center;
       transition: border-color 0.3s;
       cursor: pointer;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .upload-row .file-input-wrapper:hover {
@@ -121,15 +177,18 @@
     }
 
     .upload-row .file-info {
-      font-size: 13px;
+      font-size: 12px;
       color: #333;
+      width: 100%;
     }
 
     .upload-row .file-name {
       color: #1976d2;
       font-weight: 500;
       margin-top: 4px;
-      word-break: break-all;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .upload-row .file-size {
@@ -138,10 +197,10 @@
     }
 
     .upload-row .status-indicator {
-      flex: 0 0 120px;
-      min-width: 120px;
-      font-size: 12px;
-      padding: 8px;
+      flex: 0 0 100px;
+      min-width: 100px;
+      font-size: 11px;
+      padding: 6px 8px;
       border-radius: 4px;
       text-align: center;
       display: none;
@@ -169,15 +228,15 @@
     }
 
     .upload-row .delete-btn {
-      flex: 0 0 40px;
-      min-width: 40px;
-      height: 40px;
+      flex: 0 0 36px;
+      min-width: 36px;
+      height: 36px;
       border: none;
       background: #f44336;
       color: white;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 18px;
+      font-size: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -195,10 +254,10 @@
 
     select {
       width: 100%;
-      padding: 10px 12px;
+      padding: 8px 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 13px;
       background: white;
     }
 
@@ -213,12 +272,12 @@
       border: 2px dashed #1976d2;
       padding: 10px 20px;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       width: 100%;
       transition: all 0.3s;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .btn-add:hover:not(:disabled) {
@@ -235,14 +294,14 @@
       background-color: #1976d2;
       color: white;
       border: none;
-      padding: 14px 24px;
+      padding: 12px 20px;
       border-radius: 4px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 500;
       cursor: pointer;
       width: 100%;
       transition: background-color 0.3s;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .btn-upload:hover:not(:disabled) {
@@ -258,9 +317,9 @@
       background-color: white;
       color: #666;
       border: 1px solid #ccc;
-      padding: 12px 24px;
+      padding: 10px 20px;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       width: 100%;
@@ -272,8 +331,8 @@
     }
 
     .progress-container {
-      margin-top: 20px;
-      padding: 16px;
+      margin-top: 16px;
+      padding: 12px;
       background-color: #f5f5f5;
       border-radius: 6px;
       display: none;
@@ -284,9 +343,9 @@
     }
 
     .progress-bar {
-      height: 8px;
+      height: 6px;
       background-color: #e0e0e0;
-      border-radius: 4px;
+      border-radius: 3px;
       overflow: hidden;
       margin-bottom: 8px;
     }
@@ -299,14 +358,14 @@
     }
 
     .progress-text {
-      font-size: 13px;
+      font-size: 12px;
       color: #666;
       text-align: center;
     }
 
     .summary {
-      margin-top: 20px;
-      padding: 16px;
+      margin-top: 16px;
+      padding: 12px;
       background-color: #e8f5e9;
       border-radius: 6px;
       display: none;
@@ -318,19 +377,19 @@
 
     .summary h3 {
       color: #2e7d32;
-      font-size: 16px;
+      font-size: 15px;
       margin-bottom: 8px;
     }
 
     .summary p {
       color: #333;
-      font-size: 14px;
+      font-size: 13px;
       margin-bottom: 8px;
     }
 
     .summary .stats {
       display: flex;
-      gap: 20px;
+      gap: 16px;
       margin-top: 12px;
     }
 
@@ -343,13 +402,13 @@
     }
 
     .summary .stat-value {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: bold;
       color: #2e7d32;
     }
 
     .summary .stat-label {
-      font-size: 12px;
+      font-size: 11px;
       color: #666;
     }
 
@@ -359,7 +418,13 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <!-- Spinner de carga inicial -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Cargando órdenes pendientes...</div>
+  </div>
+
+  <div class="container" id="mainContent" style="display: none;">
     <h2>📤 Subida Masiva de Órdenes</h2>
     <div class="subtitle">Sistema centralizado de carga de documentos en lote</div>
     
@@ -399,11 +464,21 @@
     </div>
   </div>
 
+  <!-- Mensaje cuando no hay órdenes pendientes -->
+  <div class="container no-orders" id="noOrdersMessage" style="display: none;">
+    <div class="no-orders-icon">📋</div>
+    <div class="no-orders-text">No hay órdenes pendientes de subida en este momento.</div>
+    <button class="btn-cancel" onclick="cancel()">Cerrar</button>
+  </div>
+
   <script>
     var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    var pendingOrders = [];
+    var globalPendingOrders = [];
     var rowCounter = 0;
 
+    var loadingOverlay = document.getElementById('loadingOverlay');
+    var mainContent = document.getElementById('mainContent');
+    var noOrdersMessage = document.getElementById('noOrdersMessage');
     var rowsContainer = document.getElementById('rowsContainer');
     var btnAdd = document.getElementById('btnAdd');
     var btnUpload = document.getElementById('btnUpload');
@@ -420,10 +495,18 @@
     window.onload = function() {
       google.script.run
         .withSuccessHandler(function(orders) {
-          pendingOrders = orders;
-          addRow(); // Agregar primera fila por defecto
+          globalPendingOrders = orders;
+          loadingOverlay.classList.add('hidden');
+          
+          if (orders.length === 0) {
+            noOrdersMessage.style.display = 'block';
+          } else {
+            mainContent.style.display = 'block';
+            addRow(); // Agregar primera fila por defecto
+          }
         })
         .withFailureHandler(function(error) {
+          loadingOverlay.classList.add('hidden');
           alert('Error al cargar órdenes pendientes: ' + error.message);
         })
         .getPendingOrdersList();
@@ -457,7 +540,7 @@
       var newRow = document.getElementById(rowId);
       var select = newRow.querySelector('.no-orden-select');
       
-      // Llenar select con órdenes pendientes
+      // Llenar select con órdenes pendientes desde variable global
       populateSelect(select);
       
       validateForm();
@@ -466,12 +549,12 @@
     function populateSelect(select) {
       select.innerHTML = '<option value="">Seleccione orden...</option>';
       
-      if (pendingOrders.length === 0) {
+      if (globalPendingOrders.length === 0) {
         select.innerHTML = '<option value="">No hay órdenes pendientes</option>';
         return;
       }
 
-      pendingOrders.forEach(function(order) {
+      globalPendingOrders.forEach(function(order) {
         var option = document.createElement('option');
         option.value = order;
         option.textContent = order;
@@ -675,9 +758,7 @@
     }
 
     function cancel() {
-      if (confirm('¿Estás seguro de que deseas cancelar? Se perderán los cambios no guardados.')) {
-        google.script.host.close();
-      }
+      google.script.host.close();
     }
   </script>
 </body>

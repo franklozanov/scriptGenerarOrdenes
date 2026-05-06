@@ -1281,9 +1281,13 @@ function getPendingOrdersList() {
       var noOrden = data[i][colNoOrdenIdx - 1];
       var adjuntoEstado = data[i][colAdjuntoIdx - 1];
       
+      // Manejo seguro de valores nulos o indefinidos
+      var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
+      var adjuntoStr = adjuntoEstado ? adjuntoEstado.toString().trim() : "";
+      
       // Verificar que tenga NoOrden y que AdjuntoOrden sea exactamente "Pendiente"
-      if (noOrden && adjuntoEstado && adjuntoEstado.toString().trim() === "Pendiente") {
-        pendingOrders.push(noOrden.toString().trim());
+      if (noOrdenStr && adjuntoStr === "Pendiente") {
+        pendingOrders.push(noOrdenStr);
       }
     }
     
@@ -1304,10 +1308,10 @@ function getPendingOrdersList() {
 function abrirModalSubidaGeneral() {
   try {
     var html = HtmlService.createHtmlOutputFromFile('UploadCentralModal')
-      .setWidth(500)
-      .setHeight(450)
-      .setTitle('Subir Archivo de Orden');
-    SpreadsheetApp.getUi().showModalDialog(html, 'Subir Archivo de Orden');
+      .setWidth(700)
+      .setHeight(600)
+      .setTitle('Subida Masiva de Órdenes');
+    SpreadsheetApp.getUi().showModalDialog(html, 'Subida Masiva de Órdenes');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }
