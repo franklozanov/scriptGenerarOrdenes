@@ -1404,9 +1404,10 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var targetRowIndex = -1;
     for (var i = 0; i < data.length; i++) {
       var cellValue = data[i][targetColIdx - 1];
-      var cellValueStr = cellValue ? cellValue.toString().trim() : "";
+      var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
+      var referenceNoStr = String(referenceNo).trim().toLowerCase();
       
-      if (cellValueStr === referenceNo) {
+      if (cellValueStr === referenceNoStr) {
         targetRowIndex = i + 2; // +2 porque data empieza en fila 2
         break;
       }
