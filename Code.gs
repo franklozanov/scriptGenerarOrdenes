@@ -1261,6 +1261,7 @@ function getPendingOrdersList() {
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colNoOrdenIdx = headers.indexOf('NoOrden') + 1;
     var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+    var colNoAnalisisIdx = headers.indexOf('NoAnalisis') + 1;
     
     if (colNoOrdenIdx === 0 || colAdjuntoIdx === 0) {
       throw new Error("No se encontraron las columnas 'NoOrden' y/o 'AdjuntoOrden'.");
@@ -1268,35 +1269,44 @@ function getPendingOrdersList() {
     
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return []; // No hay datos
+      return { ordenes: [], analisis: [] }; // No hay datos
     }
     
     // Obtener todas las filas de datos
     var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     var data = dataRange.getValues();
     
-    var pendingOrders = [];
+    var ordenes = [];
+    var analisis = [];
     
     for (var i = 0; i < data.length; i++) {
       var noOrden = data[i][colNoOrdenIdx - 1];
       var adjuntoEstado = data[i][colAdjuntoIdx - 1];
+      var noAnalisis = colNoAnalisisIdx > 0 ? data[i][colNoAnalisisIdx - 1] : null;
       
       // Manejo seguro de valores nulos o indefinidos
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
       var adjuntoStr = adjuntoEstado ? adjuntoEstado.toString().trim() : "";
+      var noAnalisisStr = noAnalisis ? noAnalisis.toString().trim() : "";
       
-      // Verificar que tenga NoOrden y que AdjuntoOrden sea exactamente "Pendiente"
+      // Obtener órdenes pendientes (AdjuntoOrden == "Pendiente")
       if (noOrdenStr && adjuntoStr === "Pendiente") {
-        pendingOrders.push(noOrdenStr);
+        ordenes.push(noOrdenStr);
+      }
+      
+      // Obtener todos los NoAnalisis con valor (excluyendo vacíos)
+      if (noAnalisisStr) {
+        analisis.push(noAnalisisStr);
       }
     }
     
-    Logger.log("✓ Órdenes pendientes encontradas: " + pendingOrders.length);
-    return pendingOrders;
+    Logger.log("✓ Órdenes pendientes encontradas: " + ordenes.length);
+    Logger.log("✓ NoAnalisis encontrados: " + analisis.length);
+    return { ordenes: ordenes, analisis: analisis };
     
   } catch (e) {
     Logger.log("Error en getPendingOrdersList: " + e.message);
-    throw new Error("Error al obtener órdenes pendientes: " + e.message);
+    throw new Error("Error al obtener listas pendientes: " + e.message);
   }
 }
 
@@ -1321,14 +1331,15 @@ function abrirModalSubidaGeneral() {
 
 /**
  * Procesa la subida de un documento desde el modal centralizado.
- * Incluye validaciones de seguridad para verificar que el NoOrden sigue pendiente.
+ * Soporta dos tipos de documentos: Orden de Acondicionamiento y Registro de Inspeccion Base.
  * @param {string} base64Data - Datos del archivo en base64
  * @param {string} mimeType - Tipo MIME del archivo
  * @param {string} fileName - Nombre original del archivo
- * @param {string} noOrden - Número de orden
+ * @param {string} referenceNo - Número de referencia (NoOrden o NoAnalisis)
+ * @param {string} docType - Tipo de documento ("Orden de Acondicionamiento" o "Registro de Inspeccion Base")
  * @returns {Object} Resultado de la operación
  */
-function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden) {
+function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType) {
   try {
     // Validación de seguridad: solo permitir PDF
     if (mimeType !== 'application/pdf') {
@@ -1342,39 +1353,69 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden)
       throw new Error("La hoja 'Ordenes' no existe.");
     }
 
-    // Validación de seguridad: verificar que el NoOrden existe
     var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
     var colNoOrdenIdx = headers.indexOf('NoOrden') + 1;
     var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+    var colNoAnalisisIdx = headers.indexOf('NoAnalisis') + 1;
 
-    if (colNoOrdenIdx === 0 || colAdjuntoIdx === 0) {
-      throw new Error("No se encontraron las columnas 'NoOrden' y/o 'AdjuntoOrden'.");
+    if (colNoOrdenIdx === 0) {
+      throw new Error("No se encontró la columna 'NoOrden'.");
     }
 
-    // Buscar la fila del NoOrden
+    // Determinar carpeta destino y columnas según tipo de documento
+    var folderKey = "";
+    var targetColIdx = 0;
+    var targetColName = "";
+    
+    if (docType === "Orden de Acondicionamiento") {
+      folderKey = "DOC_ORDENES";
+      targetColIdx = colAdjuntoIdx;
+      targetColName = "AdjuntoOrden";
+      
+      if (colAdjuntoIdx === 0) {
+        throw new Error("No se encontró la columna 'AdjuntoOrden'.");
+      }
+    } else if (docType === "Registro de Inspeccion Base") {
+      folderKey = "DOC_ANALISIS";
+      targetColIdx = colNoAnalisisIdx;
+      targetColName = "NoAnalisis";
+      
+      if (colNoAnalisisIdx === 0) {
+        throw new Error("No se encontró la columna 'NoAnalisis'.");
+      }
+    } else {
+      return { status: 'error', message: 'Tipo de documento no válido: ' + docType };
+    }
+
+    // Buscar la fila por referencia (NoOrden o NoAnalisis)
     var lastRow = sheetOrdenes.getLastRow();
     var dataRange = sheetOrdenes.getRange(2, 1, lastRow - 1, sheetOrdenes.getLastColumn());
     var data = dataRange.getValues();
     
     var targetRowIndex = -1;
     for (var i = 0; i < data.length; i++) {
-      if (data[i][colNoOrdenIdx - 1] && data[i][colNoOrdenIdx - 1].toString().trim() === noOrden) {
+      var cellValue = data[i][targetColIdx - 1];
+      var cellValueStr = cellValue ? cellValue.toString().trim() : "";
+      
+      if (cellValueStr === referenceNo) {
         targetRowIndex = i + 2; // +2 porque data empieza en fila 2
         break;
       }
     }
 
     if (targetRowIndex === -1) {
-      return { status: 'error', message: 'El número de orden "' + noOrden + '" no existe en la hoja. Puede haber sido eliminado mientras el modal estaba abierto.' };
+      return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja. Puede haber sido eliminada mientras el modal estaba abierto.' };
     }
 
-    // Validación de seguridad: verificar que AdjuntoOrden sea "Pendiente"
-    var currentAdjunto = data[targetRowIndex - 2][colAdjuntoIdx - 1];
-    if (currentAdjunto && currentAdjunto.toString().trim() !== "Pendiente") {
-      return { status: 'error', message: 'La orden "' + noOrden + '" ya no está en estado "Pendiente". Puede haber sido cargada por otro usuario. Actualice el modal.' };
+    // Validación específica para Orden de Acondicionamiento: verificar que AdjuntoOrden sea "Pendiente"
+    if (docType === "Orden de Acondicionamiento") {
+      var currentAdjunto = data[targetRowIndex - 2][colAdjuntoIdx - 1];
+      if (currentAdjunto && currentAdjunto.toString().trim() !== "Pendiente") {
+        return { status: 'error', message: 'La orden "' + referenceNo + '" ya no está en estado "Pendiente". Puede haber sido cargada por otro usuario. Actualice el modal.' };
+      }
     }
 
-    // Obtener carpeta usando DOC_ORDENES
+    // Obtener carpeta desde templates
     var tplSheet = ss.getSheetByName('templates');
     if (!tplSheet) {
       throw new Error("La hoja 'templates' no existe.");
@@ -1385,14 +1426,14 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden)
 
     for (var i = 1; i < tplData.length; i++) {
       var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
-      if (key === "DOC_ORDENES") {
+      if (key === folderKey) {
         folderId = tplData[i][1] ? tplData[i][1].toString().trim() : "";
         break;
       }
     }
 
     if (!folderId) {
-      throw new Error("No se encontró la clave DOC_ORDENES en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
+      throw new Error("No se encontró la clave " + folderKey + " en la hoja 'templates'. Configure el ID de la carpeta correspondiente.");
     }
 
     // Obtener la carpeta destino
@@ -1404,7 +1445,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden)
     }
 
     // Manejo de Históricos (Sobreescritura segura)
-    var targetFileName = noOrden + ".pdf";
+    var targetFileName = referenceNo + ".pdf";
     var existingFiles = folder.getFilesByName(targetFileName);
     
     while (existingFiles.hasNext()) {
@@ -1418,24 +1459,28 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden)
     var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
     var newFile = folder.createFile(blob);
 
-    // Actualizar UI en la hoja Ordenes
-    if (colAdjuntoIdx > 0) {
+    // Actualizar UI en la hoja según tipo de documento
+    if (docType === "Orden de Acondicionamiento") {
+      // Poner "✅ Cargado" en AdjuntoOrden y agregar Nota
       var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx);
-      
-      // Establecer el texto "✅ Cargado" (no fórmula HYPERLINK)
       targetCell.setValue("✅ Cargado");
-      
-      // Colocar el link del archivo como una Nota
       var fileUrl = newFile.getUrl();
       targetCell.setNote("Archivo: " + fileUrl);
+    } else if (docType === "Registro de Inspeccion Base") {
+      // Agregar Nota en NoAnalisis con el link al archivo
+      var targetCell = sheetOrdenes.getRange(targetRowIndex, colNoAnalisisIdx);
+      var fileUrl = newFile.getUrl();
+      var currentNote = targetCell.getNote() || "";
+      var newNote = currentNote ? currentNote + "\nArchivo: " + fileUrl : "Archivo: " + fileUrl;
+      targetCell.setNote(newNote);
     }
 
     // Auditoría obligatoria
     var userEmail = Session.getActiveUser().getEmail();
     var userIdentity = getUserIdentityString(userEmail);
-    logChange('CARGA_DOCUMENTO', "Se subió el documento adjunto para la orden " + noOrden + " desde el modal centralizado", userIdentity);
+    logChange('CARGA_DOCUMENTO', "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado", userIdentity);
     
-    return { status: 'success', message: 'Documento subido exitosamente para la orden ' + noOrden + '.' };
+    return { status: 'success', message: 'Documento subido exitosamente para ' + docType + ' ' + referenceNo + '.' };
     
   } catch (e) {
     Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);

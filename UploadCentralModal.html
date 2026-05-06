@@ -132,6 +132,11 @@
       pointer-events: none;
     }
 
+    .upload-row .doc-type-select {
+      flex: 0 0 160px;
+      min-width: 160px;
+    }
+
     .upload-row .order-select {
       flex: 0 0 140px;
       min-width: 140px;
@@ -467,7 +472,7 @@
   <!-- Mensaje cuando no hay órdenes pendientes -->
   <div class="container no-orders" id="noOrdersMessage" style="display: none;">
     <div class="no-orders-icon">📋</div>
-    <div class="no-orders-text">No hay órdenes pendientes de subida en este momento.</div>
+    <div class="no-orders-text">No hay documentos pendientes de subida en este momento (ni órdenes ni análisis).</div>
     <button class="btn-cancel" onclick="cancel()">Cerrar</button>
   </div>
 
@@ -494,11 +499,14 @@
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
       google.script.run
-        .withSuccessHandler(function(orders) {
-          globalPendingOrders = orders;
+        .withSuccessHandler(function(data) {
+          globalPendingOrders = data;
           loadingOverlay.classList.add('hidden');
           
-          if (orders.length === 0) {
+          var hasOrdenes = data.ordenes && data.ordenes.length > 0;
+          var hasAnalisis = data.analisis && data.analisis.length > 0;
+          
+          if (!hasOrdenes && !hasAnalisis) {
             noOrdersMessage.style.display = 'block';
           } else {
             mainContent.style.display = 'block';
@@ -507,7 +515,7 @@
         })
         .withFailureHandler(function(error) {
           loadingOverlay.classList.add('hidden');
-          alert('Error al cargar órdenes pendientes: ' + error.message);
+          alert('Error al cargar listas pendientes: ' + error.message);
         })
         .getPendingOrdersList();
     };
@@ -518,9 +526,15 @@
 
       var rowHtml = `
         <div class="upload-row" id="${rowId}">
+          <div class="doc-type-select">
+            <select class="doc-type-select-input" onchange="handleDocTypeChange(this, '${rowId}')">
+              <option value="Orden de Acondicionamiento">Orden Acond.</option>
+              <option value="Registro de Inspeccion Base">Inspección</option>
+            </select>
+          </div>
           <div class="order-select">
-            <select class="no-orden-select" onchange="validateForm()">
-              <option value="">Seleccione orden...</option>
+            <select class="reference-select" onchange="validateForm()">
+              <option value="">Seleccione referencia...</option>
             </select>
           </div>
           <div class="file-input-wrapper">
@@ -538,28 +552,54 @@
 
       rowsContainer.insertAdjacentHTML('beforeend', rowHtml);
       var newRow = document.getElementById(rowId);
-      var select = newRow.querySelector('.no-orden-select');
+      var docTypeSelect = newRow.querySelector('.doc-type-select-input');
+      var referenceSelect = newRow.querySelector('.reference-select');
       
-      // Llenar select con órdenes pendientes desde variable global
-      populateSelect(select);
+      // Inicializar con lista de órdenes por defecto
+      populateReferenceSelect(referenceSelect, 'Orden de Acondicionamiento');
       
       validateForm();
     }
 
-    function populateSelect(select) {
-      select.innerHTML = '<option value="">Seleccione orden...</option>';
+    function populateReferenceSelect(select, docType) {
+      select.innerHTML = '<option value="">Seleccione referencia...</option>';
       
-      if (globalPendingOrders.length === 0) {
-        select.innerHTML = '<option value="">No hay órdenes pendientes</option>';
+      var list = [];
+      var emptyMessage = '';
+      
+      if (docType === 'Orden de Acondicionamiento') {
+        list = globalPendingOrders.ordenes || [];
+        emptyMessage = 'No hay órdenes pendientes';
+      } else if (docType === 'Registro de Inspeccion Base') {
+        list = globalPendingOrders.analisis || [];
+        emptyMessage = 'No hay análisis disponibles';
+      }
+      
+      if (list.length === 0) {
+        select.innerHTML = '<option value="">' + emptyMessage + '</option>';
         return;
       }
 
-      globalPendingOrders.forEach(function(order) {
+      list.forEach(function(item) {
         var option = document.createElement('option');
-        option.value = order;
-        option.textContent = order;
+        option.value = item;
+        option.textContent = item;
         select.appendChild(option);
       });
+    }
+
+    function handleDocTypeChange(docTypeSelect, rowId) {
+      var row = document.getElementById(rowId);
+      var referenceSelect = row.querySelector('.reference-select');
+      var docType = docTypeSelect.value;
+      
+      // Limpiar selección actual
+      referenceSelect.value = '';
+      
+      // Poblar con la lista correspondiente
+      populateReferenceSelect(referenceSelect, docType);
+      
+      validateForm();
     }
 
     function removeRow(rowId) {
@@ -622,12 +662,12 @@
       var allValid = true;
 
       rows.forEach(function(row) {
-        var select = row.querySelector('.no-orden-select');
+        var referenceSelect = row.querySelector('.reference-select');
         var fileInput = row.querySelector('input[type="file"]');
-        var hasOrden = select.value !== '';
+        var hasReference = referenceSelect.value !== '';
         var hasFile = fileInput.files.length > 0;
 
-        if (!hasOrden || !hasFile) {
+        if (!hasReference || !hasFile) {
           allValid = false;
         }
       });
@@ -660,11 +700,13 @@
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         var rowId = row.id;
-        var select = row.querySelector('.no-orden-select');
+        var docTypeSelect = row.querySelector('.doc-type-select-input');
+        var referenceSelect = row.querySelector('.reference-select');
         var fileInput = row.querySelector('input[type="file"]');
         var statusIndicator = document.getElementById(rowId + '-status');
 
-        var noOrden = select.value;
+        var docType = docTypeSelect.value;
+        var referenceNo = referenceSelect.value;
         var file = fileInput.files[0];
 
         // Actualizar progreso
@@ -677,7 +719,7 @@
         statusIndicator.className = 'status-indicator loading';
 
         try {
-          var result = await uploadFileAsync(file, noOrden);
+          var result = await uploadFileAsync(file, referenceNo, docType);
           
           if (result.status === 'success') {
             statusIndicator.textContent = '✅ Completado';
@@ -720,7 +762,7 @@
       progressContainer.classList.remove('active');
     }
 
-    function uploadFileAsync(file, noOrden) {
+    function uploadFileAsync(file, referenceNo, docType) {
       return new Promise(function(resolve, reject) {
         var reader = new FileReader();
         
@@ -735,7 +777,7 @@
             .withFailureHandler(function(error) {
               reject(error);
             })
-            .procesarSubidaDocumentoCentral(base64Content, file.type, file.name, noOrden);
+            .procesarSubidaDocumentoCentral(base64Content, file.type, file.name, referenceNo, docType);
         };
         
         reader.onerror = function() {
