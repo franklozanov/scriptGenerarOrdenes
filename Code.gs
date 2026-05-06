@@ -1081,15 +1081,28 @@ function onEditInstalled(e) {
     var sheet = editedRange.getSheet();
     var sheetName = sheet.getName();
     
-    // Verificar permisos de edición
+    // Verificar permisos de edición (Corregido: Intersección de rangos)
     var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-    var rangeProtections = editedRange.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-    var allProtections = sheetProtections.concat(rangeProtections);
+    var allRangeProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+    var overlappingProtections = sheetProtections.slice(); // Copiar protecciones de hoja
+    
+    // Filtrar solo las protecciones que afectan a la celda editada
+    var eRow = editedRange.getRow();
+    var eCol = editedRange.getColumn();
+    
+    for (var j = 0; j < allRangeProtections.length; j++) {
+      var pRange = allRangeProtections[j].getRange();
+      if (eRow >= pRange.getRow() && eRow <= pRange.getLastRow() &&
+          eCol >= pRange.getColumn() && eCol <= pRange.getLastColumn()) {
+        overlappingProtections.push(allRangeProtections[j]);
+      }
+    }
+    
     var hasPermission = true;
     var protectionDesc = "";
     
-    for (var i = 0; i < allProtections.length; i++) {
-      var protection = allProtections[i];
+    for (var i = 0; i < overlappingProtections.length; i++) {
+      var protection = overlappingProtections[i];
       if (!protection.canEdit()) {
         hasPermission = false;
         protectionDesc = protection.getDescription() || "protegido";
