@@ -1070,122 +1070,117 @@ function setupAuditTrailTrigger() {
 }
 
 function onEditInstalled(e) {
-  Logger.log("onEditInstalled Trigger ejecutado. Fuente: " + e.source.getActiveSheet().getName() + ", Rango: " + e.range.getA1Notation());
-  
-  // Guard clause: ignorar ediciones en hoja Logs para evitar bucles infinitos
-  if (e.source.getActiveSheet().getName() === 'Logs') return;
-  
-  var user = Session.getActiveUser().getEmail();
-  var effectiveUser = Session.getEffectiveUser().getEmail();
-  
-  var editedRange = e.range;
-  var sheet = editedRange.getSheet();
-  var sheetName = sheet.getName();
-  
-  // Verificar permisos de edición (lógica migrada de onEdit original)
-  var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-  var rangeProtections = editedRange.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  var allProtections = sheetProtections.concat(rangeProtections);
-  var hasPermission = true;
-  var protectionDesc = "";
-  
-  for (var i = 0; i < allProtections.length; i++) {
-    var protection = allProtections[i];
-    if (!protection.canEdit()) {
-      hasPermission = false;
-      protectionDesc = protection.getDescription() || "protegido";
-      break;
-    }
-  }
-  
-  var userEmail = getUserEmail(e);
-  var userIdentity = getUserIdentityString(userEmail);
-  
-  if (!hasPermission) {
-    // Revertir al valor anterior
-    editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
-      "⚠️ Edición no permitida",
-      5
-    );
+  try {
+    // Guard clause: Validación inicial del objeto evento
+    if (!e || !e.range || !e.source) return;
     
-    // Registrar violación de permiso
-    var cellAddress = editedRange.getA1Notation();
-    var violationDesc = "Intento de edición denegado al usuario " + userEmail + " en la celda " + cellAddress + " de la hoja " + sheetName;
-    logChange('VIOLACION_PERMISO', violationDesc, userIdentity);
-    return;
-  }
-  
-  // Usuario tiene permiso, obtener dimensiones de edición
-  var numRows = editedRange.getNumRows();
-  var numCols = editedRange.getNumColumns();
-
-  // Lógica de detección de cambio de NoOrden en filas ya cargadas
-  if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-    var colOrdenIdx = headers.indexOf('NoOrden') + 1;
-
-    // Si se editó la columna NoOrden
-    if (colOrdenIdx > 0 && editedRange.getColumn() === colOrdenIdx) {
-      var rowIdx = editedRange.getRow();
-      var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoIdx).getValue();
-      var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
-      
-      // Si la fila ya tiene archivo cargado
-      if (adjuntoStr.indexOf("Cargado") !== -1 || adjuntoStr.indexOf("✅") !== -1) {
-        var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
-        var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
-        
-        // Alertar al usuario
-        var ui = SpreadsheetApp.getUi();
-        var response = ui.alert(
-          '⚠️ Cambio de NoOrden en fila con archivo cargado',
-          'El número de orden cambió de "' + valorAnterior + '" a "' + nuevoValor + '".\n\n' +
-          '¿Desea volver a cargar el archivo para la nueva orden o mantener el archivo existente?',
-          ui.ButtonSet.YES_NO
-        );
-        
-        if (response === ui.Button.YES) {
-          // Usuario quiere volver a cargar: resetear estado
-          sheet.getRange(rowIdx, colAdjuntoIdx).setValue("⬆️ Subir Archivo");
-          logChange('RESET_CARGA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado reseteado para nueva carga.', userIdentity);
-          SpreadsheetApp.getActiveSpreadsheet().toast("Estado reseteado. Suba el nuevo archivo.", "Info", 5);
-        } else {
-          // Usuario quiere mantener: no hacer nada adicional
-          logChange('MANTENER_CARGA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Se mantiene archivo existente.', userIdentity);
-          SpreadsheetApp.getActiveSpreadsheet().toast("Archivo existente mantenido.", "Info", 5);
-        }
-        return; // No continuar con el log normal de edición
+    // Guard clause: ignorar ediciones en hoja Logs para evitar bucles
+    if (e.source.getActiveSheet().getName() === 'Logs') return;
+    
+    var editedRange = e.range;
+    var sheet = editedRange.getSheet();
+    var sheetName = sheet.getName();
+    
+    // Verificar permisos de edición
+    var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+    var rangeProtections = editedRange.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+    var allProtections = sheetProtections.concat(rangeProtections);
+    var hasPermission = true;
+    var protectionDesc = "";
+    
+    for (var i = 0; i < allProtections.length; i++) {
+      var protection = allProtections[i];
+      if (!protection.canEdit()) {
+        hasPermission = false;
+        protectionDesc = protection.getDescription() || "protegido";
+        break;
       }
     }
-  }
-  
-  // Registrar la edición válida
-  
-  if (numRows === 1 && numCols === 1) {
-    // Edición de celda única
-    var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
-    var newValue = e.value !== undefined ? e.value : "(vacío)";
-    var cellAddress = editedRange.getA1Notation();
-    var editDesc = "Cambió '" + oldValue + "' por '" + newValue + "' en la celda " + cellAddress + " de la hoja " + sheetName;
-    logChange('EDICION_CELDA', editDesc, userIdentity);
-  } else {
-    // Edición masiva (multi-celda)
-    var rangeA1 = editedRange.getA1Notation();
-    var massEditDesc = "Edición masiva en el rango " + rangeA1 + " de la hoja " + sheetName;
-    logChange('EDICION_MASIVA', massEditDesc, userIdentity);
+    
+    var userEmail = getUserEmail(e);
+    var userIdentity = getUserIdentityString(userEmail);
+    
+    if (!hasPermission) {
+      // Revertir al valor anterior si no tiene permiso
+      editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
+        "⚠️ Edición no permitida",
+        5
+      );
+      var cellAddress = editedRange.getA1Notation();
+      var violationDesc = "Intento de edición denegado al usuario " + userEmail + " en la celda " + cellAddress + " de la hoja " + sheetName;
+      logChange('VIOLACION_PERMISO', violationDesc, userIdentity);
+      return;
+    }
+    
+    var numRows = editedRange.getNumRows();
+    var numCols = editedRange.getNumColumns();
+
+    // Lógica de detección de cambio de NoOrden en filas ya cargadas
+    if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+      var colOrdenIdx = headers.indexOf('NoOrden') + 1;
+
+      // Si se editó la columna NoOrden
+      if (colOrdenIdx > 0 && editedRange.getColumn() === colOrdenIdx) {
+        var rowIdx = editedRange.getRow();
+        var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoIdx).getValue();
+        var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
+        
+        // Si la fila ya tiene archivo cargado
+        if (adjuntoStr === "✅ Cargado") {
+          var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
+          var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
+          
+          // Reseteo AUTOMÁTICO del estado de carga (Sin UI bloqueante)
+          sheet.getRange(rowIdx, colAdjuntoIdx).setValue("Pendiente");
+          sheet.getRange(rowIdx, colAdjuntoIdx).clearNote();
+          
+          logChange('RESET_CARGA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado devuelto a Pendiente.', userIdentity);
+          SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. El estado del adjunto ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
+          return; // No continuar con el log normal de edición
+        }
+      }
+    }
+    
+    // Registrar la edición válida general
+    if (numRows === 1 && numCols === 1) {
+      var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
+      var newValue = e.value !== undefined ? e.value : "(vacío)";
+      var cellAddress = editedRange.getA1Notation();
+      var editDesc = "Cambió '" + oldValue + "' por '" + newValue + "' en la celda " + cellAddress + " de la hoja " + sheetName;
+      logChange('EDICION_CELDA', editDesc, userIdentity);
+    } else {
+      var rangeA1 = editedRange.getA1Notation();
+      var massEditDesc = "Edición masiva en el rango " + rangeA1 + " de la hoja " + sheetName;
+      logChange('EDICION_MASIVA', massEditDesc, userIdentity);
+    }
+    
+  } catch (error) {
+    Logger.log("ERROR FATAL en onEditInstalled: " + error.message);
+    Logger.log("Stack trace: " + error.stack);
+    try {
+      logChange('ERROR_SISTEMA', 'Error en onEditInstalled: ' + error.message, 'Sistema');
+    } catch (logError) {
+      Logger.log("No se pudo registrar el error en Logs: " + logError.message);
+    }
   }
 }
 
 function getUserEmail(e) {
-  var email = Session.getActiveUser().getEmail();
+  var email = "";
+  try {
+    email = Session.getActiveUser().getEmail();
+  } catch (err) {}
+  
   if (!email || email === "") {
-    email = e.user.email; // Intentar del evento
+    try { email = e.user.email; } catch (err) {}
   }
+  
   if (!email || email === "") {
-    email = "Usuario no identificado (requiere dominio corporativo para CFR21 Part 11)";
+    email = "Usuario no identificado (Ejecución vía Trigger)";
   }
   return email;
 }
@@ -1409,7 +1404,6 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden)
     // Actualizar UI en la hoja Ordenes
     if (colAdjuntoIdx > 0) {
       var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx);
-      targetCell.clearDataValidations();
       
       // Establecer el texto "✅ Cargado" (no fórmula HYPERLINK)
       targetCell.setValue("✅ Cargado");
