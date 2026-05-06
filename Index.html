@@ -739,36 +739,38 @@
             updateFieldAppearances: false   // No actualizar apariencias (ya están aplanadas)
           });
           console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(new Blob([pdfData], {type:'application/pdf'}));
-          link.download = `Orden_${orderNo}.pdf`;
-          link.click();
+          
+          // Convertir PDF a base64 para guardar en Drive
+          const base64Data = btoa(new Uint8Array(pdfData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+          
+          status.innerText = "🔄 Guardando PDF en Drive...";
 
-          status.innerText = "🔄 Actualizando registro en la hoja...";
-
-          google.script.run.withSuccessHandler(msg => {
-            // Continuous workflow: don't close modal, reset for next order
-            status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
-            status.className = "success-text";
+          google.script.run.withSuccessHandler(fileUrl => {
+            // Abrir PDF en nueva pestaña
+            window.open(fileUrl + '#toolbar=0&navpanes=0', '_blank');
             
-            // Reset state for next print
-            document.getElementById('orderNo').value = '';
-            preloadState = { orderNo: null, data: null, isFetching: false, error: null };
-            btn.disabled = false;
-            document.getElementById('orderNo').focus();
+            status.innerText = "🔄 Actualizando registro en la hoja...";
             
-            // Clear status message after 3 seconds
-            setTimeout(() => {
-              if (status.innerText.includes("Listo para la siguiente orden")) {
-                status.innerText = '';
-              }
-            }, 3000);
-          }).withFailureHandler(err => {
-            alert("Fallo al actualizar: " + err.message);
-            status.innerText = "PDF descargado, pero falló el registro.";
-            status.className = "error-text";
-            btn.disabled = false;
-          }).updateTraceability(orderNo, userName, totalPages, printType);
+            // Actualizar registro después de guardar el PDF
+            google.script.run.withSuccessHandler(msg => {
+              // Continuous workflow: don't close modal, reset for next order
+              status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
+              status.className = "success-text";
+              
+              // Reset state for next print
+              document.getElementById('orderNo').value = '';
+              preloadState = { orderNo: null, data: null, isFetching: false, error: null };
+              btn.disabled = false;
+              document.getElementById('orderNo').focus();
+              
+              // Clear status message after 3 seconds
+              setTimeout(() => {
+                if (status.innerText.includes("Listo para la siguiente orden")) {
+                  status.innerText = '';
+                }
+              }, 3000);
+            }).updateTraceability(orderNo, userName, printType);
+          }).saveFinalUnifiedPDF(base64Data, orderNo);
 
         } catch (pdfError) {
           alert("Error generando PDF: " + pdfError.message);

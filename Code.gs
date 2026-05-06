@@ -1507,3 +1507,73 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     return { status: 'error', message: e.message };
   }
 }
+
+// --- FUNCIÓN PARA GUARDAR PDF UNIFICADO FINAL ---
+
+/**
+ * Guarda el PDF unificado final en la carpeta DOC_COMPLETO.
+ * @param {string} base64Data - Datos del PDF en base64
+ * @param {string} orderNo - Número de orden
+ * @returns {string} URL de visualización directa del PDF
+ */
+function saveFinalUnifiedPDF(base64Data, orderNo) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var tplSheet = ss.getSheetByName('templates');
+    
+    if (!tplSheet) {
+      throw new Error("La hoja 'templates' no existe.");
+    }
+    
+    var tplData = tplSheet.getDataRange().getValues();
+    var folderId = null;
+    
+    for (var i = 0; i < tplData.length; i++) {
+      if (tplData[i][0] && tplData[i][0].toString().trim() === 'DOC_COMPLETO') {
+        folderId = tplData[i][1] ? tplData[i][1].toString().trim() : null;
+        break;
+      }
+    }
+    
+    if (!folderId) {
+      throw new Error("No se encontró la carpeta DOC_COMPLETO en la hoja templates.");
+    }
+    
+    var folder = DriveApp.getFolderById(folderId);
+    var targetFileName = 'Orden_' + orderNo + '_Final.pdf';
+    
+    // Decodificar base64 y crear el archivo
+    var decodedData = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(decodedData, 'application/pdf', targetFileName);
+    var file = folder.createFile(blob);
+    
+    // Retornar URL de visualización directa
+    return file.getDownloadUrl();
+    
+  } catch (e) {
+    Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
+    throw new Error("Error al guardar PDF final: " + e.message);
+  }
+}
+
+// --- FUNCIÓN doGet PARA SERVIR VISOR PDF ---
+
+/**
+ * Sirve el visor de PDF cuando se accede a la Web App con parámetro fileId.
+ * @param {Object} e - Objeto de evento
+ * @returns {HtmlOutput} HTML del visor de PDF
+ */
+function doGet(e) {
+  var fileId = e.parameter.fileId;
+  
+  var html = HtmlService.createTemplateFromFile('PDFViewer')
+    .evaluate()
+    .setTitle('Visor de PDF')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  
+  // Inyectar fileId en el HTML
+  html = html.getContent().replace('{{fileId}}', fileId || '');
+  
+  return HtmlService.createHtmlOutput(html);
+}
