@@ -1369,10 +1369,19 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var targetColIdx = -1;
     var colAdjuntoIdx = headers.indexOf('AdjuntoOrden');
     
+    // Determinar la clave de la carpeta según el tipo de documento
+    var folderKey = "";
     if (docType === "Orden de Acondicionamiento") {
       targetColIdx = headers.indexOf('NoOrden');
+      folderKey = "DOC_ORDENES";
     } else if (docType === "Registro de Inspeccion Base") {
       targetColIdx = headers.indexOf('NoAnalisis');
+      folderKey = "DOC_ANALISIS";
+    }
+    
+    // Validación de seguridad para folderKey
+    if (folderKey === "") {
+      return { status: 'error', message: "Tipo de documento no reconocido para asignar carpeta: " + docType };
     }
     
     // Validación de seguridad vital
