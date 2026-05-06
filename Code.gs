@@ -1467,14 +1467,12 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx);
       targetCell.setValue("✅ Cargado");
       var fileUrl = newFile.getUrl();
-      targetCell.setNote("Archivo: " + fileUrl);
+      targetCell.setNote("Archivo cargado: " + fileUrl);
     } else if (docType === "Registro de Inspeccion Base") {
-      // Agregar Nota en NoAnalisis con el link al archivo
+      // NO tocar AdjuntoOrden - solo agregar Nota en NoAnalisis
       var targetCell = sheetOrdenes.getRange(targetRowIndex, colNoAnalisisIdx);
       var fileUrl = newFile.getUrl();
-      var currentNote = targetCell.getNote() || "";
-      var newNote = currentNote ? currentNote + "\nArchivo: " + fileUrl : "Archivo: " + fileUrl;
-      targetCell.setNote(newNote);
+      targetCell.setNote("Registro base cargado: " + fileUrl);
     }
 
     // Auditoría obligatoria
