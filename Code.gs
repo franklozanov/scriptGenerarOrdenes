@@ -1396,6 +1396,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     }
 
     // Buscar la fila por referencia (NoOrden o NoAnalisis)
+    Logger.log("Buscando referencia: " + referenceNo);
     var lastRow = sheetOrdenes.getLastRow();
     var dataRange = sheetOrdenes.getRange(2, 1, lastRow - 1, sheetOrdenes.getLastColumn());
     var data = dataRange.getValues();
@@ -1448,6 +1449,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var folder;
     try {
       folder = DriveApp.getFolderById(folderId);
+      Logger.log("Carpeta destino obtenida correctamente.");
     } catch (e) {
       throw new Error("No se puede acceder a la carpeta (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
     }
@@ -1459,8 +1461,10 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     
     // Verificar si el archivo ya existe
     if (existingFiles.hasNext()) {
+      Logger.log("Archivo ya existe: " + targetFileName);
       if (!overwriteConfirmed) {
         // Retornar status 'exists' para que el frontend pida confirmación
+        Logger.log("Retornando status 'exists' para pedir confirmación al usuario");
         return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndex };
       }
       
@@ -1504,7 +1508,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     
   } catch (e) {
     Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);
-    return { status: 'error', message: e.message };
+    return { status: 'error', message: "Error interno del servidor: " + e.message };
   }
 }
 

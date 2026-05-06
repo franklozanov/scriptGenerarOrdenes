@@ -546,6 +546,7 @@
             </div>
           </div>
           <div class="status-indicator" id="${rowId}-status"></div>
+          <div class="error-msg" id="${rowId}-error" style="color: red; font-size: 11px; margin-top: 4px;"></div>
           <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>🗑️</button>
         </div>
       `;
@@ -708,6 +709,12 @@
         var docType = docTypeSelect.value;
         var referenceNo = referenceSelect.value;
         var file = fileInput.files[0];
+        var errorContainer = document.getElementById(rowId + '-error');
+
+        // Limpiar contenedor de error al inicio de cada intento
+        if (errorContainer) {
+          errorContainer.textContent = '';
+        }
 
         // Actualizar progreso
         var progress = ((i) / totalRows) * 100;
@@ -721,7 +728,7 @@
         try {
           var result = await uploadFileAsync(file, referenceNo, docType, false);
           
-          console.log('Respuesta del servidor:', result);
+          console.log('Fila ID:', rowId, 'Status:', result.status, 'Msg:', result.message);
           
           if (result.status === 'exists') {
             // Archivo existe, pedir confirmación al usuario
@@ -738,7 +745,9 @@
               } else {
                 statusIndicator.textContent = '❌ Error';
                 statusIndicator.className = 'status-indicator error';
-                statusIndicator.title = result.message || 'Error desconocido';
+                if (errorContainer) {
+                  errorContainer.textContent = result.message || 'Error desconocido';
+                }
                 errorCounter++;
               }
             } else {
@@ -755,14 +764,18 @@
           } else {
             statusIndicator.textContent = '❌ Error';
             statusIndicator.className = 'status-indicator error';
-            statusIndicator.title = result.message || 'Error desconocido';
+            if (errorContainer) {
+              errorContainer.textContent = result.message || 'Error desconocido';
+            }
             errorCounter++;
           }
         } catch (error) {
           console.log('Error en catch:', error);
           statusIndicator.textContent = '❌ Error';
           statusIndicator.className = 'status-indicator error';
-          statusIndicator.title = error.message || 'Error desconocido';
+          if (errorContainer) {
+            errorContainer.textContent = error.message || 'Error desconocido';
+          }
           errorCounter++;
         }
 
