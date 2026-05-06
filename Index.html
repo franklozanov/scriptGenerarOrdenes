@@ -681,7 +681,9 @@
               height = temp;
             }
 
-            const footerLeftText = `Impreso por: ${userName} el ${formattedDate}   |   No. Orden: ${orderNo}`;
+            // Extraer solo el nombre si viene con el formato "ID - Nombre"
+            const nombreParaPie = userName.includes(" - ") ? userName.split(" - ")[1].trim() : userName;
+            const footerLeftText = `Impreso por: ${nombreParaPie} el ${formattedDate}   |   No. Orden: ${orderNo}`;
             const footerRightText = "Pág. ____ de ____";
 
             const drawVisualText = (text, vX, vY, size) => {

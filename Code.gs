@@ -1447,11 +1447,13 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     // Manejo de Históricos (Sobreescritura segura)
     var targetFileName = referenceNo + ".pdf";
     var existingFiles = folder.getFilesByName(targetFileName);
+    var archivoReemplazado = false;
     
     while (existingFiles.hasNext()) {
       var oldFile = existingFiles.next();
       Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
-      oldFile.setTrashed(true);
+      oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
+      archivoReemplazado = true;
     }
 
     // Decodificar base64 y crear el archivo
@@ -1478,7 +1480,10 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     // Auditoría obligatoria
     var userEmail = Session.getActiveUser().getEmail();
     var userIdentity = getUserIdentityString(userEmail);
-    logChange('CARGA_DOCUMENTO', "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado", userIdentity);
+    var logMessage = archivoReemplazado 
+      ? "Se REEMPLAZÓ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado"
+      : "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
+    logChange('CARGA_DOCUMENTO', logMessage, userIdentity);
     
     return { status: 'success', message: 'Documento subido exitosamente para ' + docType + ' ' + referenceNo + '.' };
     
