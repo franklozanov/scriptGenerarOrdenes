@@ -2,31 +2,34 @@
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
 function onOpen() {
+  // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
     .addItem('⚙️ Configurar Proxy', 'promptSetWebAppUrl')
     .addItem('🔧 Inicializar App', 'promptInitializeApp')
     .addItem('🛡️ Aplicar Nuevo Esquema de Protección', 'promptApplyNewProtection')
     .addItem('▶️ Activar Auditoría', 'promptSetupAuditTrail');
 
-  SpreadsheetApp.getUi().createMenu('🖨️ Impresión')
-    .addItem('Imprimir Plantillas', 'openPrintDialog')
+  // 2. Menú de Configuración General
+  var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
+    .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
     .addSeparator()
-    .addItem('🔄 Actualizar Celdas de Subida', 'actualizarCeldasDeSubida')
-    .addItem('🧹 Limpiar Botones Residuales', 'limpiarBotonesResiduales')
-    .addItem('🔍 Diagnosticar Celdas de Subida', 'diagnosticarCeldasDeSubida')
+    .addSubMenu(adminMenu);
+
+  // 3. Menú Principal (Gestionar OA)
+  SpreadsheetApp.getUi().createMenu('Gestionar OA')
+    .addItem('� Subir Orden SAP', 'abrirModalSubidaGeneral')
+    .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addSeparator()
-    .addItem(' Diagnosticar Plantillas', 'diagnosticarPlantillas')
-    .addSeparator()
-    .addSubMenu(adminMenu)
+    .addSubMenu(configMenu)
     .addToUi();
   
-  // Clear cache to ensure fresh NombreTemplate data is loaded
+  // Limpiar caché para asegurar que se carguen datos frescos
   clearInitialDataCache();
   
-  // Cache warmup: preload data silently to improve performance
+  // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Plantillas estáticas listas para impresión.', 'Sistema QMS', 5);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Plantillas estáticas listas.', 'Sistema QMS', 5);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
   }
@@ -199,7 +202,7 @@ function getInitialData() {
         var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
         var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
       
-        if (key && key !== "Clave" && key !== "ID_FOLDER" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
+        if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
           var displayName = key;
           var hasAccess = true;
           var base64 = null;
@@ -349,25 +352,25 @@ function diagnosticarPlantillas() {
   for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
-    if (k === "ID_FOLDER") folderId = v;
+    if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
   }
   
   report += "CARPETAS DINÁMICAS:\n";
   
-  // Verificar ID_FOLDER
+  // Verificar DOC_ORDENES
   if (folderId) {
     try {
       var folder = DriveApp.getFolderById(folderId);
-      report += "✓ ID_FOLDER → " + folder.getName() + "\n";
+      report += "✓ DOC_ORDENES → " + folder.getName() + "\n";
       successCount++;
     } catch (e) {
-      report += "✗ ID_FOLDER → ERROR: " + e.message + "\n";
+      report += "✗ DOC_ORDENES → ERROR: " + e.message + "\n";
       report += "  ID: " + folderId + "\n";
       errorCount++;
     }
   } else {
-    report += "⚠ ID_FOLDER → No configurado (requerido para TPL_ORDEN)\n";
+    report += "⚠ DOC_ORDENES → No configurado (requerido para TPL_ORDEN)\n";
     errorCount++;
   }
   
@@ -392,9 +395,9 @@ function diagnosticarPlantillas() {
     var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     
-    if (key && key !== "Clave" && key !== "ID_FOLDER" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
+    if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
       if (key === "TPL_ORDEN") {
-        report += "✓ " + key + " (Dinámico - depende de ID_FOLDER)\n";
+        report += "✓ " + key + " (Dinámico - depende de DOC_ORDENES)\n";
       } else if (value) {
         try {
           var file = DriveApp.getFileById(value);
@@ -453,7 +456,7 @@ function fetchOrderData(orderNo) {
   for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][0].toString().trim();
     var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
-    if (k === "ID_FOLDER") folderId = v;
+    if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
     if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);
     if (k === "COORD_EXP" && v) dynamicCoords["Exp"] = parseXY(v);
@@ -561,7 +564,7 @@ function preparePrintPayload(orderNo, templateConfig) {
   for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][0].toString().trim();
     var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
-    if (k === "ID_FOLDER") folderId = v;
+    if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
     if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);
     if (k === "COORD_EXP" && v) dynamicCoords["Exp"] = parseXY(v);
@@ -607,7 +610,7 @@ function preparePrintPayload(orderNo, templateConfig) {
     try {
       if (config.key === "TPL_ORDEN") {
         if (!folderId) {
-          throw new Error("ID_FOLDER no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
+          throw new Error("DOC_ORDENES no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
         }
         try {
           var folder = DriveApp.getFolderById(folderId);
@@ -619,7 +622,7 @@ function preparePrintPayload(orderNo, templateConfig) {
           }
         } catch (driveError) {
           if (driveError.message.indexOf("not found") !== -1 || driveError.message.indexOf("not exist") !== -1) {
-            throw new Error("No se puede acceder a la carpeta ID_FOLDER (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
+            throw new Error("No se puede acceder a la carpeta DOC_ORDENES (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
           }
           throw driveError;
         }
@@ -754,7 +757,7 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
 
 // Estructura esperada del libro de trabajo
 const REQUIRED_SHEETS = {
-  'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: ID_FOLDER es valor de fila, no columna
+  'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
   'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
@@ -1223,295 +1226,171 @@ function logChange(tipoCambio, descripcion, userIdentity) {
 
 /**
  * Se ejecuta cuando el usuario cambia la selección en la hoja.
- * Detecta si se ha hecho clic en una celda de "Subir Archivo" para abrir el modal.
+ * NOTA: La lógica de subida de archivos ha sido centralizada en el modal UploadCentralModal.html.
+ * Esta función ya no maneja la apertura de modales de subida por fila.
  * @param {Object} e El objeto de evento de onSelectionChange.
  */
 function onSelectionChange(e) {
-  // Salir si el evento no tiene rango (ej. al cargar la hoja)
-  if (!e || !e.range) return;
-
-  // Solo nos interesa la selección de una única celda
-  if (e.range.getNumRows() !== 1 || e.range.getNumColumns() !== 1) return;
-
-  var sheet = e.range.getSheet();
-  // Solo actuar en la hoja 'Ordenes'
-  if (sheet.getName() !== 'Ordenes') return;
-
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-  var colOrdenIdx = headers.indexOf('NoOrden') + 1;
-
-  // Solo actuar si se selecciona la columna 'AdjuntoOrden' y la celda contiene el texto específico
-  if (e.range.getColumn() === colAdjuntoIdx && e.range.getValue() === "⬆️ Subir Archivo") {
-    var rowIdx = e.range.getRow();
-    var noOrden = sheet.getRange(rowIdx, colOrdenIdx).getValue();
-    if (noOrden) {
-      abrirModalSubidaDocumento(rowIdx, noOrden.toString().trim());
-    }
-  }
+  // Función vacía - la lógica de subida ha sido centralizada
+  // Se mantiene para compatibilidad con disparadores existentes
 }
 
-// --- FUNCIÓN PARA ABRIR MODAL DE SUBIDA DE DOCUMENTO ---
-
-function abrirModalSubidaDocumento(rowIdx, noOrden) {
-  try {
-    var html = HtmlService.createHtmlOutputFromFile('UploadModal')
-      .setWidth(500)
-      .setHeight(350)
-      .setTitle('Subir Adjunto - Orden ' + noOrden);
-    
-    // Inyectar variables en el HTML
-    html = html.setContent(html.getContent()
-      .replace(/{{ROW_IDX}}/g, rowIdx)
-      .replace(/{{NO_ORDEN}}/g, noOrden)
-    );
-    
-    SpreadsheetApp.getUi().showModalDialog(html, 'Subir Adjunto - Orden ' + noOrden);
-  } catch (e) {
-    Logger.log("Error al abrir modal de subida: " + e.message);
-    SpreadsheetApp.getActiveSpreadsheet().toast("Error al abrir el modal de subida.", "Error", 5);
-  }
-}
-
-// --- FUNCIONES PARA BOTONES DE SUBIDA DE DOCUMENTOS ---
-
-function actualizarCeldasDeSubida() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Ordenes');
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('❌ La hoja "Ordenes" no fue encontrada.');
-    return;
-  }
-
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-  var colOrdenIdx = headers.indexOf('NoOrden') + 1;
-
-  if (colAdjuntoIdx === 0 || colOrdenIdx === 0) {
-    SpreadsheetApp.getUi().alert('❌ No se encontraron las columnas "AdjuntoOrden" y/o "NoOrden".');
-    return;
-  }
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    SpreadsheetApp.getUi().alert('ℹ️ No hay filas de datos para procesar.');
-    return;
-  }
-
-  var celdasActualizadas = 0;
-  var filasIgnoradas = 0;
-  var filasSinOrden = 0;
-
-  var range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
-  var values = range.getValues();
-
-  // Recorrer los datos en memoria para eficiencia
-  for (var i = 0; i < values.length; i++) {
-    var row = i + 2; // El índice de la fila real en la hoja
-    var adjuntoStr = values[i][colAdjuntoIdx - 1] ? values[i][colAdjuntoIdx - 1].toString().trim() : "";
-    var noOrden = values[i][colOrdenIdx - 1];
-
-    // Ignorar filas que ya tienen un archivo cargado
-    if (adjuntoStr.startsWith("=HYPERLINK") || adjuntoStr.includes("Cargado")) {
-      filasIgnoradas++;
-      continue;
-    }
-
-    // Si la celda está vacía y hay un número de orden, prepararla para la subida.
-    if (adjuntoStr === "" && noOrden) {
-      sheet.getRange(row, colAdjuntoIdx).setValue("⬆️ Subir Archivo");
-      celdasActualizadas++;
-    } else if (!noOrden) {
-      filasSinOrden++;
-    }
-  }
-
-  var mensaje = "=== Actualización de Celdas de Subida ===\n\n";
-  mensaje += "✅ Celdas configuradas para subida: " + celdasActualizadas + "\n";
-  mensaje += "⏭️ Filas ignoradas (ya cargadas): " + filasIgnoradas + "\n";
-  mensaje += "⚠️ Filas sin NoOrden (ignoradas): " + filasSinOrden + "\n\n";
-  mensaje += "ℹ️ Para subir un archivo, simplemente haga clic en la celda '⬆️ Subir Archivo' correspondiente.";
-
-  SpreadsheetApp.getUi().alert(mensaje);
-}
+// --- FUNCIÓN PARA OBTENER LISTA DE ÓRDENES PENDIENTES ---
 
 /**
- * Elimina todas las imágenes/botones residuales de la columna AdjuntoOrden.
- * Esta función limpia artefactos de la implementación anterior con assignScript.
+ * Retorna un array con los NoOrden de todas las filas donde AdjuntoOrden sea "Pendiente".
+ * @returns {Array} Array de strings con números de orden pendientes.
  */
-function limpiarBotonesResiduales() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Ordenes');
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('❌ La hoja "Ordenes" no fue encontrada.');
-    return;
-  }
-
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-  
-  if (colAdjuntoIdx === 0) {
-    SpreadsheetApp.getUi().alert('❌ No se encontró la columna "AdjuntoOrden".');
-    return;
-  }
-
-  var images = sheet.getImages();
-  var botonesEliminados = 0;
-  var ubicacionesEliminadas = [];
-  
-  for (var i = 0; i < images.length; i++) {
-    var img = images[i];
-    var imgCol = img.getAnchorCell().getColumn();
-    var imgRow = img.getAnchorCell().getRow();
-    // Eliminar únicamente imágenes en la columna AdjuntoOrden
-    if (imgCol === colAdjuntoIdx) {
-      img.remove();
-      botonesEliminados++;
-      ubicacionesEliminadas.push("Fila " + imgRow);
-    }
-  }
-
-  var mensaje = "=== Limpieza de Botones Residuales ===\n\n";
-  mensaje += "🗑️ Botones/imágenes eliminados: " + botonesEliminados + "\n";
-  
-  if (botonesEliminados > 0) {
-    mensaje += "📍 Ubicaciones: " + ubicacionesEliminadas.join(", ") + "\n\n";
-    mensaje += "✅ Se eliminaron los artefactos de la implementación anterior.\n";
-    mensaje += "ℹ️ El nuevo sistema usa celdas con texto '⬆️ Subir Archivo'.";
-  } else {
-    mensaje += "ℹ️ No se encontraron botones residuales para eliminar.\n";
-    mensaje += "ℹ️ El sistema está limpio y usa el nuevo enfoque de celdas.";
-  }
-
-  SpreadsheetApp.getUi().alert(mensaje);
-  Logger.log("✅ Limpieza completada: " + botonesEliminados + " botones eliminados");
-}
-
-function diagnosticarCeldasDeSubida() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Ordenes');
-  
-  var reporte = "=== DIAGNÓSTICO DE CELDAS DE SUBIDA ===\n\n";
-  
-  if (!sheet) {
-    reporte += "❌ Hoja 'Ordenes' NO encontrada\n";
-    SpreadsheetApp.getUi().alert(reporte);
-    return;
-  }
-  reporte += "✅ Hoja 'Ordenes' encontrada\n";
-  
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-  var colOrdenIdx = headers.indexOf('NoOrden') + 1;
-  
-  reporte += "📍 Columna 'AdjuntoOrden': " + (colAdjuntoIdx > 0 ? `✅ (Col ${colAdjuntoIdx})` : "❌ NO ENCONTRADA") + "\n";
-  reporte += "📍 Columna 'NoOrden': " + (colOrdenIdx > 0 ? `✅ (Col ${colOrdenIdx})` : "❌ NO ENCONTRADA") + "\n\n";
-  
-  if (colAdjuntoIdx === 0 || colOrdenIdx === 0) {
-    SpreadsheetApp.getUi().alert(reporte);
-    return;
-  }
-  
-  // Detectar imágenes residuales en columna AdjuntoOrden
-  var images = sheet.getImages();
-  var imagenesEnColumna = 0;
-  var imagenesInfo = [];
-  for (var i = 0; i < images.length; i++) {
-    var img = images[i];
-    var imgCol = img.getAnchorCell().getColumn();
-    var imgRow = img.getAnchorCell().getRow();
-    if (imgCol === colAdjuntoIdx) {
-      imagenesEnColumna++;
-      imagenesInfo.push(`Fila ${imgRow}`);
-    }
-  }
-  
-  if (imagenesEnColumna > 0) {
-    reporte += "⚠️ IMÁGENES RESIDUALES ENCONTRADAS:\n";
-    reporte += `   - Total de imágenes en columna AdjuntoOrden: ${imagenesEnColumna}\n`;
-    reporte += `   - Ubicaciones: ${imagenesInfo.join(", ")}\n`;
-    reporte += "   - Estas imágenes son artefactos de la implementación anterior.\n";
-    reporte += "   - Deben eliminarse ejecutando '🧹 Limpiar Botones Residuales'.\n\n";
-  }
-  
-  var lastRow = sheet.getLastRow();
-  reporte += `📊 Total de filas de datos: ${lastRow - 1}\n\n`;
-  
-  var filasPendientes = 0, filasCargadas = 0, filasVacias = 0, filasSinOrden = 0;
-  
-  for (var row = 2; row <= lastRow; row++) {
-    var adjuntoValue = sheet.getRange(row, colAdjuntoIdx).getValue();
-    var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
-    var noOrden = sheet.getRange(row, colOrdenIdx).getValue();
-    
-    if (!noOrden) {
-      filasSinOrden++;
-    } else if (adjuntoStr.startsWith("=HYPERLINK") || adjuntoStr.includes("Cargado")) {
-      filasCargadas++;
-    } else if (adjuntoStr === "⬆️ Subir Archivo") {
-      filasPendientes++;
-    } else if (adjuntoStr === "") {
-      filasVacias++;
-    }
-  }
-  
-  reporte += `📈 Estado de filas:\n`;
-  reporte += `   - ⬆️ Pendientes de subida: ${filasPendientes}\n`;
-  reporte += `   - ✅ Ya cargadas: ${filasCargadas}\n`;
-  reporte += `   - (Vacías): ${filasVacias}\n`;
-  reporte += `   - ⚠️ Sin NoOrden: ${filasSinOrden}\n\n`;
-  
-  reporte += "💡 Recomendaciones:\n";
-  if (imagenesEnColumna > 0) {
-    reporte += "   - ⚠️ PRIORIDAD: Ejecutar '🧹 Limpiar Botones Residuales' para eliminar imágenes obsoletas.\n";
-  }
-  if (filasVacias > 0) {
-    reporte += "   - Ejecutar '🔄 Actualizar Celdas de Subida' para configurar las filas vacías.\n";
-  } else if (filasPendientes === 0 && filasCargadas > 0) {
-    reporte += "   - ¡Excelente! Todas las filas con orden ya tienen un documento cargado.\n";
-  } else {
-    reporte += "   - El sistema parece estar sincronizado. No se requieren acciones.\n";
-  }
-  
-  SpreadsheetApp.getUi().alert(reporte);
-  Logger.log(reporte);
-}
-
-// --- FUNCIÓN PARA PROCESAR LA SUBIDA DEL DOCUMENTO ---
-
-function procesarSubidaDocumento(base64Data, mimeType, fileName, rowIdx, noOrden) {
+function getPendingOrdersList() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var tplSheet = ss.getSheetByName('templates');
+    var sheet = ss.getSheetByName('Ordenes');
     
+    if (!sheet) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colNoOrdenIdx = headers.indexOf('NoOrden') + 1;
+    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+    
+    if (colNoOrdenIdx === 0 || colAdjuntoIdx === 0) {
+      throw new Error("No se encontraron las columnas 'NoOrden' y/o 'AdjuntoOrden'.");
+    }
+    
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return []; // No hay datos
+    }
+    
+    // Obtener todas las filas de datos
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    var data = dataRange.getValues();
+    
+    var pendingOrders = [];
+    
+    for (var i = 0; i < data.length; i++) {
+      var noOrden = data[i][colNoOrdenIdx - 1];
+      var adjuntoEstado = data[i][colAdjuntoIdx - 1];
+      
+      // Verificar que tenga NoOrden y que AdjuntoOrden sea exactamente "Pendiente"
+      if (noOrden && adjuntoEstado && adjuntoEstado.toString().trim() === "Pendiente") {
+        pendingOrders.push(noOrden.toString().trim());
+      }
+    }
+    
+    Logger.log("✓ Órdenes pendientes encontradas: " + pendingOrders.length);
+    return pendingOrders;
+    
+  } catch (e) {
+    Logger.log("Error en getPendingOrdersList: " + e.message);
+    throw new Error("Error al obtener órdenes pendientes: " + e.message);
+  }
+}
+
+// --- FUNCIÓN PARA ABRIR MODAL DE SUBIDA GENERAL ---
+
+/**
+ * Abre el modal centralizado de subida de archivos.
+ */
+function abrirModalSubidaGeneral() {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('UploadCentralModal')
+      .setWidth(500)
+      .setHeight(450)
+      .setTitle('Subir Archivo de Orden');
+    SpreadsheetApp.getUi().showModalDialog(html, 'Subir Archivo de Orden');
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
+  }
+}
+
+// --- FUNCIÓN PARA PROCESAR LA SUBIDA DEL DOCUMENTO (CENTRALIZADA) ---
+
+/**
+ * Procesa la subida de un documento desde el modal centralizado.
+ * Incluye validaciones de seguridad para verificar que el NoOrden sigue pendiente.
+ * @param {string} base64Data - Datos del archivo en base64
+ * @param {string} mimeType - Tipo MIME del archivo
+ * @param {string} fileName - Nombre original del archivo
+ * @param {string} noOrden - Número de orden
+ * @returns {Object} Resultado de la operación
+ */
+function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, noOrden) {
+  try {
+    // Validación de seguridad: solo permitir PDF
+    if (mimeType !== 'application/pdf') {
+      return { status: 'error', message: 'Solo se permiten archivos PDF.' };
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    
+    if (!sheetOrdenes) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+
+    // Validación de seguridad: verificar que el NoOrden existe
+    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+    var colNoOrdenIdx = headers.indexOf('NoOrden') + 1;
+    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
+
+    if (colNoOrdenIdx === 0 || colAdjuntoIdx === 0) {
+      throw new Error("No se encontraron las columnas 'NoOrden' y/o 'AdjuntoOrden'.");
+    }
+
+    // Buscar la fila del NoOrden
+    var lastRow = sheetOrdenes.getLastRow();
+    var dataRange = sheetOrdenes.getRange(2, 1, lastRow - 1, sheetOrdenes.getLastColumn());
+    var data = dataRange.getValues();
+    
+    var targetRowIndex = -1;
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][colNoOrdenIdx - 1] && data[i][colNoOrdenIdx - 1].toString().trim() === noOrden) {
+        targetRowIndex = i + 2; // +2 porque data empieza en fila 2
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      return { status: 'error', message: 'El número de orden "' + noOrden + '" no existe en la hoja. Puede haber sido eliminado mientras el modal estaba abierto.' };
+    }
+
+    // Validación de seguridad: verificar que AdjuntoOrden sea "Pendiente"
+    var currentAdjunto = data[targetRowIndex - 2][colAdjuntoIdx - 1];
+    if (currentAdjunto && currentAdjunto.toString().trim() !== "Pendiente") {
+      return { status: 'error', message: 'La orden "' + noOrden + '" ya no está en estado "Pendiente". Puede haber sido cargada por otro usuario. Actualice el modal.' };
+    }
+
+    // Obtener carpeta usando DOC_ORDENES
+    var tplSheet = ss.getSheetByName('templates');
     if (!tplSheet) {
       throw new Error("La hoja 'templates' no existe.");
     }
-    
-    // Buscar ID_FOLDER en la hoja templates
+
     var tplData = tplSheet.getDataRange().getValues();
     var folderId = "";
-    
+
     for (var i = 1; i < tplData.length; i++) {
       var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
-      if (key === "ID_FOLDER") {
+      if (key === "DOC_ORDENES") {
         folderId = tplData[i][1] ? tplData[i][1].toString().trim() : "";
         break;
       }
     }
-    
+
     if (!folderId) {
-      throw new Error("No se encontró la clave ID_FOLDER en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
+      throw new Error("No se encontró la clave DOC_ORDENES en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
     }
-    
+
     // Obtener la carpeta destino
     var folder;
     try {
       folder = DriveApp.getFolderById(folderId);
     } catch (e) {
-      throw new Error("No se puede acceder a la carpeta ID_FOLDER (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
+      throw new Error("No se puede acceder a la carpeta (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
     }
-    
+
     // Manejo de Históricos (Sobreescritura segura)
     var targetFileName = noOrden + ".pdf";
     var existingFiles = folder.getFilesByName(targetFileName);
@@ -1519,41 +1398,36 @@ function procesarSubidaDocumento(base64Data, mimeType, fileName, rowIdx, noOrden
     while (existingFiles.hasNext()) {
       var oldFile = existingFiles.next();
       Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
-      oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
+      oldFile.setTrashed(true);
     }
-    
+
     // Decodificar base64 y crear el archivo
     var decodedData = Utilities.base64Decode(base64Data);
     var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
     var newFile = folder.createFile(blob);
-    
+
     // Actualizar UI en la hoja Ordenes
-    var sheetOrdenes = ss.getSheetByName('Ordenes');
-    if (!sheetOrdenes) {
-      throw new Error("La hoja 'Ordenes' no existe.");
-    }
-    
-    var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
-    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-    
     if (colAdjuntoIdx > 0) {
-      // Crear hipervínculo al archivo
-      var fileUrl = newFile.getUrl();
-      var hyperlinkFormula = '=HYPERLINK("' + fileUrl + '", "✅ Cargado")';
-      var targetCell = sheetOrdenes.getRange(rowIdx, colAdjuntoIdx);
+      var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx);
       targetCell.clearDataValidations();
-      targetCell.setValue(hyperlinkFormula);
+      
+      // Establecer el texto "✅ Cargado" (no fórmula HYPERLINK)
+      targetCell.setValue("✅ Cargado");
+      
+      // Colocar el link del archivo como una Nota
+      var fileUrl = newFile.getUrl();
+      targetCell.setNote("Archivo: " + fileUrl);
     }
-    
+
     // Auditoría obligatoria
     var userEmail = Session.getActiveUser().getEmail();
     var userIdentity = getUserIdentityString(userEmail);
-    logChange('CARGA_DOCUMENTO', "Se subió el documento adjunto para la orden " + noOrden, userIdentity);
+    logChange('CARGA_DOCUMENTO', "Se subió el documento adjunto para la orden " + noOrden + " desde el modal centralizado", userIdentity);
     
-    return { status: 'success', message: 'Documento subido exitosamente.' };
+    return { status: 'success', message: 'Documento subido exitosamente para la orden ' + noOrden + '.' };
     
   } catch (e) {
-    Logger.log("Error en procesarSubidaDocumento: " + e.message);
+    Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);
     return { status: 'error', message: e.message };
   }
 }
