@@ -17,7 +17,7 @@ function onOpen() {
 
   // 3. Menú Principal (Gestionar OA)
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
-    .addItem('� Subir Orden SAP', 'abrirModalSubidaGeneral')
+    .addItem('📤 Subir Orden SAP', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addSeparator()
     .addSubMenu(configMenu)
