@@ -721,6 +721,8 @@
         try {
           var result = await uploadFileAsync(file, referenceNo, docType, false);
           
+          console.log('Respuesta del servidor:', result);
+          
           if (result.status === 'exists') {
             // Archivo existe, pedir confirmación al usuario
             var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
@@ -736,7 +738,7 @@
               } else {
                 statusIndicator.textContent = '❌ Error';
                 statusIndicator.className = 'status-indicator error';
-                statusIndicator.title = result.message;
+                statusIndicator.title = result.message || 'Error desconocido';
                 errorCounter++;
               }
             } else {
@@ -753,13 +755,14 @@
           } else {
             statusIndicator.textContent = '❌ Error';
             statusIndicator.className = 'status-indicator error';
-            statusIndicator.title = result.message;
+            statusIndicator.title = result.message || 'Error desconocido';
             errorCounter++;
           }
         } catch (error) {
+          console.log('Error en catch:', error);
           statusIndicator.textContent = '❌ Error';
           statusIndicator.className = 'status-indicator error';
-          statusIndicator.title = error.message;
+          statusIndicator.title = error.message || 'Error desconocido';
           errorCounter++;
         }
 

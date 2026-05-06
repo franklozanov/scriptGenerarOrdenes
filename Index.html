@@ -556,6 +556,9 @@
                   copies: cfg.copies
                 });
                 console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+              } else if (cfg.key === 'DOC_COMPLETO') {
+                // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
+                console.log(`✓ Omitiendo DOC_COMPLETO (carpeta de destino)`);
               } else {
                 throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
               }

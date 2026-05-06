@@ -1461,7 +1461,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     if (existingFiles.hasNext()) {
       if (!overwriteConfirmed) {
         // Retornar status 'exists' para que el frontend pida confirmación
-        return { status: 'exists', fileName: targetFileName };
+        return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndex };
       }
       
       // Si overwriteConfirmed es true, proceder con el reemplazo
