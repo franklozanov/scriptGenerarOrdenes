@@ -757,6 +757,7 @@
           status.innerText = "🔄 Guardando en Drive y registrando...";
 
           // 2. En paralelo: guardar en Drive y actualizar registro
+          console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
           google.script.run
             .withSuccessHandler(fileId => {
               google.script.run

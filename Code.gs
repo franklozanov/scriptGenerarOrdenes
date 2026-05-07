@@ -858,11 +858,6 @@ function updateTraceability(orderNo, userId, pagesPrinted, printType) {
 }
 
 function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
-  // DEBUG: Validar parámetros
-  if (!userId || userId === 'undefined' || userId === undefined) {
-    throw new Error("userId es undefined o vacío. Recibido: '" + userId + "' (tipo: " + typeof userId + ")");
-  }
-  
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
@@ -876,32 +871,16 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
       var uHeaders = uData[0];
       var colUserIdIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'UserID', false);
       var colCortoIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'NombreCorto', false);
-      
-      if (!colUserIdIdx || !colCortoIdx) {
-        throw new Error("No se encontraron columnas en hoja Usuarios. UserID: " + colUserIdIdx + ", NombreCorto: " + colCortoIdx);
-      }
-      
       if (colUserIdIdx && colCortoIdx) {
-        // Convertir a base-0 para acceso a array
         var userIdIdx = colUserIdIdx - 1;
         var cortoIdx = colCortoIdx - 1;
-        
-        var found = false;
         for (var u = 1; u < uData.length; u++) {
           var userIdEnFila = uData[u][userIdIdx] ? uData[u][userIdIdx].toString().trim() : "";
-          
           if (userIdEnFila === userId) {
             var nc = uData[u][cortoIdx];
-            if (nc) {
-              nombreCorto = nc.toString().trim();
-              found = true;
-            }
+            if (nc) nombreCorto = nc.toString().trim();
             break;
           }
-        }
-        
-        if (!found) {
-          throw new Error("No se encontró userId '" + userId + "' en hoja Usuarios. Verifica que el usuario existe.");
         }
       }
     }
