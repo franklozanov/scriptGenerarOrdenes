@@ -831,8 +831,7 @@ function doPost(e) {
   try {
     var params = JSON.parse(e.postData.contents);
     if (params.action === 'updateTraceability') {
-      var result = internalUpdateTraceability(params.orderNo, params.userName, params.pagesPrinted, params.printType);
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: result })).setMimeType(ContentService.MimeType.JSON);
+      var result = internalUpdateTraceability(params.orderNo, params.userId, params.pagesPrinted, params.printType);      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: result })).setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Acción no reconocida' })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
