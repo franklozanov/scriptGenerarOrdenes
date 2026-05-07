@@ -858,6 +858,13 @@ function updateTraceability(orderNo, userId, pagesPrinted, printType) {
 }
 
 function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
+  // DEBUG: Log parámetros recibidos
+  Logger.log("=== DEBUG internalUpdateTraceability ===");
+  Logger.log("orderNo: " + orderNo);
+  Logger.log("userId recibido: '" + userId + "' (tipo: " + typeof userId + ")");
+  Logger.log("pagesPrinted: " + pagesPrinted);
+  Logger.log("printType: " + printType);
+  
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
@@ -872,6 +879,8 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
       var colUserIdIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'UserID', false);
       var colCortoIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'NombreCorto', false);
       
+      Logger.log("Encabezados hoja Usuarios: " + JSON.stringify(uHeaders));
+      Logger.log("colUserIdIdx: " + colUserIdIdx + ", colCortoIdx: " + colCortoIdx);
       
       if (colUserIdIdx && colCortoIdx) {
         // Convertir a base-0 para acceso a array
@@ -880,11 +889,13 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
         
         for (var u = 1; u < uData.length; u++) {
           var userIdEnFila = uData[u][userIdIdx] ? uData[u][userIdIdx].toString().trim() : "";
+          Logger.log("Fila " + u + ": userIdEnFila='" + userIdEnFila + "' vs userId='" + userId + "' (match: " + (userIdEnFila === userId) + ")");
           
           if (userIdEnFila === userId) {
             var nc = uData[u][cortoIdx];
             if (nc) {
               nombreCorto = nc.toString().trim();
+              Logger.log("✓ NombreCorto encontrado: '" + nombreCorto + "'");
             }
             break;
           }
@@ -893,6 +904,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
     }
   }
   
+  Logger.log("nombreCorto FINAL a usar: '" + nombreCorto + "'");
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
