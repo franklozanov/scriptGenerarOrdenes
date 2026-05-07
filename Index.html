@@ -746,9 +746,8 @@
           // Convertir PDF a base64 para guardar en Drive
           const base64Data = btoa(new Uint8Array(pdfData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
           
-          // Crear un Blob URL local para abrir el PDF en una pestaña segura de inmediato
-          const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
-          const blobUrl = URL.createObjectURL(pdfBlob);
+          // Convertir PDF a Data URL para evitar restricciones de CORS
+          const pdfDataUrl = 'data:application/pdf;base64,' + base64Data;
           
           // Crear visor HTML personalizado que oculta botones de descarga pero mantiene zoom e imprimir
           const viewerHtml = `<!DOCTYPE html>
@@ -765,7 +764,7 @@
 </head>
 <body>
   <div id="pdfContainer">
-    <embed src="${blobUrl}" type="application/pdf" />
+    <embed src="${pdfDataUrl}" type="application/pdf" />
   </div>
 </body>
 </html>`;
