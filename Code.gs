@@ -840,11 +840,11 @@ function doPost(e) {
   }
 }
 
-function updateTraceability(orderNo, userName, pagesPrinted, printType) {
+function updateTraceability(orderNo, userId, pagesPrinted, printType) {
   var webAppUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
   if (!webAppUrl) throw new Error("El sistema no tiene configurada la WEB_APP_URL. Contacte al administrador.");
   
-  var payload = { action: 'updateTraceability', orderNo: orderNo, userName: userName, pagesPrinted: pagesPrinted, printType: printType };
+  var payload = { action: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: pagesPrinted, printType: printType };
   var options = { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true };
   
   var response = UrlFetchApp.fetch(webAppUrl, options);
