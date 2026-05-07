@@ -500,7 +500,9 @@
             `;
           }).join('');
 
-          document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u}">`).join('');
+          // Guardar usuarios globalmente para acceder después
+          window.globalUsers = data.users;
+          document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
 
           const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
           if (noAccessCount > 0) {
@@ -796,7 +798,7 @@
                   status.innerText = '';
                 }
               }, 3000);
-            }).updateTraceability(orderNo, userName, totalPages, printType);
+            }).updateTraceability(orderNo, userId, totalPages, printType);
           }).saveFinalUnifiedPDF(base64Data, orderNo);
 
         } catch (pdfError) {
@@ -831,12 +833,14 @@
           return;
         }
 
-        const validUsers = Array.from(document.getElementById('usersList').options).map(opt => opt.value);
-        if (!validUsers.includes(userName)) {
+        // Buscar el UserID correspondiente al Nombre Completo seleccionado
+        const userObj = window.globalUsers.find(u => u.nombreCompleto === userName);
+        if (!userObj) {
           alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
           document.getElementById('userName').focus();
           return;
         }
+        const userId = userObj.userId;
 
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 

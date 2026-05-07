@@ -250,10 +250,11 @@ function getInitialData() {
         colNombreCortoIdx = colNombreCortoIdx - 1;
         
         for (var j = 1; j < userData.length; j++) {
-          if (colNombreCompletoIdx !== undefined && userData[j][colNombreCompletoIdx]) {
+          if (colUserIdIdx !== undefined && colNombreCompletoIdx !== undefined && userData[j][colUserIdIdx] && userData[j][colNombreCompletoIdx]) {
+            var userId = userData[j][colUserIdIdx].toString().trim();
             var nombreCompleto = userData[j][colNombreCompletoIdx].toString().trim();
-            if (nombreCompleto) {
-              users.push(nombreCompleto);
+            if (userId && nombreCompleto) {
+              users.push({ userId: userId, nombreCompleto: nombreCompleto });
             }
           }
         }
@@ -856,31 +857,47 @@ function updateTraceability(orderNo, userName, pagesPrinted, printType) {
   }
 }
 
-function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) {
+function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
 
-  // Obtener NombreCorto a partir de userName (Nombre Completo)
-  var nombreCorto = userName;
+  // Obtener NombreCorto a partir de userId
+  var nombreCorto = userId; // Fallback si no se encuentra
   var usersSheet = ss.getSheetByName('Usuarios');
   if (usersSheet) {
     var uData = usersSheet.getDataRange().getValues();
     if (uData.length > 0) {
       var uHeaders = uData[0];
-      var colNombreIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'Nombre Completo', false);
+      var colUserIdIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'UserID', false);
       var colCortoIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'NombreCorto', false);
-      if (colNombreIdx && colCortoIdx) {
+      
+      Logger.log("Buscando NombreCorto para UserID: " + userId);
+      Logger.log("colUserIdIdx: " + colUserIdIdx + ", colCortoIdx: " + colCortoIdx);
+      
+      if (colUserIdIdx && colCortoIdx) {
+        // Convertir a base-0 para acceso a array
+        var userIdIdx = colUserIdIdx - 1;
+        var cortoIdx = colCortoIdx - 1;
+        
         for (var u = 1; u < uData.length; u++) {
-          if (uData[u][colNombreIdx - 1] === userName) {
-            var nc = uData[u][colCortoIdx - 1];
-            if (nc) nombreCorto = nc.toString().trim();
+          var userIdEnFila = uData[u][userIdIdx] ? uData[u][userIdIdx].toString().trim() : "";
+          Logger.log("Comparando UserID '" + userIdEnFila + "' con '" + userId + "'");
+          
+          if (userIdEnFila === userId) {
+            var nc = uData[u][cortoIdx];
+            if (nc) {
+              nombreCorto = nc.toString().trim();
+              Logger.log("✓ NombreCorto encontrado: " + nombreCorto);
+            }
             break;
           }
         }
       }
     }
   }
+  
+  Logger.log("NombreCorto final a usar: " + nombreCorto);
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
@@ -1778,16 +1795,15 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var blob = Utilities.newBlob(decodedData, 'application/pdf', targetFileName);
     var file = folder.createFile(blob);
     
-    // Configurar permisos de seguridad del archivo en Drive (evita descargas no autorizadas en Drive)
+    // Configurar permisos de seguridad del archivo en Drive
     try {
       file.setShareableByEditors(false);
-      file.setCopyRequiresWriterPermission(true);
     } catch(secErr) {
       Logger.log("No se pudieron aplicar restricciones de seguridad adicionales al PDF: " + secErr.message);
     }
     
-    // Retornamos un mensaje de éxito, ya no la URL directa porque el cliente manejará el PDF
-    return "SUCCESS";
+    // Retornar el ID del archivo para abrirlo con el visor de Google Drive
+    return file.getId();
     
   } catch (e) {
     Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
