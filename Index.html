@@ -745,29 +745,28 @@
           });
           console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
           
-          // Convertir PDF a base64 para guardar en Drive
+          // Convertir PDF a base64 para guardar en Drive (background)
           const base64Data = btoa(new Uint8Array(pdfData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-          
-          status.innerText = "🔄 Guardando PDF en Drive...";
 
+          // 1. Abrir PDF INMEDIATAMENTE en nueva pestana (mismo tick del click, sin bloqueo de popup)
+          const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          window.open(blobUrl, '_blank');
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+
+          status.innerText = "🔄 Guardando en Drive y registrando...";
+
+          // 2. En paralelo: guardar en Drive y actualizar registro
           google.script.run
             .withSuccessHandler(fileId => {
-              // Abrir PDF con vista previa de Google Drive (sin botón de descarga)
-              window.open('https://drive.google.com/file/d/' + fileId + '/preview', '_blank');
-              
-              status.innerText = "🔄 Actualizando registro en la hoja...";
-              
-              // Actualizar registro después de guardar el PDF
               google.script.run
                 .withSuccessHandler(msg => {
                   status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
                   status.className = "success-text";
-                  
                   document.getElementById('orderNo').value = '';
                   preloadState = { orderNo: null, data: null, isFetching: false, error: null };
                   btn.disabled = false;
                   document.getElementById('orderNo').focus();
-                  
                   setTimeout(() => {
                     if (status.innerText.includes("Listo para la siguiente orden")) {
                       status.innerText = '';
@@ -776,7 +775,7 @@
                 })
                 .withFailureHandler(e => {
                   console.error('Error en updateTraceability:', e.message);
-                  status.innerText = "⚠️ PDF generado, pero error al registrar: " + e.message;
+                  status.innerText = "⚠️ PDF abierto, pero error al registrar: " + e.message;
                   status.className = "error-text";
                   btn.disabled = false;
                 })
@@ -784,8 +783,7 @@
             })
             .withFailureHandler(e => {
               console.error('Error en saveFinalUnifiedPDF:', e.message);
-              alert('Error al guardar PDF en Drive: ' + e.message);
-              status.innerText = "Proceso cancelado.";
+              status.innerText = "⚠️ PDF abierto, pero error al guardar en Drive: " + e.message;
               status.className = "error-text";
               btn.disabled = false;
             })
