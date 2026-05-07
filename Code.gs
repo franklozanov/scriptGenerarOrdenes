@@ -250,10 +250,12 @@ function getInitialData() {
         colNombreCortoIdx = colNombreCortoIdx - 1;
         
         for (var j = 1; j < userData.length; j++) {
-          var userId = userData[j][colUserIdIdx] ? userData[j][colUserIdIdx].toString().trim() : "N/A";
-          var nombreCompleto = userData[j][colNombreCompletoIdx] ? userData[j][colNombreCompletoIdx].toString().trim() : "N/A";
-          var nombreCorto = userData[j][colNombreCortoIdx] ? userData[j][colNombreCortoIdx].toString().trim() : "N/A";
-          users.push(userId + " - " + nombreCompleto);
+          if (colNombreCompletoIdx !== undefined && userData[j][colNombreCompletoIdx]) {
+            var nombreCompleto = userData[j][colNombreCompletoIdx].toString().trim();
+            if (nombreCompleto) {
+              users.push(nombreCompleto);
+            }
+          }
         }
       }
     } catch (e) {
@@ -859,16 +861,39 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
   var sheet = ss.getSheetByName('Ordenes');
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
 
+  // Obtener NombreCorto a partir de userName (Nombre Completo)
+  var nombreCorto = userName;
+  var usersSheet = ss.getSheetByName('Usuarios');
+  if (usersSheet) {
+    var uData = usersSheet.getDataRange().getValues();
+    if (uData.length > 0) {
+      var uHeaders = uData[0];
+      var colNombreIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'Nombre Completo', false);
+      var colCortoIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'NombreCorto', false);
+      if (colNombreIdx && colCortoIdx) {
+        for (var u = 1; u < uData.length; u++) {
+          if (uData[u][colNombreIdx - 1] === userName) {
+            var nc = uData[u][colCortoIdx - 1];
+            if (nc) nombreCorto = nc.toString().trim();
+            break;
+          }
+        }
+      }
+    }
+  }
+
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
+  // Usar getColumnIndexByNameCaseInsensitive para robustez
   var cols = {
-    NoOrden: headers.indexOf("NoOrden") + 1, STATUS: headers.indexOf("STATUS") + 1,
-    NoPags: headers.indexOf("NoPags") + 1, Reimpresion: headers.indexOf("Reimpresion") + 1,
-    TotalPags: headers.indexOf("TotalPags") + 1, ImpresoPor: headers.indexOf("ImpresoPor") + 1,
-    ReimpresoPor: headers.indexOf("ReimpresoPor") + 1
+    NoOrden: getColumnIndexByNameCaseInsensitive(headers, "NoOrden", true),
+    STATUS: getColumnIndexByNameCaseInsensitive(headers, "STATUS", true),
+    NoPags: getColumnIndexByNameCaseInsensitive(headers, "NoPags", true),
+    Reimpresion: getColumnIndexByNameCaseInsensitive(headers, "Reimpresion", true),
+    TotalPags: getColumnIndexByNameCaseInsensitive(headers, "TotalPags", true),
+    ImpresoPor: getColumnIndexByNameCaseInsensitive(headers, "ImpresoPor", true),
+    ReimpresoPor: getColumnIndexByNameCaseInsensitive(headers, "Reimpreso", false) || getColumnIndexByNameCaseInsensitive(headers, "ReimpresoPor", true)
   };
-
-  for (var k in cols) if (cols[k] === 0) throw new Error("Column '" + k + "' missing.");
 
   var colNoOrdenData = sheet.getRange(1, cols.NoOrden, sheet.getLastRow(), 1).getValues();
   var rowIndex = -1;
@@ -876,25 +901,44 @@ function internalUpdateTraceability(orderNo, userName, pagesPrinted, printType) 
 
   if (rowIndex === -1) throw new Error("Row lost during update.");
 
-  var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-  var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
-  var newEntry = userName + " (" + pagesPrinted + ")";
+  var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
+  var newEntry = nombreCorto + " " + timestamp + " (" + pagesPrinted + ")";
+
+  // Helper para sumar CSVs (ej: "5, 2" -> 7)
+  function sumCsv(csvString) {
+    if (!csvString) return 0;
+    var parts = csvString.toString().split(",");
+    var sum = 0;
+    for (var p = 0; p < parts.length; p++) {
+      sum += Number(parts[p].trim()) || 0;
+    }
+    return sum;
+  }
 
   if (printType === "Reimpresion") {
     sheet.getRange(rowIndex, cols.STATUS).setValue("Reimpreso");
-    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
+    
+    var currentReimpresion = sheet.getRange(rowIndex, cols.Reimpresion).getValue() || "";
+    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion ? currentReimpresion + ", " + pagesPrinted : pagesPrinted);
+    
     var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
     sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
   } else {
     sheet.getRange(rowIndex, cols.STATUS).setValue("Impreso");
-    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
+    
+    var currentNoPags = sheet.getRange(rowIndex, cols.NoPags).getValue() || "";
+    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags ? currentNoPags + ", " + pagesPrinted : pagesPrinted);
+    
     var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
     sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry); 
   }
 
-  var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-  var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
-  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
+  // Recalcular TotalPags leyendo los nuevos valores
+  var finalNoPagsStr = sheet.getRange(rowIndex, cols.NoPags).getValue() || "";
+  var finalReimpresionStr = sheet.getRange(rowIndex, cols.Reimpresion).getValue() || "";
+  
+  var total = sumCsv(finalNoPagsStr) + sumCsv(finalReimpresionStr);
+  sheet.getRange(rowIndex, cols.TotalPags).setValue(total);
 
   return "Record updated successfully.";
 }

@@ -750,9 +750,9 @@
           const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
           const blobUrl = URL.createObjectURL(pdfBlob);
           
-          // Abrir el visor del navegador ocultando paneles y toolbar en lo posible (#toolbar=0)
+          // Abrir el visor del navegador con los controles nativos (zoom, imprimir)
           // Al ser un blob local, no se vinculará a Drive, impidiendo "Guardar en otra carpeta"
-          window.open(blobUrl + '#toolbar=0&navpanes=0', '_blank');
+          window.open(blobUrl, '_blank');
           
           status.innerText = "🔄 Guardando PDF de respaldo en Drive...";
 
@@ -778,7 +778,7 @@
                   status.innerText = '';
                 }
               }, 3000);
-            }).updateTraceability(orderNo, userName, printType);
+            }).updateTraceability(orderNo, userName, totalPages, printType);
           }).saveFinalUnifiedPDF(base64Data, orderNo);
 
         } catch (pdfError) {
