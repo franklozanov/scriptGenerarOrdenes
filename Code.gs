@@ -79,7 +79,6 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
 function onOpen() {
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
-    .addItem('⚙️ Configurar Proxy', 'promptSetWebAppUrl')
     .addItem('🔧 Inicializar App', 'promptInitializeApp')
     .addItem('🛡️ Aplicar Nuevo Esquema de Protección', 'promptApplyNewProtection')
     .addItem('▶️ Activar Auditoría', 'promptSetupAuditTrail');
@@ -130,16 +129,6 @@ function withAdminAuth(title, action) {
   }
 }
 
-
-function promptSetWebAppUrl() {
-  withAdminAuth('Configurar Proxy (Admin)', function(ui) {
-    var urlResponse = ui.prompt('URL de Web App', 'Pegue la URL de la Web App desplegada (ejecutar como "Yo"):', ui.ButtonSet.OK_CANCEL);
-    if (urlResponse.getSelectedButton() == ui.Button.OK) {
-      PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', urlResponse.getResponseText().trim());
-      ui.alert('✅ URL configurada. La app ahora inyectará datos silenciosamente usando privilegios elevados.');
-    }
-  });
-}
 
 function promptInitializeApp() {
   withAdminAuth('Inicializar App (Admin)', function(ui) {
@@ -827,34 +816,8 @@ function preparePrintPayload(orderNo, templateConfig) {
   return { formData: formData, pdfs: finalPdfs, coords: dynamicCoords };
 }
 
-function doPost(e) {
-  try {
-    var params = JSON.parse(e.postData.contents);
-    if (params.action === 'updateTraceability') {
-      var result = internalUpdateTraceability(params.orderNo, params.userId, params.pagesPrinted, params.printType);
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: result })).setMimeType(ContentService.MimeType.JSON);
-    }
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Acción no reconocida' })).setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
 function updateTraceability(orderNo, userId, pagesPrinted, printType) {
-  var webAppUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
-  if (!webAppUrl) throw new Error("El sistema no tiene configurada la WEB_APP_URL. Contacte al administrador.");
-  
-  var payload = { action: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: pagesPrinted, printType: printType };
-  var options = { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true };
-  
-  var response = UrlFetchApp.fetch(webAppUrl, options);
-  var result = JSON.parse(response.getContentText());
-  
-  if (result.status === 'success') {
-    return result.message;
-  } else {
-    throw new Error("Proxy Error: " + result.message);
-  }
+  return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
 
 function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
