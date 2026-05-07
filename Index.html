@@ -538,7 +538,7 @@
       };
 
       // PDF generation processing function (extracted for reuse)
-      async function processPdfGeneration(payload, config, orderNo, userName, printType, btn, status) {
+      async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status) {
         try {
           status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
 
@@ -750,32 +750,46 @@
           
           status.innerText = "🔄 Guardando PDF en Drive...";
 
-          google.script.run.withSuccessHandler(fileId => {
-            // Abrir PDF con vista previa de Google Drive (sin botón de descarga)
-            window.open('https://drive.google.com/file/d/' + fileId + '/preview', '_blank');
-            
-            status.innerText = "🔄 Actualizando registro en la hoja...";
-            
-            // Actualizar registro después de guardar el PDF
-            google.script.run.withSuccessHandler(msg => {
-              // Continuous workflow: don't close modal, reset for next order
-              status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
-              status.className = "success-text";
+          google.script.run
+            .withSuccessHandler(fileId => {
+              // Abrir PDF con vista previa de Google Drive (sin botón de descarga)
+              window.open('https://drive.google.com/file/d/' + fileId + '/preview', '_blank');
               
-              // Reset state for next print
-              document.getElementById('orderNo').value = '';
-              preloadState = { orderNo: null, data: null, isFetching: false, error: null };
+              status.innerText = "🔄 Actualizando registro en la hoja...";
+              
+              // Actualizar registro después de guardar el PDF
+              google.script.run
+                .withSuccessHandler(msg => {
+                  status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
+                  status.className = "success-text";
+                  
+                  document.getElementById('orderNo').value = '';
+                  preloadState = { orderNo: null, data: null, isFetching: false, error: null };
+                  btn.disabled = false;
+                  document.getElementById('orderNo').focus();
+                  
+                  setTimeout(() => {
+                    if (status.innerText.includes("Listo para la siguiente orden")) {
+                      status.innerText = '';
+                    }
+                  }, 3000);
+                })
+                .withErrorHandler(e => {
+                  console.error('Error en updateTraceability:', e.message);
+                  status.innerText = "⚠️ PDF generado, pero error al registrar: " + e.message;
+                  status.className = "error-text";
+                  btn.disabled = false;
+                })
+                .updateTraceability(orderNo, userId, totalPages, printType);
+            })
+            .withErrorHandler(e => {
+              console.error('Error en saveFinalUnifiedPDF:', e.message);
+              alert('Error al guardar PDF en Drive: ' + e.message);
+              status.innerText = "Proceso cancelado.";
+              status.className = "error-text";
               btn.disabled = false;
-              document.getElementById('orderNo').focus();
-              
-              // Clear status message after 3 seconds
-              setTimeout(() => {
-                if (status.innerText.includes("Listo para la siguiente orden")) {
-                  status.innerText = '';
-                }
-              }, 3000);
-            }).updateTraceability(orderNo, userId, totalPages, printType);
-          }).saveFinalUnifiedPDF(base64Data, orderNo);
+            })
+            .saveFinalUnifiedPDF(base64Data, orderNo);
 
         } catch (pdfError) {
           alert("Error generando PDF: " + pdfError.message);
@@ -828,7 +842,7 @@
           status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
           status.className = "info-text";
           console.log(`✓ Usando datos precargados para orden ${orderNo}`);
-          processPdfGeneration(preloadState.data, config, orderNo, userName, printType, btn, status);
+          processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
         } else if (preloadState.isFetching && preloadState.orderNo === orderNo) {
           // Data is currently being fetched - wait for it
           status.innerText = "⏳ Esperando datos del servidor...";
@@ -840,7 +854,7 @@
               clearInterval(checkInterval);
               if (preloadState.data && preloadState.orderNo === orderNo) {
                 status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
-                processPdfGeneration(preloadState.data, config, orderNo, userName, printType, btn, status);
+                processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
               } else if (preloadState.error) {
                 alert("Error al cargar datos: " + preloadState.error);
                 status.innerText = "Proceso cancelado.";
@@ -872,7 +886,7 @@
           status.className = "info-text";
 
           google.script.run.withSuccessHandler(async (payload) => {
-            processPdfGeneration(payload, config, orderNo, userName, printType, btn, status);
+            processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
           }).withFailureHandler(e => {
             alert("Error del servidor: " + e.message);
             status.innerText = "Proceso cancelado.";
