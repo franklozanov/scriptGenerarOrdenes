@@ -295,7 +295,7 @@ function getInitialData() {
         var key = tplData[k][colClaveIdx] ? tplData[k][colClaveIdx].toString().trim() : "";
         var value = tplData[k][colValorIdx] ? tplData[k][colValorIdx].toString().trim() : "";
       
-        if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1) {
+        if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
           var displayName = key;
           var hasAccess = true;
           var base64 = null;
@@ -516,7 +516,7 @@ function diagnosticarPlantillas() {
     var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     
-    if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1) {
+    if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
       if (value) {
         try {
           var file = DriveApp.getFileById(value);
