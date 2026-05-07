@@ -202,7 +202,7 @@ function getInitialData() {
         var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
         var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
       
-        if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
+        if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1) {
           var displayName = key;
           var hasAccess = true;
           var base64 = null;
@@ -395,7 +395,7 @@ function diagnosticarPlantillas() {
     var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
     var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     
-    if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key.indexOf("COORD_") === -1) {
+    if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1) {
       if (key === "TPL_ORDEN") {
         report += "✓ " + key + " (Dinámico - depende de DOC_ORDENES)\n";
       } else if (value) {
