@@ -746,12 +746,18 @@
           // Convertir PDF a base64 para guardar en Drive
           const base64Data = btoa(new Uint8Array(pdfData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
           
-          status.innerText = "🔄 Guardando PDF en Drive...";
+          // Crear un Blob URL local para abrir el PDF en una pestaña segura de inmediato
+          const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          
+          // Abrir el visor del navegador ocultando paneles y toolbar en lo posible (#toolbar=0)
+          // Al ser un blob local, no se vinculará a Drive, impidiendo "Guardar en otra carpeta"
+          window.open(blobUrl + '#toolbar=0&navpanes=0', '_blank');
+          
+          status.innerText = "🔄 Guardando PDF de respaldo en Drive...";
 
-          google.script.run.withSuccessHandler(fileUrl => {
-            // Abrir PDF en nueva pestaña
-            window.open(fileUrl + '#toolbar=0&navpanes=0', '_blank');
-            
+          google.script.run.withSuccessHandler(response => {
+            // Ya abrimos el archivo local, el servidor solo retornó "SUCCESS"
             status.innerText = "🔄 Actualizando registro en la hoja...";
             
             // Actualizar registro después de guardar el PDF

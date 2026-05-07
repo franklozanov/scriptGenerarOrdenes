@@ -310,8 +310,7 @@ function getInitialData() {
           
           // Fallback to hardcoded names if NombreTemplate is empty or doesn't exist
           if (displayName === key) {
-            if (key === "TPL_ORDEN") displayName = "Orden (Dinámico)";
-            else if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
+            if (key === "DOC_ANALISIS") displayName = "Cert. Análisis (Dinámico)";
           }
           
           if (value) {
@@ -351,6 +350,21 @@ function getInitialData() {
           templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess, base64: base64 });
         }
         
+        // Handle DOC_ORDENES separately - it's a folder ID, not a file ID (dynamic PDF of order)
+        if (key === "DOC_ORDENES") {
+          var displayName = "Orden (Dinámico)";
+          
+          // Try to get name from NombreTemplate column first
+          if (colNombreTemplateIdx !== undefined && colNombreTemplateIdx !== null && k > 0 && tplData[k][colNombreTemplateIdx]) {
+            var nombreTemplateValue = tplData[k][colNombreTemplateIdx].toString().trim();
+            if (nombreTemplateValue) {
+              displayName = nombreTemplateValue;
+            }
+          }
+          
+          templates.push({ key: key, fileId: value, name: displayName, hasAccess: true, base64: null });
+        }
+        
         // Handle DOC_ANALISIS separately - it's a folder ID, not a file ID
         if (key === "DOC_ANALISIS") {
           var displayName = "Cert. Análisis (Dinámico)";
@@ -382,7 +396,7 @@ function getInitialData() {
     var result = { users: users, templates: templates };
     
     // Force hardcoded sort order for templates
-    const sortOrder = ["TPL_ORDEN", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
+    const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
       var indexA = sortOrder.indexOf(a.key);
       var indexB = sortOrder.indexOf(b.key);
@@ -477,7 +491,7 @@ function diagnosticarPlantillas() {
       errorCount++;
     }
   } else {
-    report += "⚠ DOC_ORDENES → No configurado (requerido para TPL_ORDEN)\n";
+    report += "⚠ DOC_ORDENES → No configurado (requerido para buscar PDF de órdenes)\n";
     errorCount++;
   }
   
@@ -503,20 +517,17 @@ function diagnosticarPlantillas() {
     var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
     
     if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1) {
-      if (key === "TPL_ORDEN") {
-        report += "✓ " + key + " (Dinámico - depende de DOC_ORDENES)\n";
-      } else if (value) {
+      if (value) {
         try {
           var file = DriveApp.getFileById(value);
           report += "✓ " + key + " → " + file.getName() + "\n";
           successCount++;
         } catch (e) {
           report += "✗ " + key + " → ERROR: " + e.message + "\n";
-          report += "  ID: " + value + "\n";
           errorCount++;
         }
       } else {
-        report += "⚠ " + key + " → Sin ID configurado\n";
+        report += "⚠ " + key + " → No configurado\n";
         errorCount++;
       }
     }
@@ -614,27 +625,27 @@ function fetchOrderData(orderNo) {
     }
   });
 
-  // Fetch only dynamic templates (TPL_ORDEN and DOC_ANALISIS)
+  // Fetch only dynamic templates (DOC_ORDENES and DOC_ANALISIS)
   var dynamicPdfs = [];
   
-  // Try to fetch TPL_ORDEN
+  // Try to fetch PDF de Orden from DOC_ORDENES folder
   try {
     if (folderId) {
       var folder = DriveApp.getFolderById(folderId);
       var files = folder.getFilesByName(orderNo + ".pdf");
       if (files.hasNext()) {
         var file = files.next();
-        dynamicPdfs.push({ key: "TPL_ORDEN", base64: Utilities.base64Encode(file.getBlob().getBytes()) });
-        Logger.log("✓ Precargado TPL_ORDEN para orden " + orderNo);
+        dynamicPdfs.push({ key: "DOC_ORDENES", base64: Utilities.base64Encode(file.getBlob().getBytes()) });
+        Logger.log("✓ Precargado PDF de Orden para orden " + orderNo);
       } else {
-        Logger.log("⚠️ No se encontró TPL_ORDEN para orden " + orderNo);
+        Logger.log("⚠️ No se encontró PDF de Orden para orden " + orderNo);
       }
     }
   } catch (e) {
-    Logger.log("Error fetching TPL_ORDEN: " + e.message);
+    Logger.log("Error fetching PDF de Orden from DOC_ORDENES: " + e.message);
   }
   
-  // Try to fetch DOC_ANALISIS
+  // Try to fetch DOC_ANALYSIS
   try {
     if (folderAnalysisId && noAnalisisStr) {
       var aFolder = DriveApp.getFolderById(folderAnalysisId);
@@ -738,12 +749,12 @@ function preparePrintPayload(orderNo, templateConfig) {
 
   var pdfsToProcess = [];
   
-  // Only process dynamic templates (TPL_ORDEN and DOC_ANALISIS)
+  // Only process dynamic templates (DOC_ORDENES and DOC_ANALISIS)
   // Static templates are already preloaded on the frontend
   templateConfig.forEach(function(config) {
     var file;
     try {
-      if (config.key === "TPL_ORDEN") {
+      if (config.key === "DOC_ORDENES") {
         if (!folderId) {
           throw new Error("DOC_ORDENES no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
         }
@@ -801,7 +812,7 @@ function preparePrintPayload(orderNo, templateConfig) {
   var pdfOrden = null, pdfAnalisis = null, pdfsOthers = [];
 
   for (var j = 0; j < pdfsToProcess.length; j++) {
-    if (pdfsToProcess[j].key === "TPL_ORDEN") pdfOrden = pdfsToProcess[j];
+    if (pdfsToProcess[j].key === "DOC_ORDENES") pdfOrden = pdfsToProcess[j];
     else if (pdfsToProcess[j].key === "DOC_ANALISIS") pdfAnalisis = pdfsToProcess[j];
     else pdfsOthers.push(pdfsToProcess[j]);
   }
@@ -1690,11 +1701,23 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     }
     
     var tplData = tplSheet.getDataRange().getValues();
+    var tplHeaders = tplData[0];
     var folderId = null;
     
-    for (var i = 0; i < tplData.length; i++) {
-      if (tplData[i][0] && tplData[i][0].toString().trim() === 'DOC_COMPLETO') {
-        folderId = tplData[i][1] ? tplData[i][1].toString().trim() : null;
+    // Obtener índices de columnas por nombre
+    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+    
+    if (!colClaveIdx) colClaveIdx = 1;
+    if (!colValorIdx) colValorIdx = 2;
+    
+    // Convertir a base-0 para array
+    colClaveIdx -= 1;
+    colValorIdx -= 1;
+    
+    for (var i = 1; i < tplData.length; i++) {
+      if (tplData[i][colClaveIdx] && tplData[i][colClaveIdx].toString().trim() === 'DOC_COMPLETO') {
+        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : null;
         break;
       }
     }
@@ -1711,8 +1734,16 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var blob = Utilities.newBlob(decodedData, 'application/pdf', targetFileName);
     var file = folder.createFile(blob);
     
-    // Retornar URL de visualización directa
-    return file.getDownloadUrl();
+    // Configurar permisos de seguridad del archivo en Drive (evita descargas no autorizadas en Drive)
+    try {
+      file.setShareableByEditors(false);
+      file.setCopyRequiresWriterPermission(true);
+    } catch(secErr) {
+      Logger.log("No se pudieron aplicar restricciones de seguridad adicionales al PDF: " + secErr.message);
+    }
+    
+    // Retornamos un mensaje de éxito, ya no la URL directa porque el cliente manejará el PDF
+    return "SUCCESS";
     
   } catch (e) {
     Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
