@@ -774,7 +774,7 @@
                     }
                   }, 3000);
                 })
-                .withErrorHandler(e => {
+                .withFailureHandler(e => {
                   console.error('Error en updateTraceability:', e.message);
                   status.innerText = "⚠️ PDF generado, pero error al registrar: " + e.message;
                   status.className = "error-text";
@@ -782,7 +782,7 @@
                 })
                 .updateTraceability(orderNo, userId, totalPages, printType);
             })
-            .withErrorHandler(e => {
+            .withFailureHandler(e => {
               console.error('Error en saveFinalUnifiedPDF:', e.message);
               alert('Error al guardar PDF en Drive: ' + e.message);
               status.innerText = "Proceso cancelado.";
