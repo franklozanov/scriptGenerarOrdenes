@@ -858,12 +858,10 @@ function updateTraceability(orderNo, userId, pagesPrinted, printType) {
 }
 
 function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
-  // DEBUG: Log parámetros recibidos
-  Logger.log("=== DEBUG internalUpdateTraceability ===");
-  Logger.log("orderNo: " + orderNo);
-  Logger.log("userId recibido: '" + userId + "' (tipo: " + typeof userId + ")");
-  Logger.log("pagesPrinted: " + pagesPrinted);
-  Logger.log("printType: " + printType);
+  // DEBUG: Validar parámetros
+  if (!userId || userId === 'undefined' || userId === undefined) {
+    throw new Error("userId es undefined o vacío. Recibido: '" + userId + "' (tipo: " + typeof userId + ")");
+  }
   
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ordenes');
@@ -879,32 +877,35 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
       var colUserIdIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'UserID', false);
       var colCortoIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'NombreCorto', false);
       
-      Logger.log("Encabezados hoja Usuarios: " + JSON.stringify(uHeaders));
-      Logger.log("colUserIdIdx: " + colUserIdIdx + ", colCortoIdx: " + colCortoIdx);
+      if (!colUserIdIdx || !colCortoIdx) {
+        throw new Error("No se encontraron columnas en hoja Usuarios. UserID: " + colUserIdIdx + ", NombreCorto: " + colCortoIdx);
+      }
       
       if (colUserIdIdx && colCortoIdx) {
         // Convertir a base-0 para acceso a array
         var userIdIdx = colUserIdIdx - 1;
         var cortoIdx = colCortoIdx - 1;
         
+        var found = false;
         for (var u = 1; u < uData.length; u++) {
           var userIdEnFila = uData[u][userIdIdx] ? uData[u][userIdIdx].toString().trim() : "";
-          Logger.log("Fila " + u + ": userIdEnFila='" + userIdEnFila + "' vs userId='" + userId + "' (match: " + (userIdEnFila === userId) + ")");
           
           if (userIdEnFila === userId) {
             var nc = uData[u][cortoIdx];
             if (nc) {
               nombreCorto = nc.toString().trim();
-              Logger.log("✓ NombreCorto encontrado: '" + nombreCorto + "'");
+              found = true;
             }
             break;
           }
         }
+        
+        if (!found) {
+          throw new Error("No se encontró userId '" + userId + "' en hoja Usuarios. Verifica que el usuario existe.");
+        }
       }
     }
   }
-  
-  Logger.log("nombreCorto FINAL a usar: '" + nombreCorto + "'");
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
