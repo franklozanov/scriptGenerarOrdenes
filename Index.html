@@ -609,7 +609,7 @@
               });
               const pages = doc.getPages();
 
-              if (item.key === "TPL_ORDEN") {
+              if (item.key === "DOC_ORDENES") {
                 const firstPage = pages[0];
                 Object.keys(payload.coords).forEach(k => {
                   firstPage.drawText(payload.formData[k] || "", { 
@@ -750,9 +750,28 @@
           const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
           const blobUrl = URL.createObjectURL(pdfBlob);
           
-          // Abrir el visor del navegador con los controles nativos (zoom, imprimir)
-          // Al ser un blob local, no se vinculará a Drive, impidiendo "Guardar en otra carpeta"
-          window.open(blobUrl, '_blank');
+          // Crear visor HTML personalizado que oculta botones de descarga pero mantiene zoom e imprimir
+          const viewerHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Visor de Documento</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; font-family: Arial, sans-serif; }
+    #pdfContainer { width: 100vw; height: 100vh; }
+    embed { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="pdfContainer">
+    <embed src="${blobUrl}" type="application/pdf" />
+  </div>
+</body>
+</html>`;
+          const viewerBlob = new Blob([viewerHtml], { type: 'text/html' });
+          const viewerUrl = URL.createObjectURL(viewerBlob);
+          window.open(viewerUrl, '_blank');
           
           status.innerText = "🔄 Guardando PDF de respaldo en Drive...";
 
