@@ -751,8 +751,8 @@
           status.innerText = "🔄 Guardando PDF en Drive...";
 
           google.script.run.withSuccessHandler(fileId => {
-            // Abrir PDF con el visor nativo de Google Drive
-            window.open('https://drive.google.com/file/d/' + fileId + '/view', '_blank');
+            // Abrir PDF con vista previa de Google Drive (sin botón de descarga)
+            window.open('https://drive.google.com/file/d/' + fileId + '/preview', '_blank');
             
             status.innerText = "🔄 Actualizando registro en la hoja...";
             
