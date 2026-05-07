@@ -1,6 +1,81 @@
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
+// --- FUNCIONES HELPER PARA ACCESO A COLUMNAS POR NOMBRE ---
+
+/**
+ * Busca el índice de una columna por su nombre de encabezado.
+ * Devuelve índice base-1 para usar con getRange(), o null si no existe.
+ * @param {Array} headers - Array de encabezados (fila 1 de la hoja)
+ * @param {string} columnName - Nombre exacto de la columna a buscar
+ * @param {boolean} required - Si es true, lanza error si no encuentra la columna
+ * @returns {number|null} Índice base-1 de la columna, o null si no existe y required=false
+ */
+function getColumnIndexByName(headers, columnName, required) {
+  if (required === undefined) required = true;
+  
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i] && headers[i].toString().trim() === columnName) {
+      return i + 1; // Devolver base-1 para getRange()
+    }
+  }
+  
+  if (required) {
+    throw new Error("No se encontró la columna '" + columnName + "' en los encabezados.");
+  }
+  return null;
+}
+
+/**
+ * Busca el índice de una columna por su nombre de encabezado (case-insensitive).
+ * Devuelve índice base-1 para usar con getRange().
+ * @param {Array} headers - Array de encabezados (fila 1 de la hoja)
+ * @param {string} columnName - Nombre de la columna a buscar
+ * @param {boolean} required - Si es true, lanza error si no encuentra la columna
+ * @returns {number|null} Índice base-1 de la columna, o null si no existe y required=false
+ */
+function getColumnIndexByNameCaseInsensitive(headers, columnName, required) {
+  if (required === undefined) required = true;
+  var columnNameLower = columnName.toString().trim().toLowerCase();
+  
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i] && headers[i].toString().trim().toLowerCase() === columnNameLower) {
+      return i + 1; // Devolver base-1 para getRange()
+    }
+  }
+  
+  if (required) {
+    throw new Error("No se encontró la columna '" + columnName + "' en los encabezados.");
+  }
+  return null;
+}
+
+/**
+ * Obtiene el valor de una celda por nombre de columna y número de fila.
+ * @param {Sheet} sheet - Hoja de cálculo
+ * @param {number} rowIndex - Número de fila (base-1)
+ * @param {string} columnName - Nombre de la columna
+ * @returns {*} Valor de la celda
+ */
+function getCellValueByColumnName(sheet, rowIndex, columnName) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colIndex = getColumnIndexByName(headers, columnName, true);
+  return sheet.getRange(rowIndex, colIndex).getValue();
+}
+
+/**
+ * Establece el valor de una celda por nombre de columna y número de fila.
+ * @param {Sheet} sheet - Hoja de cálculo
+ * @param {number} rowIndex - Número de fila (base-1)
+ * @param {string} columnName - Nombre de la columna
+ * @param {*} value - Valor a establecer
+ */
+function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colIndex = getColumnIndexByName(headers, columnName, true);
+  sheet.getRange(rowIndex, colIndex).setValue(value);
+}
+
 function onOpen() {
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
@@ -157,15 +232,27 @@ function getInitialData() {
     try {
       var userData = userSheet.getDataRange().getValues();
       if (userData.length >= 2) {
-        var colNombreCorto = 2; // Índice por defecto según estructura ['UserID', 'Nombre Completo', 'NombreCorto', 'Email']
-        for (var i = 0; i < userData[0].length; i++) {
-          var headerValue = userData[0][i].toString().trim().toLowerCase();
-          if (headerValue === "nombrecorto") { colNombreCorto = i; break; }
-        }
+        var headers = userData[0];
+        
+        // Obtener índices de columnas por nombre
+        var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
+        var colNombreCompletoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Completo', false);
+        var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
+        
+        // Si alguna columna no existe, usar índices por defecto
+        if (!colUserIdIdx) colUserIdIdx = 1;
+        if (!colNombreCompletoIdx) colNombreCompletoIdx = 2;
+        if (!colNombreCortoIdx) colNombreCortoIdx = 3;
+        
+        // Convertir a base-0 para acceso a array
+        colUserIdIdx = colUserIdIdx - 1;
+        colNombreCompletoIdx = colNombreCompletoIdx - 1;
+        colNombreCortoIdx = colNombreCortoIdx - 1;
+        
         for (var j = 1; j < userData.length; j++) {
-          var userId = userData[j][0] ? userData[j][0].toString().trim() : "N/A";
-          var nombreCompleto = userData[j][1] ? userData[j][1].toString().trim() : "N/A";
-          var nombreCorto = userData[j][colNombreCorto] ? userData[j][colNombreCorto].toString().trim() : "N/A";
+          var userId = userData[j][colUserIdIdx] ? userData[j][colUserIdIdx].toString().trim() : "N/A";
+          var nombreCompleto = userData[j][colNombreCompletoIdx] ? userData[j][colNombreCompletoIdx].toString().trim() : "N/A";
+          var nombreCorto = userData[j][colNombreCortoIdx] ? userData[j][colNombreCortoIdx].toString().trim() : "N/A";
           users.push(userId + " - " + nombreCompleto);
         }
       }
@@ -184,23 +271,29 @@ function getInitialData() {
       var tplData = tplSheet.getDataRange().getValues();
       var accessErrors = [];
       
-      // Find column index for "NombreTemplate" if it exists
-      var colNombreTemplate = -1;
-      if (tplData.length > 0) {
-        for (var i = 0; i < tplData[0].length; i++) {
-          if (tplData[0][i].toString().trim().toLowerCase() === "nombretemplate") {
-            colNombreTemplate = i;
-            break;
-          }
-        }
-      }
+      var headers = tplData[0];
+      
+      // Obtener índices de columnas por nombre
+      var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+      var colValorIdx = getColumnIndexByNameCaseInsensitive(headers, 'Valor', false);
+      var colNombreTemplateIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreTemplate', false);
+      
+      // Si alguna columna no existe, usar índices por defecto
+      if (!colClaveIdx) colClaveIdx = 1;
+      if (!colValorIdx) colValorIdx = 2;
+      // colNombreTemplate es opcional
+      
+      // Convertir a base-0 para acceso a array
+      colClaveIdx = colClaveIdx - 1;
+      colValorIdx = colValorIdx - 1;
+      if (colNombreTemplateIdx) colNombreTemplateIdx = colNombreTemplateIdx - 1;
       
       // Static templates to preload
       var staticTemplates = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
       
       for (var k = 1; k < tplData.length; k++) {
-        var key = tplData[k][0] ? tplData[k][0].toString().trim() : "";
-        var value = tplData[k][1] ? tplData[k][1].toString().trim() : "";
+        var key = tplData[k][colClaveIdx] ? tplData[k][colClaveIdx].toString().trim() : "";
+        var value = tplData[k][colValorIdx] ? tplData[k][colValorIdx].toString().trim() : "";
       
         if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1) {
           var displayName = key;
@@ -208,8 +301,8 @@ function getInitialData() {
           var base64 = null;
           
           // Try to get name from NombreTemplate column first (highest priority)
-          if (colNombreTemplate !== -1 && k > 0 && tplData[k][colNombreTemplate]) {
-            var nombreTemplateValue = tplData[k][colNombreTemplate].toString().trim();
+          if (colNombreTemplateIdx !== undefined && colNombreTemplateIdx !== null && k > 0 && tplData[k][colNombreTemplateIdx]) {
+            var nombreTemplateValue = tplData[k][colNombreTemplateIdx].toString().trim();
             if (nombreTemplateValue) {
               displayName = nombreTemplateValue;
             }
@@ -263,8 +356,8 @@ function getInitialData() {
           var displayName = "Cert. Análisis (Dinámico)";
           
           // Try to get name from NombreTemplate column first
-          if (colNombreTemplate !== -1 && k > 0 && tplData[k][colNombreTemplate]) {
-            var nombreTemplateValue = tplData[k][colNombreTemplate].toString().trim();
+          if (colNombreTemplateIdx !== undefined && colNombreTemplateIdx !== null && k > 0 && tplData[k][colNombreTemplateIdx]) {
+            var nombreTemplateValue = tplData[k][colNombreTemplateIdx].toString().trim();
             if (nombreTemplateValue) {
               displayName = nombreTemplateValue;
             }
@@ -348,10 +441,24 @@ function diagnosticarPlantillas() {
   var folderId = "";
   var folderAnalysisId = "";
   
+  var headers = tplData[0];
+  
+  // Obtener índices de columnas por nombre
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+  var colValorIdx = getColumnIndexByNameCaseInsensitive(headers, 'Valor', false);
+  
+  // Si alguna columna no existe, usar índices por defecto
+  if (!colClaveIdx) colClaveIdx = 1;
+  if (!colValorIdx) colValorIdx = 2;
+  
+  // Convertir a base-0 para acceso a array
+  colClaveIdx = colClaveIdx - 1;
+  colValorIdx = colValorIdx - 1;
+  
   // Verificar carpetas dinámicas primero
   for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][0] ? tplData[i][0].toString().trim() : "";
-    var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
     if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
   }
@@ -439,6 +546,20 @@ function fetchOrderData(orderNo) {
   var tplSheet = ss.getSheetByName('templates');
   var tplData = tplSheet.getDataRange().getValues();
   
+  var tplHeaders = tplData[0];
+  
+  // Obtener índices de columnas por nombre para templates
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+  var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+  
+  // Si alguna columna no existe, usar índices por defecto
+  if (!colClaveIdx) colClaveIdx = 1;
+  if (!colValorIdx) colValorIdx = 2;
+  
+  // Convertir a base-0 para acceso a array
+  colClaveIdx = colClaveIdx - 1;
+  colValorIdx = colValorIdx - 1;
+  
   var folderId = "";
   var folderAnalysisId = "";
   var dynamicCoords = {
@@ -454,8 +575,8 @@ function fetchOrderData(orderNo) {
   }
   
   for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][0].toString().trim();
-    var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    var k = tplData[i][colClaveIdx].toString().trim();
+    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
     if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
     if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);
@@ -463,7 +584,7 @@ function fetchOrderData(orderNo) {
     if (k === "COORD_NoANALISIS" && v) dynamicCoords["NoAnalisis"] = parseXY(v);
   }
 
-  var colNoOrden = headers.indexOf("NoOrden") + 1;
+  var colNoOrden = getColumnIndexByName(headers, 'NoOrden', true);
   var orderValues = dataSheet.getRange(1, colNoOrden, dataSheet.getLastRow(), 1).getValues();
   var targetRowIndex = -1;
   
@@ -547,6 +668,20 @@ function preparePrintPayload(orderNo, templateConfig) {
   var tplSheet = ss.getSheetByName('templates');
   var tplData = tplSheet.getDataRange().getValues();
   
+  var tplHeaders = tplData[0];
+  
+  // Obtener índices de columnas por nombre para templates
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+  var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+  
+  // Si alguna columna no existe, usar índices por defecto
+  if (!colClaveIdx) colClaveIdx = 1;
+  if (!colValorIdx) colValorIdx = 2;
+  
+  // Convertir a base-0 para acceso a array
+  colClaveIdx = colClaveIdx - 1;
+  colValorIdx = colValorIdx - 1;
+  
   var folderId = "";
   var folderAnalysisId = "";
   var dynamicCoords = {
@@ -562,8 +697,8 @@ function preparePrintPayload(orderNo, templateConfig) {
   }
   
   for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][0].toString().trim();
-    var v = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    var k = tplData[i][colClaveIdx].toString().trim();
+    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
     if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
     if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);
@@ -571,7 +706,7 @@ function preparePrintPayload(orderNo, templateConfig) {
     if (k === "COORD_NoANALISIS" && v) dynamicCoords["NoAnalisis"] = parseXY(v);
   }
 
-  var colNoOrden = headers.indexOf("NoOrden") + 1;
+  var colNoOrden = getColumnIndexByName(headers, 'NoOrden', true);
   var orderValues = dataSheet.getRange(1, colNoOrden, dataSheet.getLastRow(), 1).getValues();
   var targetRowIndex = -1;
   
@@ -1213,10 +1348,25 @@ function getUserIdentityString(email) {
   if (!sheet) return email; // Fallback
   
   var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  
+  // Obtener índices de columnas por nombre
+  var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
+  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
+  var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
+  
+  // Si alguna columna no existe, retornar email como fallback
+  if (!colEmailIdx || !colUserIdIdx || !colNombreCortoIdx) return email;
+  
+  // Convertir a base-0 para acceso a array
+  colEmailIdx = colEmailIdx - 1;
+  colUserIdIdx = colUserIdIdx - 1;
+  colNombreCortoIdx = colNombreCortoIdx - 1;
+  
   // Iterar saltando el encabezado (fila 1 / índice 0)
   for (var i = 1; i < data.length; i++) {
-    if (data[i][3] && data[i][3].toString().trim().toLowerCase() === email.toLowerCase()) {
-      return (data[i][0] || "N/A") + " - " + (data[i][2] || "N/A");
+    if (data[i][colEmailIdx] && data[i][colEmailIdx].toString().trim().toLowerCase() === email.toLowerCase()) {
+      return (data[i][colUserIdIdx] || "N/A") + " - " + (data[i][colNombreCortoIdx] || "N/A");
     }
   }
   return email; // Fallback si el correo no está en la tabla
@@ -1365,17 +1515,19 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var data = sheetOrdenes.getDataRange().getValues();
     var headers = data[0]; // La primera fila son los encabezados
     
-    // Determinar índice de columna dinámicamente según docType
-    var targetColIdx = -1;
-    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden');
+    // Mapeo de columnas por nombre de encabezado (base-1 para getRange)
+    var colAdjuntoIdx = getColumnIndexByName(headers, 'AdjuntoOrden', true);
+    var colNoOrdenIdx = getColumnIndexByName(headers, 'NoOrden', true);
+    var colNoAnalisisIdx = getColumnIndexByName(headers, 'NoAnalisis', true);
     
-    // Determinar la clave de la carpeta según el tipo de documento
+    // Determinar la columna objetivo según docType (para búsqueda en array data)
+    var targetColName = "";
     var folderKey = "";
     if (docType === "Orden de Acondicionamiento") {
-      targetColIdx = headers.indexOf('NoOrden');
+      targetColName = "NoOrden";
       folderKey = "DOC_ORDENES";
     } else if (docType === "Registro de Inspeccion Base") {
-      targetColIdx = headers.indexOf('NoAnalisis');
+      targetColName = "NoAnalisis";
       folderKey = "DOC_ANALISIS";
     }
     
@@ -1384,10 +1536,8 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       return { status: 'error', message: "Tipo de documento no reconocido para asignar carpeta: " + docType };
     }
     
-    // Validación de seguridad vital
-    if (targetColIdx === -1) {
-      return { status: 'error', message: "No se encontró la columna de encabezado para el tipo: " + docType };
-    }
+    // Obtener índice de columna objetivo para búsqueda en array (base-0)
+    var targetColIdx = getColumnIndexByName(headers, targetColName, true) - 1;
     
     // Logs de auditoría críticos
     Logger.log("--- AUDITORIA DE BUSQUEDA ---");
@@ -1415,10 +1565,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
 
     // Validación específica para Orden de Acondicionamiento: verificar que AdjuntoOrden sea "Pendiente"
     if (docType === "Orden de Acondicionamiento") {
-      if (colAdjuntoIdx === -1) {
-        return { status: 'error', message: "No se encontró la columna 'AdjuntoOrden' en los encabezados." };
-      }
-      var currentAdjunto = data[targetRowIndex - 1][colAdjuntoIdx];
+      var currentAdjunto = data[targetRowIndex - 1][colAdjuntoIdx - 1]; // colAdjuntoIdx es base-1, data es base-0
       if (currentAdjunto && currentAdjunto.toString().trim() !== "Pendiente") {
         return { status: 'error', message: 'La orden "' + referenceNo + '" ya no está en estado "Pendiente". Puede haber sido cargada por otro usuario. Actualice el modal.' };
       }
@@ -1431,12 +1578,25 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     }
 
     var tplData = tplSheet.getDataRange().getValues();
+    var tplHeaders = tplData[0];
     var folderId = "";
+    
+    // Obtener índices de columnas por nombre para templates
+    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+    
+    // Si alguna columna no existe, usar índices por defecto
+    if (!colClaveIdx) colClaveIdx = 1;
+    if (!colValorIdx) colValorIdx = 2;
+    
+    // Convertir a base-0 para acceso a array
+    colClaveIdx = colClaveIdx - 1;
+    colValorIdx = colValorIdx - 1;
 
     for (var i = 1; i < tplData.length; i++) {
-      var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
+      var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
       if (key === folderKey) {
-        folderId = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
         break;
       }
     }
@@ -1485,13 +1645,13 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     // Actualizar UI en la hoja según tipo de documento
     if (docType === "Orden de Acondicionamiento") {
       // Poner "✅ Cargado" en AdjuntoOrden y agregar Nota
-      var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx);
+      var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx); // colAdjuntoIdx es base-1
       targetCell.setValue("✅ Cargado");
       var fileUrl = newFile.getUrl();
       targetCell.setNote("Archivo cargado: " + fileUrl);
     } else if (docType === "Registro de Inspeccion Base") {
       // NO tocar AdjuntoOrden - solo agregar Nota en NoAnalisis
-      var targetCell = sheetOrdenes.getRange(targetRowIndex, colNoAnalisisIdx);
+      var targetCell = sheetOrdenes.getRange(targetRowIndex, colNoAnalisisIdx); // colNoAnalisisIdx es base-1
       var fileUrl = newFile.getUrl();
       targetCell.setNote("Registro base cargado: " + fileUrl);
     }
