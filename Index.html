@@ -748,36 +748,12 @@
           // Convertir PDF a base64 para guardar en Drive
           const base64Data = btoa(new Uint8Array(pdfData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
           
-          // Convertir PDF a Data URL para evitar restricciones de CORS
-          const pdfDataUrl = 'data:application/pdf;base64,' + base64Data;
-          
-          // Crear visor HTML personalizado que oculta botones de descarga pero mantiene zoom e imprimir
-          const viewerHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Visor de Documento</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; font-family: Arial, sans-serif; }
-    #pdfContainer { width: 100vw; height: 100vh; }
-    embed { width: 100%; height: 100%; }
-  </style>
-</head>
-<body>
-  <div id="pdfContainer">
-    <embed src="${pdfDataUrl}" type="application/pdf" />
-  </div>
-</body>
-</html>`;
-          const viewerBlob = new Blob([viewerHtml], { type: 'text/html' });
-          const viewerUrl = URL.createObjectURL(viewerBlob);
-          window.open(viewerUrl, '_blank');
-          
-          status.innerText = "🔄 Guardando PDF de respaldo en Drive...";
+          status.innerText = "🔄 Guardando PDF en Drive...";
 
-          google.script.run.withSuccessHandler(response => {
-            // Ya abrimos el archivo local, el servidor solo retornó "SUCCESS"
+          google.script.run.withSuccessHandler(fileId => {
+            // Abrir PDF con el visor nativo de Google Drive
+            window.open('https://drive.google.com/file/d/' + fileId + '/view', '_blank');
+            
             status.innerText = "🔄 Actualizando registro en la hoja...";
             
             // Actualizar registro después de guardar el PDF
