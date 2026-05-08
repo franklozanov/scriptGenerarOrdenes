@@ -916,7 +916,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
   'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden'],
-  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
+  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
 };
 
