@@ -2022,8 +2022,14 @@ function getWebAppUrl() {
       return savedUrl;
     }
 
+    var fallbackUrl = "https://script.google.com/macros/s/AKfycbyixSyKwcVkFQG1GQMyBhNZ8WOK0MVdg3wcThtG8tZvtpgGVzTj03M097hvEm01Hwwe/exec";
+
     var service = ScriptApp.getService();
     var url = service.getUrl();
+    if (!url && fallbackUrl) {
+      Logger.log("URL de Web App obtenida desde fallback: " + fallbackUrl);
+      return fallbackUrl;
+    }
     if (!url) {
       throw new Error("La URL de la Web App está vacía. Publique una nueva implementación como Aplicación web.");
     }
