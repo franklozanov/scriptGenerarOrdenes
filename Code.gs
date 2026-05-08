@@ -916,7 +916,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
   'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden'],
-  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email'],
+  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
 };
 
@@ -1814,6 +1814,52 @@ function doGet(e) {
 }
 
 /**
+ * Verifica si un usuario está autorizado para realizar acciones de escritura.
+ * Lee la hoja 'Usuarios' y comprueba si el email del usuario tiene un rol permitido ('ADMIN', 'QA', 'STANDARD').
+ * @param {string} email - El correo electrónico del usuario a verificar.
+ * @returns {boolean} - True si está autorizado, false en caso contrario.
+ */
+function isUserAuthorized(email) {
+  if (!email) return false;
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var userSheet = ss.getSheetByName('Usuarios');
+    if (!userSheet) {
+      Logger.log("ADVERTENCIA: La hoja 'Usuarios' no existe. Denegando todas las acciones de escritura.");
+      return false;
+    }
+
+    var data = userSheet.getDataRange().getValues();
+    var headers = data[0];
+    
+    // Usar la función helper para encontrar columnas por nombre, insensible a mayúsculas/minúsculas
+    var emailColIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
+    var rolColIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+    
+    if (emailColIdx === -1 || rolColIdx === -1) {
+      Logger.log("ADVERTENCIA: La hoja 'Usuarios' no tiene las columnas 'Email' y/o 'Rol'. Denegando acceso.");
+      return false;
+    }
+    
+    // Convertir a índice base-0 para acceder al array
+    emailColIdx -= 1;
+    rolColIdx -= 1;
+    
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][emailColIdx] && data[i][emailColIdx].toString().trim().toLowerCase() === email.toLowerCase()) {
+        var userRole = data[i][rolColIdx] ? data[i][rolColIdx].toString().trim().toUpperCase() : "";
+        return userRole === 'ADMIN' || userRole === 'QA' || userRole === 'STANDARD';
+      }
+    }
+    return false; // Usuario no encontrado en la lista
+  } catch (e) {
+    Logger.log("Error en isUserAuthorized: " + e.message);
+    return false; // Denegar acceso en caso de error
+  }
+}
+
+/**
  * Maneja solicitudes POST para operaciones de Drive con permisos de propietario.
  * Esta función se ejecuta como el propietario del script, no como el usuario que accede.
  * Soporta dos tipos de operaciones:
@@ -1824,6 +1870,19 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
+    // --- CONTROL DE ACCESO BASADO EN ROLES (RBAC) ---
+    // Identificar al usuario que realiza la llamada, no al que ejecuta el script.
+    var callingUserEmail = Session.getActiveUser().getEmail();
+    if (!isUserAuthorized(callingUserEmail)) {
+      Logger.log("Acceso denegado para el usuario no autorizado: " + callingUserEmail);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Acceso denegado. No tienes permiso para realizar esta acción.',
+        diagnostic: 'ACCESS_DENIED'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    // --- FIN DE CONTROL DE ACCESO ---
+
     // Validar que se haya proporcionado el cuerpo de la solicitud
     if (!e || !e.postData) {
       Logger.log("Error en doPost: No se recibieron datos en la solicitud");
