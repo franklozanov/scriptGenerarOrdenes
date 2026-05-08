@@ -255,6 +255,33 @@
         color: #2563eb; 
         background: #eff6ff;
       }
+      .preload-banner {
+        display: none;
+        margin-bottom: 20px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+      .preload-banner.info {
+        display: block;
+        color: #1d4ed8;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+      }
+      .preload-banner.success {
+        display: block;
+        color: #047857;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+      }
+      .preload-banner.error {
+        display: block;
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+      }
       .hint { 
         font-size: 12px; 
         color: #64748b; 
@@ -295,6 +322,8 @@
         <div class="spinner"></div>
         <div style="font-size: 14px; color: #64748b; font-weight: 600;">Cargando panel...</div>
       </div>
+
+      <div id="preloadBanner" class="preload-banner"></div>
 
       <div class="section">
         <div class="section-title">Datos de la Orden</div>
@@ -343,7 +372,7 @@
     <script>
       let globalTemplates = [];
       let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
-      let preloadState = { orderNo: null, data: null, isFetching: false, error: null }; // Background preloading state
+      let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
       let debounceTimer = null; // Timer for debounce function
 
       // Debounce function to avoid multiple backend calls while typing
@@ -354,32 +383,100 @@
         };
       }
 
+      function setPreloadBanner(type, message) {
+        const banner = document.getElementById('preloadBanner');
+        if (!banner) return;
+        if (!message) {
+          banner.className = 'preload-banner';
+          banner.innerHTML = '';
+          return;
+        }
+        banner.className = 'preload-banner ' + type;
+        banner.innerHTML = message;
+      }
+
+      function resetPreloadState() {
+        preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] };
+        updateGoButtonState();
+      }
+
+      function buildPdfsByKey(pdfs) {
+        const pdfsByKey = {};
+        (pdfs || []).forEach(pdf => {
+          pdfsByKey[pdf.key] = pdf;
+        });
+        return pdfsByKey;
+      }
+
+      function isPreloadReadyForOrder(orderNo) {
+        return preloadState.orderNo === orderNo &&
+          preloadState.status === 'ready' &&
+          preloadState.data &&
+          preloadState.pdfsByKey.DOC_ORDENES &&
+          preloadState.pdfsByKey.DOC_ANALISIS;
+      }
+
+      function renderPreloadResult(response) {
+        if (response.ready) {
+          setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Documentos listos para impresión.');
+          updateGoButtonState();
+          return;
+        }
+        const messages = (response.errors || []).map(err => '⚠️ ' + err.message);
+        setPreloadBanner('error', messages.join('<br>') || '⚠️ No fue posible preparar los documentos dinámicos.');
+        updateGoButtonState();
+      }
+
+      function hasAnyCopiesSelected() {
+        return globalTemplates.some(t => {
+          const input = document.getElementById('val_' + t.key);
+          return input && (parseInt(input.value) || 0) > 0;
+        });
+      }
+
+      function isUserSelectionValid() {
+        const userNameInput = document.getElementById('userName');
+        if (!userNameInput || !window.globalUsers) return false;
+        return window.globalUsers.some(u => u.nombreCompleto === userNameInput.value.trim());
+      }
+
+      function updateGoButtonState() {
+        const btn = document.getElementById('goBtn');
+        const orderInput = document.getElementById('orderNo');
+        if (!btn || !orderInput) return;
+        btn.disabled = !(isPreloadReadyForOrder(orderInput.value.trim()) && isUserSelectionValid() && hasAnyCopiesSelected());
+      }
+
       // Background preloading function
       function preloadOrderData(orderNo) {
         const currentOrderNo = orderNo.trim();
-        
-        // Clear any existing error if user is typing
-        if (preloadState.orderNo === currentOrderNo && preloadState.error) {
-          preloadState.error = null;
+        if (!currentOrderNo) {
+          resetPreloadState();
+          setPreloadBanner('', '');
+          return;
         }
         
         // If already fetching for this order, don't start another request
-        if (preloadState.isFetching && preloadState.orderNo === currentOrderNo) {
+        if (preloadState.status === 'loading' && preloadState.orderNo === currentOrderNo) {
           return;
         }
         
         // If already loaded for this order, no need to fetch again
-        if (preloadState.orderNo === currentOrderNo && preloadState.data) {
+        if (isPreloadReadyForOrder(currentOrderNo)) {
           return;
         }
         
         // Start fetching
         preloadState.orderNo = currentOrderNo;
-        preloadState.isFetching = true;
-        preloadState.error = null;
+        preloadState.status = 'loading';
+        preloadState.data = null;
+        preloadState.pdfsByKey = {};
+        preloadState.errors = [];
+        updateGoButtonState();
         
         // Show subtle status message
         const status = document.getElementById('status');
+        setPreloadBanner('info', '🔍 Buscando documentos de la orden...');
         if (status && !status.innerText.includes("Impresión registrada")) {
           status.innerText = "🔍 Buscando datos de la orden...";
           status.className = "info-text";
@@ -394,16 +491,18 @@
               return;
             }
             
+            preloadState.status = response.ready ? 'ready' : 'error';
             preloadState.data = response;
-            preloadState.isFetching = false;
-            preloadState.error = null;
+            preloadState.pdfsByKey = buildPdfsByKey(response.pdfs);
+            preloadState.errors = response.errors || [];
             
             console.log(`✓ Datos precargados para orden ${currentOrderNo}`);
+            renderPreloadResult(response);
             
             // Update status to show data is ready
             if (status && !status.innerText.includes("Impresión registrada")) {
-              status.innerText = "✅ Datos de la orden listos para generar PDF";
-              status.className = "success-text";
+              status.innerText = response.ready ? "✅ Documentos listos para impresión" : "⚠️ Faltan documentos requeridos";
+              status.className = response.ready ? "success-text" : "error-text";
             }
           })
           .withFailureHandler(error => {
@@ -414,10 +513,14 @@
               return;
             }
             
-            preloadState.isFetching = false;
-            preloadState.error = error.message;
+            preloadState.status = 'error';
+            preloadState.data = null;
+            preloadState.pdfsByKey = {};
+            preloadState.errors = [{ key: 'server', message: error.message }];
+            updateGoButtonState();
             
             console.error(`Error precargando orden ${currentOrderNo}:`, error.message);
+            setPreloadBanner('error', `⚠️ Error: ${error.message}`);
             
             // Show error in status
             if (status) {
@@ -436,6 +539,7 @@
         if (value > 0) {
           input.value = value - 1;
         }
+        updateGoButtonState();
       }
 
       function incrementCounter(key, noAccess) {
@@ -445,15 +549,20 @@
         if (value < 999) {
           input.value = value + 1;
         }
+        updateGoButtonState();
       }
 
       function validateCounter(input) {
         // Permitir que el campo esté temporalmente vacío mientras se borra/escribe
-        if (input.value === '') return;
+        if (input.value === '') {
+          updateGoButtonState();
+          return;
+        }
         
         let value = parseInt(input.value);
         if (isNaN(value)) {
           input.value = ''; // Borra caracteres no numéricos
+          updateGoButtonState();
           return;
         }
         
@@ -463,20 +572,30 @@
           value = 999;
         }
         input.value = value;
+        updateGoButtonState();
       }
 
-      function hasSelectedDynamicPdfs(payload, config) {
-        const dynamicKeys = ["DOC_ORDENES", "DOC_ANALISIS"];
-        const selectedDynamicKeys = config
-          .filter(c => dynamicKeys.includes(c.key) && c.copies > 0)
-          .map(c => c.key);
+      function buildPayloadFromPreload(config) {
+        const pdfs = [];
+        config.forEach(cfg => {
+          if (cfg.key === "DOC_ORDENES" || cfg.key === "DOC_ANALISIS") {
+            const dynamicPdf = preloadState.pdfsByKey[cfg.key];
+            if (!dynamicPdf) {
+              throw new Error(`Falta el archivo para ${cfg.key}.`);
+            }
+            pdfs.push({
+              key: cfg.key,
+              base64: dynamicPdf.base64,
+              copies: cfg.copies
+            });
+          }
+        });
 
-        if (selectedDynamicKeys.length === 0) {
-          return true;
-        }
-
-        const availableKeys = (payload.pdfs || []).map(p => p.key);
-        return selectedDynamicKeys.every(key => availableKeys.includes(key));
+        return {
+          formData: preloadState.data.formData,
+          coords: preloadState.data.coords,
+          pdfs: pdfs
+        };
       }
 
       function saveFinalUnifiedPdfAsync(base64Data, orderNo) {
@@ -548,21 +667,6 @@
         }
       }
 
-      function fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow) {
-        status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
-        status.className = "info-text";
-
-        google.script.run.withSuccessHandler(async (payload) => {
-          processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status, previewWindow);
-        }).withFailureHandler(e => {
-          setPreviewWindowContent(previewWindow, "❌ Error obteniendo datos: " + e.message, true);
-          alert("Error del servidor: " + e.message);
-          status.innerText = "Proceso cancelado.";
-          status.className = "error-text";
-          btn.disabled = false;
-        }).preparePrintPayload(orderNo, config);
-      }
-
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
           globalTemplates = data.templates;
@@ -601,6 +705,7 @@
           // Guardar usuarios globalmente para acceder después
           window.globalUsers = data.users;
           document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
+          document.getElementById('userName').addEventListener('input', updateGoButtonState);
 
           const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
           if (noAccessCount > 0) {
@@ -610,17 +715,24 @@
           }
 
           document.getElementById('loader').style.display = 'none';
-          document.getElementById('goBtn').disabled = false;
           
           // Add event listener for background preloading on orderNo input
           const orderNoInput = document.getElementById('orderNo');
           const debouncedPreload = debounce((value) => {
             if (value.trim().length >= 3) { // Only preload if at least 3 characters
               preloadOrderData(value);
+            } else {
+              resetPreloadState();
+              setPreloadBanner('', '');
             }
           }, 600);
           
           orderNoInput.addEventListener('input', (e) => {
+            if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
+              resetPreloadState();
+              setPreloadBanner('', '');
+            }
+            updateGoButtonState();
             debouncedPreload(e.target.value);
           });
           
@@ -895,8 +1007,8 @@
             status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
             status.className = "success-text";
             document.getElementById('orderNo').value = '';
-            preloadState = { orderNo: null, data: null, isFetching: false, error: null };
-            btn.disabled = false;
+            resetPreloadState();
+            setPreloadBanner('', '');
             document.getElementById('orderNo').focus();
             setTimeout(() => {
               if (status.innerText.includes("Listo para la siguiente orden")) {
@@ -957,73 +1069,34 @@
 
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 
+        if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
+          setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca “Documentos listos para impresión”.');
+          status.innerText = "⏳ Esperando documentos dinámicos...";
+          status.className = "info-text";
+          return;
+        }
+
+        if (!isPreloadReadyForOrder(orderNo)) {
+          const messages = (preloadState.orderNo === orderNo && preloadState.errors.length)
+            ? preloadState.errors.map(err => '⚠️ ' + err.message).join('<br>')
+            : '⚠️ Ingrese un No. de Orden válido y espere a que DOC_ORDENES y DOC_ANALISIS estén listos.';
+          setPreloadBanner('error', messages);
+          status.innerText = "Proceso bloqueado: faltan documentos requeridos.";
+          status.className = "error-text";
+          return;
+        }
+
         btn.disabled = true;
         const previewWindow = window.open('', '_blank');
         if (previewWindow) {
           setPreviewWindowContent(previewWindow, "⏳ Preparando documento final...", false);
         }
-        
-        // Check if preloaded data is available and matches current order
-        if (preloadState.orderNo === orderNo && preloadState.data) {
-          // Data is already preloaded - use it immediately
-          if (hasSelectedDynamicPdfs(preloadState.data, config)) {
-            status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
-            status.className = "info-text";
-            console.log(`✓ Usando datos precargados para orden ${orderNo}`);
-            processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status, previewWindow);
-          } else {
-            console.log(`⚠️ Datos precargados incompletos para orden ${orderNo}. Solicitando payload completo al servidor.`);
-            fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow);
-          }
-        } else if (preloadState.isFetching && preloadState.orderNo === orderNo) {
-          // Data is currently being fetched - wait for it
-          status.innerText = "⏳ Esperando datos del servidor...";
-          status.className = "info-text";
-          
-          // Poll for completion (simple approach)
-          const checkInterval = setInterval(() => {
-            if (!preloadState.isFetching) {
-              clearInterval(checkInterval);
-              if (preloadState.data && preloadState.orderNo === orderNo) {
-                if (hasSelectedDynamicPdfs(preloadState.data, config)) {
-                  status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
-                  processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status, previewWindow);
-                } else {
-                  console.log(`⚠️ Datos precargados incompletos para orden ${orderNo}. Solicitando payload completo al servidor.`);
-                  fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow);
-                }
-              } else if (preloadState.error) {
-                setPreviewWindowContent(previewWindow, "❌ Error al cargar datos: " + preloadState.error, true);
-                alert("Error al cargar datos: " + preloadState.error);
-                status.innerText = "Proceso cancelado.";
-                status.className = "error-text";
-                btn.disabled = false;
-              }
-            }
-          }, 100);
-          
-          // Timeout after 10 seconds
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            if (preloadState.isFetching) {
-              setPreviewWindowContent(previewWindow, "❌ Tiempo de espera agotado. Por favor, intente nuevamente.", true);
-              alert("Tiempo de espera agotado. Por favor, intente nuevamente.");
-              status.innerText = "Proceso cancelado.";
-              status.className = "error-text";
-              btn.disabled = false;
-            }
-          }, 10000);
-        } else if (preloadState.error && preloadState.orderNo === orderNo) {
-          // There was an error fetching this order
-          setPreviewWindowContent(previewWindow, "❌ Error al cargar datos: " + preloadState.error, true);
-          alert("Error al cargar datos: " + preloadState.error);
-          status.innerText = "Proceso cancelado.";
-          status.className = "error-text";
-          btn.disabled = false;
-        } else {
-          // No preloaded data - fetch normally
-          fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow);
-        }
+
+        status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
+        status.className = "info-text";
+        console.log(`✓ Usando documentos dinámicos precargados para orden ${orderNo}`);
+        const payload = buildPayloadFromPreload(config);
+        processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status, previewWindow);
       }
     </script>
   </body>

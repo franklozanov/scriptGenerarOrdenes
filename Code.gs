@@ -97,9 +97,6 @@ function onOpen() {
     .addSubMenu(configMenu)
     .addToUi();
   
-  // Limpiar caché para asegurar que se carguen datos frescos
-  clearInitialDataCache();
-  
   // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();
@@ -187,6 +184,61 @@ function onEdit(e) {
 
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
 
+var STATIC_TEMPLATE_KEYS_ = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
+var STATIC_TEMPLATE_CACHE_TTL_ = 21600;
+var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
+
+function getStaticTemplateCachePrefix_(key) {
+  return 'staticPdf_' + key + '_';
+}
+
+function getCachedStaticTemplateBase64_(key) {
+  var cache = CacheService.getScriptCache();
+  var prefix = getStaticTemplateCachePrefix_(key);
+  var meta = cache.get(prefix + 'meta');
+  if (!meta) return null;
+
+  try {
+    var parsedMeta = JSON.parse(meta);
+    var chunks = [];
+    for (var i = 0; i < parsedMeta.chunkCount; i++) {
+      var chunk = cache.get(prefix + i);
+      if (chunk == null) return null;
+      chunks.push(chunk);
+    }
+    return chunks.join('');
+  } catch (e) {
+    Logger.log("Error leyendo caché estático " + key + ": " + e.message);
+    return null;
+  }
+}
+
+function cacheStaticTemplateBase64_(key, base64) {
+  if (!base64) return;
+  var cache = CacheService.getScriptCache();
+  var prefix = getStaticTemplateCachePrefix_(key);
+  var chunkCount = Math.ceil(base64.length / STATIC_TEMPLATE_CHUNK_SIZE_);
+
+  try {
+    for (var i = 0; i < chunkCount; i++) {
+      cache.put(prefix + i, base64.substring(i * STATIC_TEMPLATE_CHUNK_SIZE_, (i + 1) * STATIC_TEMPLATE_CHUNK_SIZE_), STATIC_TEMPLATE_CACHE_TTL_);
+    }
+    cache.put(prefix + 'meta', JSON.stringify({ chunkCount: chunkCount }), STATIC_TEMPLATE_CACHE_TTL_);
+  } catch (e) {
+    Logger.log("Error cacheando plantilla estática " + key + ": " + e.message);
+  }
+}
+
+function getStaticTemplateBase64_(key, fileId) {
+  var cached = getCachedStaticTemplateBase64_(key);
+  if (cached) return cached;
+
+  var file = DriveApp.getFileById(fileId);
+  var base64 = Utilities.base64Encode(file.getBlob().getBytes());
+  cacheStaticTemplateBase64_(key, base64);
+  return base64;
+}
+
 function getInitialData() {
   try {
     var cache = CacheService.getScriptCache();
@@ -194,12 +246,10 @@ function getInitialData() {
     if (cached) {
       try { 
         var parsedData = JSON.parse(cached); 
-        var staticTemplates = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
         for (var i = 0; i < parsedData.templates.length; i++) {
           var t = parsedData.templates[i];
-          if (staticTemplates.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
-            var file = DriveApp.getFileById(t.fileId);
-            t.base64 = Utilities.base64Encode(file.getBlob().getBytes());
+          if (STATIC_TEMPLATE_KEYS_.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
+            t.base64 = getStaticTemplateBase64_(t.key, t.fileId);
           } else {
             t.base64 = null;
           }
@@ -280,9 +330,6 @@ function getInitialData() {
       colValorIdx = colValorIdx - 1;
       if (colNombreTemplateIdx) colNombreTemplateIdx = colNombreTemplateIdx - 1;
       
-      // Static templates to preload
-      var staticTemplates = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
-      
       for (var k = 1; k < tplData.length; k++) {
         var key = tplData[k][colClaveIdx] ? tplData[k][colClaveIdx].toString().trim() : "";
         var value = tplData[k][colValorIdx] ? tplData[k][colValorIdx].toString().trim() : "";
@@ -314,8 +361,8 @@ function getInitialData() {
               }
               
               // Preload base64 for static templates
-              if (staticTemplates.indexOf(key) !== -1) {
-                base64 = Utilities.base64Encode(file.getBlob().getBytes());
+              if (STATIC_TEMPLATE_KEYS_.indexOf(key) !== -1) {
+                base64 = getStaticTemplateBase64_(key, value);
                 Logger.log("✓ Precargando base64 para " + key);
               }
             } catch (e) { 
@@ -324,7 +371,7 @@ function getInitialData() {
               Logger.log("  - Error: " + e.message);
               
               // For static templates, do NOT set hasAccess = false since base64 is handled separately
-              if (staticTemplates.indexOf(key) === -1) {
+              if (STATIC_TEMPLATE_KEYS_.indexOf(key) === -1) {
                 // Only mark as no access for dynamic templates
                 displayName = displayName + " (Sin acceso)";
                 hasAccess = false;
@@ -428,7 +475,24 @@ function getInitialData() {
 }
 
 function clearInitialDataCache() {
-  CacheService.getScriptCache().remove('initialData_v1');
+  var cache = CacheService.getScriptCache();
+  cache.remove('initialData_v1');
+  cache.remove('printConfig_v1');
+  for (var i = 0; i < STATIC_TEMPLATE_KEYS_.length; i++) {
+    var prefix = getStaticTemplateCachePrefix_(STATIC_TEMPLATE_KEYS_[i]);
+    var meta = cache.get(prefix + 'meta');
+    if (meta) {
+      try {
+        var parsedMeta = JSON.parse(meta);
+        for (var j = 0; j < parsedMeta.chunkCount; j++) {
+          cache.remove(prefix + j);
+        }
+      } catch (e) {
+        Logger.log("Error limpiando caché estático " + STATIC_TEMPLATE_KEYS_[i] + ": " + e.message);
+      }
+    }
+    cache.remove(prefix + 'meta');
+  }
 }
 
 // Función de diagnóstico para verificar el estado de las plantillas
@@ -566,35 +630,63 @@ function findOrderPdfInFolder(folderId, orderNo) {
   throw new Error("No se encontró un PDF para la orden '" + orderNo + "' en la carpeta DOC_ORDENES (ID: " + folderId + "). Verifique que el archivo exista y que el nombre contenga el número de orden.");
 }
 
-function fetchOrderData(orderNo) {
+function findAnalysisPdfInFolder(folderId, noAnalisis) {
+  if (!folderId) {
+    throw new Error("DOC_ANALISIS no está configurado en la hoja 'templates'. Configure el ID de la carpeta de análisis.");
+  }
+
+  var folder = DriveApp.getFolderById(folderId);
+  var normalizedNoAnalisis = noAnalisis.toString().trim().toLowerCase();
+  var exactFiles = folder.getFilesByName(noAnalisis + ".pdf");
+  if (exactFiles.hasNext()) {
+    return exactFiles.next();
+  }
+
+  var aQuery = "title contains '" + noAnalisis + "' and mimeType = 'application/pdf' and trashed = false";
+  var files = folder.searchFiles(aQuery);
+  while (files.hasNext()) {
+    var file = files.next();
+    var fileName = file.getName().toString().trim().toLowerCase();
+    if (file.getMimeType() === MimeType.PDF && (fileName === normalizedNoAnalisis + ".pdf" || fileName.indexOf(normalizedNoAnalisis) === 0)) {
+      return file;
+    }
+  }
+
+  throw new Error("No se encontró un PDF de análisis para '" + noAnalisis + "' en la carpeta DOC_ANALISIS (ID: " + folderId + ").");
+}
+
+function getPrintConfig_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('printConfig_v1');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      Logger.log("Error parsing printConfig_v1: " + e.message);
+    }
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var dataSheet = ss.getSheetByName('Ordenes');
-  if (!dataSheet) throw new Error("Sheet 'Ordenes' not found.");
-  var headers = dataSheet.getRange(1, 1, 1, dataSheet.getLastColumn()).getValues()[0];
-  
   var tplSheet = ss.getSheetByName('templates');
+  if (!tplSheet) throw new Error("La hoja 'templates' no existe.");
   var tplData = tplSheet.getDataRange().getValues();
-  
   var tplHeaders = tplData[0];
-  
-  // Obtener índices de columnas por nombre para templates
   var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
   var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
-  
-  // Si alguna columna no existe, usar índices por defecto
   if (!colClaveIdx) colClaveIdx = 1;
   if (!colValorIdx) colValorIdx = 2;
-  
-  // Convertir a base-0 para acceso a array
   colClaveIdx = colClaveIdx - 1;
   colValorIdx = colValorIdx - 1;
-  
-  var folderId = "";
-  var folderAnalysisId = "";
-  var dynamicCoords = {
-    "Fabricante": { x: 450, y: 585 },
-    "Exp":        { x: 360, y: 495 },
-    "NoAnalisis": { x: 155, y: 385 }
+
+  var config = {
+    DOC_ORDENES: "",
+    DOC_ANALISIS: "",
+    DOC_COMPLETO: "",
+    coords: {
+      "Fabricante": { x: 450, y: 585 },
+      "Exp":        { x: 360, y: 495 },
+      "NoAnalisis": { x: 155, y: 385 }
+    }
   };
 
   function parseXY(str) {
@@ -602,28 +694,63 @@ function fetchOrderData(orderNo) {
     var matchY = str.match(/y:\s*([0-9.]+)/i);
     return { x: matchX ? parseFloat(matchX[1]) : 0, y: matchY ? parseFloat(matchY[1]) : 0 };
   }
-  
+
   for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][colClaveIdx].toString().trim();
+    var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
     var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
-    if (k === "DOC_ORDENES") folderId = v;
-    if (k === "DOC_ANALISIS") folderAnalysisId = v;
-    if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);
-    if (k === "COORD_EXP" && v) dynamicCoords["Exp"] = parseXY(v);
-    if (k === "COORD_NoANALISIS" && v) dynamicCoords["NoAnalisis"] = parseXY(v);
+    if (k === "DOC_ORDENES") config.DOC_ORDENES = v;
+    if (k === "DOC_ANALISIS") config.DOC_ANALISIS = v;
+    if (k === "DOC_COMPLETO") config.DOC_COMPLETO = v;
+    if (k === "COORD_FABRICANTE" && v) config.coords["Fabricante"] = parseXY(v);
+    if (k === "COORD_EXP" && v) config.coords["Exp"] = parseXY(v);
+    if (k === "COORD_NoANALISIS" && v) config.coords["NoAnalisis"] = parseXY(v);
   }
+
+  try {
+    cache.put('printConfig_v1', JSON.stringify(config), 21600);
+  } catch (e) {
+    Logger.log("Error caching printConfig_v1: " + e.message);
+  }
+
+  return config;
+}
+
+function fetchOrderData(orderNo) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dataSheet = ss.getSheetByName('Ordenes');
+  if (!dataSheet) throw new Error("Sheet 'Ordenes' not found.");
+  var headers = dataSheet.getRange(1, 1, 1, dataSheet.getLastColumn()).getValues()[0];
+  var printConfig = getPrintConfig_();
+  var dynamicCoords = printConfig.coords || {
+    "Fabricante": { x: 450, y: 585 },
+    "Exp":        { x: 360, y: 495 },
+    "NoAnalisis": { x: 155, y: 385 }
+  };
 
   var colNoOrden = getColumnIndexByName(headers, 'NoOrden', true);
   var orderValues = dataSheet.getRange(1, colNoOrden, dataSheet.getLastRow(), 1).getValues();
   var targetRowIndex = -1;
+  var normalizedOrderNo = orderNo != null ? orderNo.toString().trim().toLowerCase() : "";
   
   for (var idx = 1; idx < orderValues.length; idx++) {
-    if (orderValues[idx][0] == orderNo) { targetRowIndex = idx + 1; break; }
+    var rowOrderNo = orderValues[idx][0] != null ? orderValues[idx][0].toString().trim().toLowerCase() : "";
+    if (rowOrderNo === normalizedOrderNo) { targetRowIndex = idx + 1; break; }
   }
   
-  if (targetRowIndex === -1) throw new Error("Order " + orderNo + " not found in 'Ordenes' sheet.");
-  var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
+  if (targetRowIndex === -1) {
+    return {
+      status: "error",
+      ready: false,
+      orderNo: orderNo,
+      noAnalisis: "",
+      formData: {},
+      coords: dynamicCoords,
+      pdfs: [],
+      errors: [{ key: "NoOrden", message: "La orden " + orderNo + " no existe en la hoja Ordenes." }]
+    };
+  }
 
+  var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
   var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
   var formData = {};
   var noAnalisisStr = "";
@@ -643,43 +770,41 @@ function fetchOrderData(orderNo) {
     }
   });
 
-  // Fetch only dynamic templates (DOC_ORDENES and DOC_ANALISIS)
   var dynamicPdfs = [];
-  
-  // Try to fetch PDF de Orden from DOC_ORDENES folder
+  var errors = [];
+
   try {
-    if (folderId) {
-      var file = findOrderPdfInFolder(folderId, orderNo);
-      dynamicPdfs.push({ key: "DOC_ORDENES", base64: Utilities.base64Encode(file.getBlob().getBytes()) });
-      Logger.log("✓ Precargado PDF de Orden para orden " + orderNo + " desde archivo: " + file.getName());
-    }
+    var orderFile = findOrderPdfInFolder(printConfig.DOC_ORDENES, orderNo);
+    dynamicPdfs.push({ key: "DOC_ORDENES", base64: Utilities.base64Encode(orderFile.getBlob().getBytes()), fileName: orderFile.getName() });
+    Logger.log("✓ Precargado PDF de Orden para orden " + orderNo + " desde archivo: " + orderFile.getName());
   } catch (e) {
     Logger.log("Error fetching PDF de Orden from DOC_ORDENES: " + e.message);
-  }
-  
-  // Try to fetch DOC_ANALYSIS
-  try {
-    if (folderAnalysisId && noAnalisisStr) {
-      var aFolder = DriveApp.getFolderById(folderAnalysisId);
-      var aQuery = "title contains '" + noAnalisisStr + "' and mimeType = 'application/pdf' and trashed = false";
-      var aFiles = aFolder.searchFiles(aQuery);
-      while (aFiles.hasNext()) {
-        var candidate = aFiles.next();
-        if (candidate.getName().indexOf(noAnalisisStr) === 0) {
-          dynamicPdfs.push({ key: "DOC_ANALISIS", base64: Utilities.base64Encode(candidate.getBlob().getBytes()) });
-          Logger.log("✓ Precargado DOC_ANALISIS para orden " + orderNo);
-          break;
-        }
-      }
-      if (dynamicPdfs.filter(p => p.key === "DOC_ANALISIS").length === 0) {
-        Logger.log("⚠️ No se encontró DOC_ANALISIS para orden " + orderNo);
-      }
-    }
-  } catch (e) {
-    Logger.log("Error fetching DOC_ANALISIS: " + e.message);
+    errors.push({ key: "DOC_ORDENES", message: "Archivo NoOrden " + orderNo + ".pdf no encontrado en DOC_ORDENES. Por favor cargue el documento." });
   }
 
-  return { formData: formData, coords: dynamicCoords, pdfs: dynamicPdfs };
+  try {
+    if (!noAnalisisStr) {
+      throw new Error("La orden no tiene NoAnalisis.");
+    }
+    var analysisFile = findAnalysisPdfInFolder(printConfig.DOC_ANALISIS, noAnalisisStr);
+    dynamicPdfs.push({ key: "DOC_ANALISIS", base64: Utilities.base64Encode(analysisFile.getBlob().getBytes()), fileName: analysisFile.getName() });
+    Logger.log("✓ Precargado DOC_ANALISIS para orden " + orderNo + " desde archivo: " + analysisFile.getName());
+  } catch (e) {
+    Logger.log("Error fetching DOC_ANALISIS: " + e.message);
+    var missingNoAnalisis = noAnalisisStr || "sin NoAnalisis";
+    errors.push({ key: "DOC_ANALISIS", message: "Archivo NoAnalisis " + missingNoAnalisis + ".pdf no encontrado en DOC_ANALISIS. Por favor cargue el documento." });
+  }
+
+  return {
+    status: errors.length ? "error" : "ready",
+    ready: errors.length === 0,
+    orderNo: orderNo,
+    noAnalisis: noAnalisisStr,
+    formData: formData,
+    coords: dynamicCoords,
+    pdfs: dynamicPdfs,
+    errors: errors
+  };
 }
 
 function preparePrintPayload(orderNo, templateConfig) {
@@ -1730,42 +1855,8 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
 function saveFinalUnifiedPDF(base64Data, orderNo) {
   try {
     var startedAt = new Date().getTime();
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var cache = CacheService.getScriptCache();
-    var folderId = cache.get('docCompletoFolderId');
-    
-    if (!folderId) {
-      var tplSheet = ss.getSheetByName('templates');
-      
-      if (!tplSheet) {
-        throw new Error("La hoja 'templates' no existe.");
-      }
-      
-      var tplData = tplSheet.getDataRange().getValues();
-      var tplHeaders = tplData[0];
-      
-      // Obtener índices de columnas por nombre
-      var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
-      var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
-      
-      if (!colClaveIdx) colClaveIdx = 1;
-      if (!colValorIdx) colValorIdx = 2;
-      
-      // Convertir a base-0 para array
-      colClaveIdx -= 1;
-      colValorIdx -= 1;
-      
-      for (var i = 1; i < tplData.length; i++) {
-        if (tplData[i][colClaveIdx] && tplData[i][colClaveIdx].toString().trim() === 'DOC_COMPLETO') {
-          folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : null;
-          break;
-        }
-      }
-      
-      if (folderId) {
-        cache.put('docCompletoFolderId', folderId, 21600);
-      }
-    }
+    var printConfig = getPrintConfig_();
+    var folderId = printConfig.DOC_COMPLETO;
     
     if (!folderId) {
       throw new Error("No se encontró la carpeta DOC_COMPLETO en la hoja templates.");
