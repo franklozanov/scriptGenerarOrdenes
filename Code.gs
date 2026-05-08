@@ -1729,32 +1729,41 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
  */
 function saveFinalUnifiedPDF(base64Data, orderNo) {
   try {
+    var startedAt = new Date().getTime();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var tplSheet = ss.getSheetByName('templates');
+    var cache = CacheService.getScriptCache();
+    var folderId = cache.get('docCompletoFolderId');
     
-    if (!tplSheet) {
-      throw new Error("La hoja 'templates' no existe.");
-    }
-    
-    var tplData = tplSheet.getDataRange().getValues();
-    var tplHeaders = tplData[0];
-    var folderId = null;
-    
-    // Obtener índices de columnas por nombre
-    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
-    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
-    
-    if (!colClaveIdx) colClaveIdx = 1;
-    if (!colValorIdx) colValorIdx = 2;
-    
-    // Convertir a base-0 para array
-    colClaveIdx -= 1;
-    colValorIdx -= 1;
-    
-    for (var i = 1; i < tplData.length; i++) {
-      if (tplData[i][colClaveIdx] && tplData[i][colClaveIdx].toString().trim() === 'DOC_COMPLETO') {
-        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : null;
-        break;
+    if (!folderId) {
+      var tplSheet = ss.getSheetByName('templates');
+      
+      if (!tplSheet) {
+        throw new Error("La hoja 'templates' no existe.");
+      }
+      
+      var tplData = tplSheet.getDataRange().getValues();
+      var tplHeaders = tplData[0];
+      
+      // Obtener índices de columnas por nombre
+      var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+      var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+      
+      if (!colClaveIdx) colClaveIdx = 1;
+      if (!colValorIdx) colValorIdx = 2;
+      
+      // Convertir a base-0 para array
+      colClaveIdx -= 1;
+      colValorIdx -= 1;
+      
+      for (var i = 1; i < tplData.length; i++) {
+        if (tplData[i][colClaveIdx] && tplData[i][colClaveIdx].toString().trim() === 'DOC_COMPLETO') {
+          folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : null;
+          break;
+        }
+      }
+      
+      if (folderId) {
+        cache.put('docCompletoFolderId', folderId, 21600);
       }
     }
     
@@ -1777,9 +1786,15 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     }
     
     // Decodificar base64 y crear el archivo
+    var decodeStartedAt = new Date().getTime();
     var decodedData = Utilities.base64Decode(base64Data);
     var blob = Utilities.newBlob(decodedData, 'application/pdf', targetFileName);
+    Logger.log("saveFinalUnifiedPDF decode/blob ms: " + (new Date().getTime() - decodeStartedAt));
+    
+    var createStartedAt = new Date().getTime();
     var file = folder.createFile(blob);
+    Logger.log("saveFinalUnifiedPDF createFile ms: " + (new Date().getTime() - createStartedAt));
+    var fileId = file.getId();
     
     // --- MEJORA DE AUDITORÍA ---
     var userEmail = Session.getActiveUser().getEmail();
@@ -1796,8 +1811,17 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
       Logger.log("No se pudieron aplicar restricciones de seguridad adicionales al PDF: " + secErr.message);
     }
     
-    // Retornar el ID del archivo para abrirlo con el visor de Google Drive
-    return file.getId();
+    var drivePreviewUrl = 'https://drive.google.com/file/d/' + fileId + '/preview';
+    var viewerUrl = getWebAppUrl() + '?fileId=' + encodeURIComponent(fileId);
+    Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
+    
+    // Retornar URLs listas para abrir vista previa desde Drive
+    return {
+      fileId: fileId,
+      drivePreviewUrl: drivePreviewUrl,
+      viewerUrl: viewerUrl,
+      archivoReemplazado: archivoReemplazado
+    };
     
   } catch (e) {
     Logger.log("Error en saveFinalUnifiedPDF: " + e.message);

@@ -479,13 +479,74 @@
         return selectedDynamicKeys.every(key => availableKeys.includes(key));
       }
 
-      function fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status) {
+      function saveFinalUnifiedPdfAsync(base64Data, orderNo) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .saveFinalUnifiedPDF(base64Data, orderNo);
+        });
+      }
+
+      function updateTraceabilityAsync(orderNo, userId, totalPages, printType) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .updateTraceability(orderNo, userId, totalPages, printType);
+        });
+      }
+
+      function uint8ArrayToBase64(bytes) {
+        const chunkSize = 0x8000;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
+      }
+
+      function setPreviewWindowContent(previewWindow, message, isError) {
+        if (!previewWindow || previewWindow.closed) return;
+        previewWindow.document.open();
+        previewWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>Preparando vista previa</title>
+              <style>
+                body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; color: ${isError ? '#c62828' : '#1976d2'}; }
+                .box { text-align: center; padding: 24px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); max-width: 520px; }
+              </style>
+            </head>
+            <body><div class="box">${message}</div></body>
+          </html>
+        `);
+        previewWindow.document.close();
+      }
+
+      function openSavedPdfPreview(previewWindow, saveResult) {
+        const viewerUrl = saveResult.viewerUrl || saveResult.drivePreviewUrl;
+        if (previewWindow && !previewWindow.closed) {
+          previewWindow.location.href = viewerUrl;
+        } else {
+          const opened = window.open(viewerUrl, '_blank');
+          if (!opened) {
+            const status = document.getElementById('status');
+            status.innerHTML = `✅ PDF guardado. <a href="${viewerUrl}" target="_blank">Abrir vista previa</a>`;
+          }
+        }
+      }
+
+      function fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow) {
         status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
         status.className = "info-text";
 
         google.script.run.withSuccessHandler(async (payload) => {
-          processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
+          processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status, previewWindow);
         }).withFailureHandler(e => {
+          setPreviewWindowContent(previewWindow, "❌ Error obteniendo datos: " + e.message, true);
           alert("Error del servidor: " + e.message);
           status.innerText = "Proceso cancelado.";
           status.className = "error-text";
@@ -566,7 +627,7 @@
       };
 
       // PDF generation processing function (extracted for reuse)
-      async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status) {
+      async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status, previewWindow) {
         try {
           status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
 
@@ -763,7 +824,7 @@
             console.log('No se pudo purgar AcroForm:', e);
           }
 
-          // Guardar con opciones optimizadas para máxima compatibilidad con impresoras
+          console.time('pdf-save');
           console.log('✓ Guardando PDF con configuración optimizada para impresión');
           const pdfData = await finalPdf.save({
             useObjectStreams: true,         // Activa compresión de objetos (FlateDecode)
@@ -771,54 +832,78 @@
             objectsPerTick: 50,             // Procesar objetos en lotes pequeños
             updateFieldAppearances: false   // No actualizar apariencias (ya están aplanadas)
           });
+          console.timeEnd('pdf-save');
           console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
           
-          // Convertir PDF a base64 para guardar en Drive (background)
-          const base64Data = btoa(new Uint8Array(pdfData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+          console.time('base64-conversion');
+          const base64Data = uint8ArrayToBase64(new Uint8Array(pdfData));
+          console.timeEnd('base64-conversion');
 
-          // 1. Abrir PDF INMEDIATAMENTE en nueva pestana (mismo tick del click, sin bloqueo de popup)
-          const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
-          const blobUrl = URL.createObjectURL(pdfBlob);
-          window.open(blobUrl, '_blank');
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+          status.innerText = "🔄 Guardando en Drive y registrando impresión...";
+          setPreviewWindowContent(previewWindow, "⏳ Guardando documento final en Drive para abrir vista previa...", false);
 
-          status.innerText = "🔄 Guardando en Drive y registrando...";
-
-          // 2. En paralelo: guardar en Drive y actualizar registro
           console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
-          google.script.run
-            .withSuccessHandler(() => {
-              google.script.run
-                .withSuccessHandler(msg => {
-                  status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
-                  status.className = "success-text";
-                  document.getElementById('orderNo').value = '';
-                  preloadState = { orderNo: null, data: null, isFetching: false, error: null };
-                  btn.disabled = false;
-                  document.getElementById('orderNo').focus();
-                  setTimeout(() => {
-                    if (status.innerText.includes("Listo para la siguiente orden")) {
-                      status.innerText = '';
-                    }
-                  }, 3000);
-                })
-                .withFailureHandler(e => {
-                  console.error('Error en updateTraceability:', e.message);
-                  status.innerText = "⚠️ PDF guardado, pero error al registrar: " + e.message;
-                  status.className = "error-text";
-                  btn.disabled = false;
-                })
-                .updateTraceability(orderNo, userId, totalPages, printType);
+          console.time('drive-save');
+          console.time('traceability-update');
+          const savePromise = saveFinalUnifiedPdfAsync(base64Data, orderNo)
+            .then(saveResult => {
+              console.timeEnd('drive-save');
+              const normalizedResult = typeof saveResult === 'string'
+                ? {
+                    fileId: saveResult,
+                    drivePreviewUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/preview',
+                    viewerUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/preview'
+                  }
+                : saveResult;
+              openSavedPdfPreview(previewWindow, normalizedResult);
+              return normalizedResult;
             })
-            .withFailureHandler(e => {
-                console.error('Error en saveFinalUnifiedPDF:', e.message);
-                status.innerText = "⚠️ Error al guardar PDF en Drive: " + e.message;
-                status.className = "error-text";
-                btn.disabled = false;
+            .catch(e => {
+              console.timeEnd('drive-save');
+              console.error('Error en saveFinalUnifiedPDF:', e.message);
+              setPreviewWindowContent(previewWindow, "❌ Error al guardar PDF en Drive: " + e.message, true);
+              throw e;
+            });
+
+          const tracePromise = updateTraceabilityAsync(orderNo, userId, totalPages, printType)
+            .then(msg => {
+              console.timeEnd('traceability-update');
+              return msg;
             })
-            .saveFinalUnifiedPDF(base64Data, orderNo);
+            .catch(e => {
+              console.timeEnd('traceability-update');
+              console.error('Error en updateTraceability:', e.message);
+              throw e;
+            });
+
+          const results = await Promise.allSettled([savePromise, tracePromise]);
+          const saveOutcome = results[0];
+          const traceOutcome = results[1];
+
+          if (saveOutcome.status === 'fulfilled' && traceOutcome.status === 'fulfilled') {
+            status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
+            status.className = "success-text";
+            document.getElementById('orderNo').value = '';
+            preloadState = { orderNo: null, data: null, isFetching: false, error: null };
+            btn.disabled = false;
+            document.getElementById('orderNo').focus();
+            setTimeout(() => {
+              if (status.innerText.includes("Listo para la siguiente orden")) {
+                status.innerText = '';
+              }
+            }, 3000);
+          } else if (saveOutcome.status === 'fulfilled') {
+            status.innerText = "⚠️ PDF guardado en Drive, pero error al registrar: " + traceOutcome.reason.message;
+            status.className = "error-text";
+            btn.disabled = false;
+          } else {
+            status.innerText = "⚠️ Error al guardar PDF en Drive: " + saveOutcome.reason.message;
+            status.className = "error-text";
+            btn.disabled = false;
+          }
 
         } catch (pdfError) {
+          setPreviewWindowContent(previewWindow, "❌ Error generando PDF: " + pdfError.message, true);
           alert("Error generando PDF: " + pdfError.message);
           status.innerText = "Proceso cancelado.";
           status.className = "error-text";
@@ -862,6 +947,10 @@
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 
         btn.disabled = true;
+        const previewWindow = window.open('', '_blank');
+        if (previewWindow) {
+          setPreviewWindowContent(previewWindow, "⏳ Preparando documento final...", false);
+        }
         
         // Check if preloaded data is available and matches current order
         if (preloadState.orderNo === orderNo && preloadState.data) {
@@ -870,10 +959,10 @@
             status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
             status.className = "info-text";
             console.log(`✓ Usando datos precargados para orden ${orderNo}`);
-            processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
+            processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status, previewWindow);
           } else {
             console.log(`⚠️ Datos precargados incompletos para orden ${orderNo}. Solicitando payload completo al servidor.`);
-            fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status);
+            fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow);
           }
         } else if (preloadState.isFetching && preloadState.orderNo === orderNo) {
           // Data is currently being fetched - wait for it
@@ -887,12 +976,13 @@
               if (preloadState.data && preloadState.orderNo === orderNo) {
                 if (hasSelectedDynamicPdfs(preloadState.data, config)) {
                   status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
-                  processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
+                  processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status, previewWindow);
                 } else {
                   console.log(`⚠️ Datos precargados incompletos para orden ${orderNo}. Solicitando payload completo al servidor.`);
-                  fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status);
+                  fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow);
                 }
               } else if (preloadState.error) {
+                setPreviewWindowContent(previewWindow, "❌ Error al cargar datos: " + preloadState.error, true);
                 alert("Error al cargar datos: " + preloadState.error);
                 status.innerText = "Proceso cancelado.";
                 status.className = "error-text";
@@ -905,6 +995,7 @@
           setTimeout(() => {
             clearInterval(checkInterval);
             if (preloadState.isFetching) {
+              setPreviewWindowContent(previewWindow, "❌ Tiempo de espera agotado. Por favor, intente nuevamente.", true);
               alert("Tiempo de espera agotado. Por favor, intente nuevamente.");
               status.innerText = "Proceso cancelado.";
               status.className = "error-text";
@@ -913,13 +1004,14 @@
           }, 10000);
         } else if (preloadState.error && preloadState.orderNo === orderNo) {
           // There was an error fetching this order
+          setPreviewWindowContent(previewWindow, "❌ Error al cargar datos: " + preloadState.error, true);
           alert("Error al cargar datos: " + preloadState.error);
           status.innerText = "Proceso cancelado.";
           status.className = "error-text";
           btn.disabled = false;
         } else {
           // No preloaded data - fetch normally
-          fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status);
+          fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status, previewWindow);
         }
       }
     </script>

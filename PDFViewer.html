@@ -141,7 +141,9 @@
 
     if (fileId) {
       // Construir URL del PDF con parámetros para ocultar toolbar
-      const pdfUrl = fileId + '#toolbar=0&navpanes=0&scrollbar=0';
+      const pdfUrl = fileId.indexOf('http') === 0
+        ? fileId + '#toolbar=0&navpanes=0&scrollbar=0'
+        : 'https://drive.google.com/file/d/' + encodeURIComponent(fileId) + '/preview#toolbar=0&navpanes=0&scrollbar=0';
       document.getElementById('pdfEmbed').src = pdfUrl;
     } else {
       document.querySelector('.pdf-container').innerHTML = 
