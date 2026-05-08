@@ -497,6 +497,29 @@
     var successCount = document.getElementById('successCount');
     var errorCount = document.getElementById('errorCount');
 
+    function loadPendingOrders() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          globalPendingOrders = data;
+          loadingOverlay.classList.add('hidden');
+          
+          var hasOrdenes = data.ordenes && data.ordenes.length > 0;
+          var hasAnalisis = data.analisis && data.analisis.length > 0;
+          
+          if (!hasOrdenes && !hasAnalisis) {
+            noOrdersMessage.style.display = 'block';
+          } else {
+            mainContent.style.display = 'block';
+            addRow(); // Agregar primera fila por defecto
+          }
+        })
+        .withFailureHandler(function(error) {
+          loadingOverlay.classList.add('hidden');
+          alert('Error al cargar listas pendientes: ' + error.message);
+        })
+        .getPendingOrdersList();
+    }
+
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
       // Primero obtener la URL de la Web App y guardarla globalmente
@@ -507,30 +530,12 @@
             console.error("La URL de la Web App no pudo ser obtenida. La subida de archivos fallará.");
           }
           // Una vez obtenida la URL, cargar el resto de los datos
-          google.script.run
-            .withSuccessHandler(function(data) {
-              globalPendingOrders = data;
-              loadingOverlay.classList.add('hidden');
-              
-              var hasOrdenes = data.ordenes && data.ordenes.length > 0;
-              var hasAnalisis = data.analisis && data.analisis.length > 0;
-              
-              if (!hasOrdenes && !hasAnalisis) {
-                noOrdersMessage.style.display = 'block';
-              } else {
-                mainContent.style.display = 'block';
-                addRow(); // Agregar primera fila por defecto
-              }
-            })
-            .withFailureHandler(function(error) {
-              loadingOverlay.classList.add('hidden');
-              alert('Error al cargar listas pendientes: ' + error.message);
-            })
-            .getPendingOrdersList();
+          loadPendingOrders();
         })
         .withFailureHandler(function(error) {
-          loadingOverlay.classList.add('hidden');
-          alert('Error CRÍTICO al obtener la URL de la Web App: ' + error.message);
+          console.error('Error CRÍTICO al obtener la URL de la Web App:', error.message);
+          globalWebAppUrl = '';
+          loadPendingOrders();
         })
         .getWebAppUrl();
     };

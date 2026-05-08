@@ -2018,6 +2018,9 @@ function getWebAppUrl() {
   try {
     var service = ScriptApp.getService();
     var url = service.getUrl();
+    if (!url) {
+      throw new Error("La URL de la Web App está vacía. Publique una nueva implementación como Aplicación web.");
+    }
     Logger.log("URL de Web App obtenida: " + url);
     return url;
   } catch (e) {
