@@ -2016,6 +2016,12 @@ function doPost(e) {
  */
 function getWebAppUrl() {
   try {
+    var savedUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
+    if (savedUrl) {
+      Logger.log("URL de Web App obtenida desde propiedades: " + savedUrl);
+      return savedUrl;
+    }
+
     var service = ScriptApp.getService();
     var url = service.getUrl();
     if (!url) {
@@ -2027,4 +2033,19 @@ function getWebAppUrl() {
     Logger.log("Error obteniendo URL de Web App: " + e.message);
     throw new Error("No se pudo obtener la URL de la Web App. Asegúrese de que el script esté desplegado como Web App.");
   }
+}
+
+function setWebAppUrl(url) {
+  if (!url || url.toString().trim() === "") {
+    throw new Error("Debe proporcionar una URL de Web App válida.");
+  }
+
+  var cleanUrl = url.toString().trim();
+  if (cleanUrl.indexOf("https://script.google.com/") !== 0 || cleanUrl.indexOf("/exec") === -1) {
+    throw new Error("La URL no parece ser una URL válida de Web App de Apps Script. Debe iniciar con https://script.google.com/ y terminar en /exec.");
+  }
+
+  PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', cleanUrl);
+  Logger.log("WEB_APP_URL guardada correctamente: " + cleanUrl);
+  return "WEB_APP_URL guardada correctamente.";
 }
