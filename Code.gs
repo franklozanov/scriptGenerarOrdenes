@@ -1141,34 +1141,45 @@ function configureOrdenesProtection() {
   var sheetOrdenes = ss.getSheetByName('Ordenes');
   if (!sheetOrdenes) return;
   
-  // Proteger hoja completa primero
-  var protection = sheetOrdenes.protect().setDescription('Proteccion_Ordenes_Nuevo');
-  protection.removeEditors(protection.getEditors());
-  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+  // 1. Eliminar todas las protecciones de rango existentes en la hoja "Ordenes"
+  var proteccionesActuales = sheetOrdenes.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  proteccionesActuales.forEach(function(p) {
+    p.remove();
+    Logger.log("✓ Eliminada protección: " + p.getDescription());
+  });
   
-  var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+  // 2. Columnas que SOLO el administrador/propietario puede editar
   var colsToProtect = [
     "VerifLote", "CantDispAFecha", "VerifCant. Disponible", "VerifExp", 
     "Fabricante", "Decision", "STATUS", "ImpresoPor", "NoPags", 
     "ReimpresoPor", "Reimpresion", "TotalPags"
   ];
   
-  var unprotectedRanges = [];
-  var lastRow = sheetOrdenes.getLastRow();
-  if (lastRow < 1) lastRow = 1;
+  var filaEncabezados = 1;
+  var headers = sheetOrdenes.getRange(filaEncabezados, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
   
+  // 3. Aplicar protección solo a las columnas en colsToProtect
   for (var i = 0; i < headers.length; i++) {
     var header = headers[i] ? headers[i].toString().trim() : "";
-    if (colsToProtect.indexOf(header) === -1) {
-      unprotectedRanges.push(sheetOrdenes.getRange(1, i + 1, lastRow, 1));
+    if (colsToProtect.indexOf(header) !== -1) {
+      var columna = i + 1;
+      // Protege toda la columna excepto el encabezado
+      var rangoAProteger = sheetOrdenes.getRange(filaEncabezados + 1, columna, sheetOrdenes.getMaxRows() - filaEncabezados);
+      
+      var proteccion = rangoAProteger.protect().setDescription("Protección Admin: " + header);
+      
+      // Eliminar editores para que solo el propietario/admin pueda editar
+      proteccion.removeEditors(proteccion.getEditors());
+      if (proteccion.canDomainEdit()) proteccion.setDomainEdit(false);
+      
+      Logger.log("✓ Protección aplicada a columna: " + header);
     }
   }
   
-  if (unprotectedRanges.length > 0) {
-    protection.setUnprotectedRanges(unprotectedRanges);
-  }
+  // Las columnas no incluidas en colsToProtect no tendrán protección de rango
+  // por lo que respetarán los permisos generales de la hoja (permisos nativos de Drive)
   
-  Logger.log("✓ Protección mixta configurada para Ordenes (basada en encabezados dinámicos)");
+  Logger.log("✓ Protección por columna configurada para Ordenes");
 }
 
 function configureLogsProtection() {
@@ -1738,13 +1749,32 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     }
     
     var folder = DriveApp.getFolderById(folderId);
-    var targetFileName = 'Orden_' + orderNo + '_Final.pdf';
+    var targetFileName = 'Orden_' + orderNo + '_Final.pdf'; 
+
+    // --- MEJORA DE ROBUSTEZ: MANEJO DE SOBRESCRITURA ---
+    // Busca si el archivo ya existe para manejar la sobrescritura de forma segura.
+    var existingFiles = folder.getFilesByName(targetFileName);
+    var archivoReemplazado = false;
+    while (existingFiles.hasNext()) {
+      var oldFile = existingFiles.next();
+      Logger.log("Sobrescribiendo archivo final existente: " + oldFile.getName() + ". Moviendo a la papelera.");
+      oldFile.setTrashed(true); // Envía el archivo antiguo a la papelera en lugar de borrarlo permanentemente.
+      archivoReemplazado = true;
+    }
     
     // Decodificar base64 y crear el archivo
     var decodedData = Utilities.base64Decode(base64Data);
     var blob = Utilities.newBlob(decodedData, 'application/pdf', targetFileName);
     var file = folder.createFile(blob);
     
+    // --- MEJORA DE AUDITORÍA ---
+    var userEmail = Session.getActiveUser().getEmail();
+    var userIdentity = getUserIdentityString(userEmail);
+    var logMessage = archivoReemplazado 
+      ? "Se REEMPLAZÓ el documento unificado final para la orden " + orderNo
+      : "Se generó y guardó el documento unificado final para la orden " + orderNo;
+    logChange('GENERACION_PDF_FINAL', logMessage, userIdentity);
+
     // Configurar permisos de seguridad del archivo en Drive
     try {
       file.setShareableByEditors(false);
@@ -1781,4 +1811,142 @@ function doGet(e) {
   html = html.getContent().replace('{{fileId}}', fileId || '');
   
   return HtmlService.createHtmlOutput(html);
+}
+
+/**
+ * Maneja solicitudes POST para operaciones de Drive con permisos de propietario.
+ * Esta función se ejecuta como el propietario del script, no como el usuario que accede.
+ * Soporta dos tipos de operaciones:
+ * 1. Subida de documentos (procesarSubidaDocumentoCentral)
+ * 2. Guardado de PDF final (saveFinalUnifiedPDF)
+ * @param {Object} e - Objeto de evento con parámetros de la solicitud
+ * @returns {ContentService} Respuesta JSON
+ */
+function doPost(e) {
+  try {
+    // Validar que se haya proporcionado el cuerpo de la solicitud
+    if (!e || !e.postData) {
+      Logger.log("Error en doPost: No se recibieron datos en la solicitud");
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'No se recibieron datos en la solicitud.',
+        diagnostic: 'MISSING_POST_DATA'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var params;
+    try {
+      params = JSON.parse(e.postData.contents);
+    } catch (parseError) {
+      Logger.log("Error en doPost al parsear JSON: " + parseError.message);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Error al procesar los datos enviados. Formato JSON inválido.',
+        diagnostic: 'JSON_PARSE_ERROR',
+        details: parseError.message
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Determinar el tipo de operación basado en los parámetros
+    var operation = params.operation || '';
+    Logger.log("doPost - Operación solicitada: " + operation);
+    Logger.log("doPost - Usuario: " + Session.getActiveUser().getEmail());
+
+    var result;
+
+    if (operation === 'uploadDocument') {
+      // Operación: Subida de documento (procesarSubidaDocumentoCentral)
+      var base64Data = params.base64Data;
+      var mimeType = params.mimeType;
+      var fileName = params.fileName;
+      var referenceNo = params.referenceNo;
+      var docType = params.docType;
+      var overwriteConfirmed = params.overwriteConfirmed || false;
+
+      Logger.log("doPost - Subida de documento: " + fileName + " para " + referenceNo);
+
+      // Validación de seguridad: solo permitir PDF
+      if (mimeType !== 'application/pdf') {
+        Logger.log("Error en doPost: Tipo MIME no permitido: " + mimeType);
+        return ContentService.createTextOutput(JSON.stringify({
+          status: 'error',
+          message: 'Solo se permiten archivos PDF.',
+          diagnostic: 'INVALID_MIME_TYPE',
+          receivedMimeType: mimeType
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      // Llamar a la función existente de procesamiento
+      result = procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed);
+
+    } else if (operation === 'saveFinalPDF') {
+      // Operación: Guardado de PDF final (saveFinalUnifiedPDF)
+      var base64Data = params.base64Data;
+      var orderNo = params.orderNo;
+
+      Logger.log("doPost - Guardado de PDF final para orden: " + orderNo);
+
+      // Validación de seguridad: verificar que se proporcionaron los datos necesarios
+      if (!base64Data || !orderNo) {
+        Logger.log("Error en doPost saveFinalPDF: Faltan parámetros requeridos");
+        return ContentService.createTextOutput(JSON.stringify({
+          status: 'error',
+          message: 'Faltan parámetros requeridos para guardar el PDF final.',
+          diagnostic: 'MISSING_REQUIRED_PARAMS',
+          provided: { base64Data: !!base64Data, orderNo: !!orderNo }
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      // Llamar a la función existente de guardado
+      try {
+        saveFinalUnifiedPDF(base64Data, orderNo);
+        result = { status: 'success', message: 'PDF final guardado exitosamente para orden ' + orderNo };
+      } catch (saveError) {
+        Logger.log("Error en saveFinalUnifiedPDF dentro de doPost: " + saveError.message);
+        result = { 
+          status: 'error', 
+          message: "Error al guardar el PDF final: " + saveError.message,
+          diagnostic: 'SAVE_FINAL_PDF_ERROR',
+          details: saveError.message
+        };
+      }
+
+    } else {
+      Logger.log("Error en doPost: Operación no reconocida: " + operation);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Operación no reconocida: ' + operation,
+        diagnostic: 'UNKNOWN_OPERATION',
+        supportedOperations: ['uploadDocument', 'saveFinalPDF']
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    Logger.log("doPost - Resultado: " + result.status);
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    Logger.log("Error general en doPost: " + error.message);
+    Logger.log("Stack trace: " + error.stack);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: "Error interno del servidor: " + error.message,
+      diagnostic: 'INTERNAL_SERVER_ERROR',
+      stack: error.stack
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Obtiene la URL de la Web App actual.
+ * Esta función debe ejecutarse en el contexto del propietario para obtener la URL correcta.
+ * @returns {string} URL de la Web App
+ */
+function getWebAppUrl() {
+  try {
+    var service = ScriptApp.getService();
+    return service.getUrl();
+  } catch (e) {
+    Logger.log("Error obteniendo URL de Web App: " + e.message);
+    throw new Error("No se pudo obtener la URL de la Web App. Asegúrese de que el script esté desplegado como Web App.");
+  }
 }
