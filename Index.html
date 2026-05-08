@@ -786,83 +786,37 @@
 
           // 2. En paralelo: guardar en Drive y actualizar registro
           console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
-          // Primero obtener URL de Web App
           google.script.run
-            .withSuccessHandler(webAppUrl => {
-              if (!webAppUrl) {
-                console.error('No se pudo obtener la URL de la Web App');
-                status.innerText = "⚠️ Error: No se pudo obtener la URL de la Web App. Contacte al administrador.";
-                status.className = "error-text";
-                btn.disabled = false;
-                return;
-              }
-
-              // Preparar datos para enviar a Web App
-              var payload = {
-                operation: 'saveFinalPDF',  // Especificar tipo de operación
-                base64Data: base64Data,
-                orderNo: orderNo
-              };
-
-              // Enviar a Web App usando fetch
-              fetch(webAppUrl, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              })
-              .then(response => response.json())
-              .then(result => {
-                if (result.status === 'success') {
-                  // PDF guardado exitosamente, ahora llamar a updateTraceability
-                  google.script.run
-                    .withSuccessHandler(msg => {
-                      status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
-                      status.className = "success-text";
-                      document.getElementById('orderNo').value = '';
-                      preloadState = { orderNo: null, data: null, isFetching: false, error: null };
-                      btn.disabled = false;
-                      document.getElementById('orderNo').focus();
-                      setTimeout(() => {
-                        if (status.innerText.includes("Listo para la siguiente orden")) {
-                          status.innerText = '';
-                        }
-                      }, 3000);
-                    })
-                    .withFailureHandler(e => {
-                      console.error('Error en updateTraceability:', e.message);
-                      status.innerText = "⚠️ PDF guardado, pero error al registrar: " + e.message;
-                      status.className = "error-text";
-                      btn.disabled = false;
-                    })
-                    .updateTraceability(orderNo, userId, totalPages, printType);
-                } else {
-                  // Error al guardar el PDF
-                  console.error('Error en saveFinalUnifiedPDF (Web App):', result.message);
-                  console.error('Diagnostic:', result.diagnostic);
-                  status.innerText = "⚠️ Error al guardar PDF en Drive: " + result.message;
-                  if (result.diagnostic) {
-                    status.innerText += " (Diagnóstico: " + result.diagnostic + ")";
-                  }
+            .withSuccessHandler(() => {
+              google.script.run
+                .withSuccessHandler(msg => {
+                  status.innerText = "✅ Impresión registrada. Listo para la siguiente orden.";
+                  status.className = "success-text";
+                  document.getElementById('orderNo').value = '';
+                  preloadState = { orderNo: null, data: null, isFetching: false, error: null };
+                  btn.disabled = false;
+                  document.getElementById('orderNo').focus();
+                  setTimeout(() => {
+                    if (status.innerText.includes("Listo para la siguiente orden")) {
+                      status.innerText = '';
+                    }
+                  }, 3000);
+                })
+                .withFailureHandler(e => {
+                  console.error('Error en updateTraceability:', e.message);
+                  status.innerText = "⚠️ PDF guardado, pero error al registrar: " + e.message;
                   status.className = "error-text";
                   btn.disabled = false;
-                }
-              })
-              .catch(error => {
-                console.error('Error al comunicarse con la Web App:', error.message);
-                status.innerText = "⚠️ Error de comunicación con la Web App: " + error.message;
-                status.className = "error-text";
-                btn.disabled = false;
-              });
+                })
+                .updateTraceability(orderNo, userId, totalPages, printType);
             })
             .withFailureHandler(e => {
-              console.error('Error al obtener URL de Web App:', e.message);
-              status.innerText = "⚠️ Error al obtener URL de Web App: " + e.message;
-              status.className = "error-text";
-              btn.disabled = false;
+                console.error('Error en saveFinalUnifiedPDF:', e.message);
+                status.innerText = "⚠️ Error al guardar PDF en Drive: " + e.message;
+                status.className = "error-text";
+                btn.disabled = false;
             })
-            .getWebAppUrl();
+            .saveFinalUnifiedPDF(base64Data, orderNo);
 
         } catch (pdfError) {
           alert("Error generando PDF: " + pdfError.message);
