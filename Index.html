@@ -465,6 +465,34 @@
         input.value = value;
       }
 
+      function hasSelectedDynamicPdfs(payload, config) {
+        const dynamicKeys = ["DOC_ORDENES", "DOC_ANALISIS"];
+        const selectedDynamicKeys = config
+          .filter(c => dynamicKeys.includes(c.key) && c.copies > 0)
+          .map(c => c.key);
+
+        if (selectedDynamicKeys.length === 0) {
+          return true;
+        }
+
+        const availableKeys = (payload.pdfs || []).map(p => p.key);
+        return selectedDynamicKeys.every(key => availableKeys.includes(key));
+      }
+
+      function fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status) {
+        status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
+        status.className = "info-text";
+
+        google.script.run.withSuccessHandler(async (payload) => {
+          processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
+        }).withFailureHandler(e => {
+          alert("Error del servidor: " + e.message);
+          status.innerText = "Proceso cancelado.";
+          status.className = "error-text";
+          btn.disabled = false;
+        }).preparePrintPayload(orderNo, config);
+      }
+
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
           globalTemplates = data.templates;
@@ -884,10 +912,15 @@
         // Check if preloaded data is available and matches current order
         if (preloadState.orderNo === orderNo && preloadState.data) {
           // Data is already preloaded - use it immediately
-          status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
-          status.className = "info-text";
-          console.log(`✓ Usando datos precargados para orden ${orderNo}`);
-          processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
+          if (hasSelectedDynamicPdfs(preloadState.data, config)) {
+            status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
+            status.className = "info-text";
+            console.log(`✓ Usando datos precargados para orden ${orderNo}`);
+            processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
+          } else {
+            console.log(`⚠️ Datos precargados incompletos para orden ${orderNo}. Solicitando payload completo al servidor.`);
+            fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status);
+          }
         } else if (preloadState.isFetching && preloadState.orderNo === orderNo) {
           // Data is currently being fetched - wait for it
           status.innerText = "⏳ Esperando datos del servidor...";
@@ -898,8 +931,13 @@
             if (!preloadState.isFetching) {
               clearInterval(checkInterval);
               if (preloadState.data && preloadState.orderNo === orderNo) {
-                status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
-                processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
+                if (hasSelectedDynamicPdfs(preloadState.data, config)) {
+                  status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
+                  processPdfGeneration(preloadState.data, config, orderNo, userName, userId, printType, btn, status);
+                } else {
+                  console.log(`⚠️ Datos precargados incompletos para orden ${orderNo}. Solicitando payload completo al servidor.`);
+                  fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status);
+                }
               } else if (preloadState.error) {
                 alert("Error al cargar datos: " + preloadState.error);
                 status.innerText = "Proceso cancelado.";
@@ -927,17 +965,7 @@
           btn.disabled = false;
         } else {
           // No preloaded data - fetch normally
-          status.innerText = "⏳ Paso 1/4: Obteniendo datos de Google Drive...";
-          status.className = "info-text";
-
-          google.script.run.withSuccessHandler(async (payload) => {
-            processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
-          }).withFailureHandler(e => {
-            alert("Error del servidor: " + e.message);
-            status.innerText = "Proceso cancelado.";
-            status.className = "error-text";
-            btn.disabled = false;
-          }).preparePrintPayload(orderNo, config);
+          fetchPrintPayloadAndGenerate(orderNo, config, userName, userId, printType, btn, status);
         }
       }
     </script>
