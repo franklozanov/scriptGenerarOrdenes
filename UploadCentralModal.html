@@ -480,6 +480,7 @@
     var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     var globalPendingOrders = [];
     var rowCounter = 0;
+    var globalWebAppUrl = ''; // Variable para almacenar la URL de la Web App
 
     var loadingOverlay = document.getElementById('loadingOverlay');
     var mainContent = document.getElementById('mainContent');
@@ -498,6 +499,14 @@
 
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
+      google.script.run
+        .withSuccessHandler(function(url) {
+          globalWebAppUrl = url;
+          if (!url) {
+            console.error("La URL de la Web App no pudo ser obtenida. La subida de archivos fallará.");
+          }
+        })
+        .getWebAppUrl();
       google.script.run
         .withSuccessHandler(function(data) {
           globalPendingOrders = data;
@@ -808,50 +817,36 @@
         var reader = new FileReader();
         
         reader.onload = function(e) {
+          if (!globalWebAppUrl) {
+            reject(new Error('No se pudo obtener la URL de la Web App. Contacte al administrador.'));
+            return;
+          }
+
           var base64Data = e.target.result;
           var base64Content = base64Data.split(',')[1];
           
-          // Obtener URL de Web App dinámicamente
-          google.script.run
-            .withSuccessHandler(function(webAppUrl) {
-              if (!webAppUrl) {
-                reject(new Error('No se pudo obtener la URL de la Web App. Contacte al administrador.'));
-                return;
-              }
-              
-              // Preparar datos para enviar a Web App
-              var payload = {
-                operation: 'uploadDocument',  // Especificar tipo de operación
-                base64Data: base64Content,
-                mimeType: file.type,
-                fileName: file.name,
-                referenceNo: referenceNo,
-                docType: docType,
-                overwriteConfirmed: overwriteConfirmed
-              };
-              
-              // Enviar a Web App usando fetch
-              fetch(webAppUrl, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              })
-              .then(function(response) {
-                return response.json();
-              })
-              .then(function(result) {
-                resolve(result);
-              })
-              .catch(function(error) {
-                reject(new Error('Error al comunicarse con la Web App: ' + error.message));
-              });
-            })
-            .withFailureHandler(function(error) {
-              reject(new Error('Error al obtener URL de Web App: ' + error.message));
-            })
-            .getWebAppUrl();
+          // Preparar datos para enviar a Web App
+          var payload = {
+            operation: 'uploadDocument',  // Especificar tipo de operación
+            base64Data: base64Content,
+            mimeType: file.type,
+            fileName: file.name,
+            referenceNo: referenceNo,
+            docType: docType,
+            overwriteConfirmed: overwriteConfirmed
+          };
+          
+          // Enviar a Web App usando fetch
+          fetch(globalWebAppUrl, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+          .then(response => response.json())
+          .then(result => resolve(result))
+          .catch(error => reject(new Error('Error al comunicarse con la Web App: ' + error.message)));
         };
         
         reader.onerror = function() {
