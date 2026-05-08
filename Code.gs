@@ -540,6 +540,32 @@ function diagnosticarPlantillas() {
   Logger.log(report);
 }
 
+function findOrderPdfInFolder(folderId, orderNo) {
+  if (!folderId) {
+    throw new Error("DOC_ORDENES no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
+  }
+
+  var folder = DriveApp.getFolderById(folderId);
+  var normalizedOrderNo = orderNo.toString().trim().toLowerCase();
+  var exactFiles = folder.getFilesByName(orderNo + ".pdf");
+  if (exactFiles.hasNext()) {
+    return exactFiles.next();
+  }
+
+  var files = folder.getFiles();
+  while (files.hasNext()) {
+    var file = files.next();
+    var fileName = file.getName().toString().trim().toLowerCase();
+    var mimeType = file.getMimeType();
+
+    if (mimeType === MimeType.PDF && (fileName === normalizedOrderNo + ".pdf" || fileName.indexOf(normalizedOrderNo) !== -1)) {
+      return file;
+    }
+  }
+
+  throw new Error("No se encontró un PDF para la orden '" + orderNo + "' en la carpeta DOC_ORDENES (ID: " + folderId + "). Verifique que el archivo exista y que el nombre contenga el número de orden.");
+}
+
 function fetchOrderData(orderNo) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var dataSheet = ss.getSheetByName('Ordenes');
@@ -623,15 +649,9 @@ function fetchOrderData(orderNo) {
   // Try to fetch PDF de Orden from DOC_ORDENES folder
   try {
     if (folderId) {
-      var folder = DriveApp.getFolderById(folderId);
-      var files = folder.getFilesByName(orderNo + ".pdf");
-      if (files.hasNext()) {
-        var file = files.next();
-        dynamicPdfs.push({ key: "DOC_ORDENES", base64: Utilities.base64Encode(file.getBlob().getBytes()) });
-        Logger.log("✓ Precargado PDF de Orden para orden " + orderNo);
-      } else {
-        Logger.log("⚠️ No se encontró PDF de Orden para orden " + orderNo);
-      }
+      var file = findOrderPdfInFolder(folderId, orderNo);
+      dynamicPdfs.push({ key: "DOC_ORDENES", base64: Utilities.base64Encode(file.getBlob().getBytes()) });
+      Logger.log("✓ Precargado PDF de Orden para orden " + orderNo + " desde archivo: " + file.getName());
     }
   } catch (e) {
     Logger.log("Error fetching PDF de Orden from DOC_ORDENES: " + e.message);
@@ -751,13 +771,7 @@ function preparePrintPayload(orderNo, templateConfig) {
           throw new Error("DOC_ORDENES no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
         }
         try {
-          var folder = DriveApp.getFolderById(folderId);
-          var files = folder.getFilesByName(orderNo + ".pdf");
-          if (files.hasNext()) {
-            file = files.next();
-          } else {
-            throw new Error("El archivo '" + orderNo + ".pdf' no existe en la carpeta configurada (ID: " + folderId + "). Verifique que el archivo existe y el nombre coincide exactamente.");
-          }
+          file = findOrderPdfInFolder(folderId, orderNo);
         } catch (driveError) {
           if (driveError.message.indexOf("not found") !== -1 || driveError.message.indexOf("not exist") !== -1) {
             throw new Error("No se puede acceder a la carpeta DOC_ORDENES (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
