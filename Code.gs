@@ -1796,23 +1796,8 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     Logger.log("saveFinalUnifiedPDF createFile ms: " + (new Date().getTime() - createStartedAt));
     var fileId = file.getId();
     
-    // --- MEJORA DE AUDITORÍA ---
-    var userEmail = Session.getActiveUser().getEmail();
-    var userIdentity = getUserIdentityString(userEmail);
-    var logMessage = archivoReemplazado 
-      ? "Se REEMPLAZÓ el documento unificado final para la orden " + orderNo
-      : "Se generó y guardó el documento unificado final para la orden " + orderNo;
-    logChange('GENERACION_PDF_FINAL', logMessage, userIdentity);
-
-    // Configurar permisos de seguridad del archivo en Drive
-    try {
-      file.setShareableByEditors(false);
-    } catch(secErr) {
-      Logger.log("No se pudieron aplicar restricciones de seguridad adicionales al PDF: " + secErr.message);
-    }
-    
-    var drivePreviewUrl = 'https://drive.google.com/file/d/' + fileId + '/preview';
-    var viewerUrl = getWebAppUrl() + '?fileId=' + encodeURIComponent(fileId);
+    var drivePreviewUrl = file.getUrl();
+    var viewerUrl = drivePreviewUrl;
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
     // Retornar URLs listas para abrir vista previa desde Drive
@@ -1826,6 +1811,29 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
   } catch (e) {
     Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
     throw new Error("Error al guardar PDF final: " + e.message);
+  }
+}
+
+function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado) {
+  try {
+    var file = DriveApp.getFileById(fileId);
+    var userEmail = Session.getActiveUser().getEmail();
+    var userIdentity = getUserIdentityString(userEmail);
+    var logMessage = archivoReemplazado
+      ? "Se REEMPLAZÓ el documento unificado final para la orden " + orderNo
+      : "Se generó y guardó el documento unificado final para la orden " + orderNo;
+    logChange('GENERACION_PDF_FINAL', logMessage, userIdentity);
+
+    try {
+      file.setShareableByEditors(false);
+    } catch(secErr) {
+      Logger.log("No se pudieron aplicar restricciones de seguridad adicionales al PDF: " + secErr.message);
+    }
+
+    return "Post-guardado finalizado.";
+  } catch (e) {
+    Logger.log("Error en finalizeFinalPdfPostSave: " + e.message);
+    return "Error en post-guardado: " + e.message;
   }
 }
 

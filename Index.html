@@ -497,6 +497,15 @@
         });
       }
 
+      function finalizeFinalPdfPostSaveAsync(orderNo, fileId, archivoReemplazado) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado);
+        });
+      }
+
       function uint8ArrayToBase64(bytes) {
         const chunkSize = 0x8000;
         let binary = '';
@@ -527,7 +536,7 @@
       }
 
       function openSavedPdfPreview(previewWindow, saveResult) {
-        const viewerUrl = saveResult.viewerUrl || saveResult.drivePreviewUrl;
+        const viewerUrl = saveResult.drivePreviewUrl || saveResult.viewerUrl;
         if (previewWindow && !previewWindow.closed) {
           previewWindow.location.href = viewerUrl;
         } else {
@@ -851,11 +860,13 @@
               const normalizedResult = typeof saveResult === 'string'
                 ? {
                     fileId: saveResult,
-                    drivePreviewUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/preview',
-                    viewerUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/preview'
+                    drivePreviewUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/view',
+                    viewerUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/view'
                   }
                 : saveResult;
               openSavedPdfPreview(previewWindow, normalizedResult);
+              finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado)
+                .catch(e => console.error('Error en finalizeFinalPdfPostSave:', e.message));
               return normalizedResult;
             })
             .catch(e => {
