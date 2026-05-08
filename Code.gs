@@ -1944,7 +1944,9 @@ function doPost(e) {
 function getWebAppUrl() {
   try {
     var service = ScriptApp.getService();
-    return service.getUrl();
+    var url = service.getUrl();
+    Logger.log("URL de Web App obtenida: " + url);
+    return url;
   } catch (e) {
     Logger.log("Error obteniendo URL de Web App: " + e.message);
     throw new Error("No se pudo obtener la URL de la Web App. Asegúrese de que el script esté desplegado como Web App.");
