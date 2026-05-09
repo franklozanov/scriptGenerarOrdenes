@@ -374,6 +374,7 @@
       let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
       let debounceTimer = null; // Timer for debounce function
+      let globalWebAppUrl = ''; // Almacena la URL del Web App para llamadas seguras
 
       // Debounce function to avoid multiple backend calls while typing
       function debounce(func, delay) {
@@ -437,14 +438,38 @@
       function isUserSelectionValid() {
         const userNameInput = document.getElementById('userName');
         if (!userNameInput || !window.globalUsers) return false;
-        return window.globalUsers.some(u => u.nombreCompleto === userNameInput.value.trim());
+        const val = userNameInput.value.trim();
+        if (!val) return false;
+        return window.globalUsers.some(u => u.nombreCompleto === val);
       }
 
       function updateGoButtonState() {
         const btn = document.getElementById('goBtn');
         const orderInput = document.getElementById('orderNo');
+        const status = document.getElementById('status');
         if (!btn || !orderInput) return;
-        btn.disabled = !(isPreloadReadyForOrder(orderInput.value.trim()) && isUserSelectionValid() && hasAnyCopiesSelected());
+        
+        const isOrderReady = isPreloadReadyForOrder(orderInput.value.trim());
+        const isUserValid = isUserSelectionValid();
+        const hasCopies = hasAnyCopiesSelected();
+        
+        const isEnabled = isOrderReady && isUserValid && hasCopies;
+        btn.disabled = !isEnabled;
+
+        // Feedback visual si el orden está listo pero el botón sigue bloqueado
+        if (isOrderReady && !isEnabled && !status.innerText.includes("Impresión registrada")) {
+          if (!isUserValid) {
+            status.innerText = "⚠️ Seleccione un usuario válido de la lista";
+            status.className = "error-text";
+          } else if (!hasCopies) {
+            status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
+            status.className = "error-text";
+          }
+        } else if (isOrderReady && isEnabled && status.innerText.includes("⚠️")) {
+          // Limpiar aviso si ya todo está correcto
+          status.innerText = "✅ Documentos listos para impresión";
+          status.className = "success-text";
+        }
       }
 
       // Background preloading function
@@ -599,20 +624,40 @@
       }
 
       function saveFinalUnifiedPdfAsync(base64Data, orderNo) {
-        return new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .saveFinalUnifiedPDF(base64Data, orderNo);
+        if (!globalWebAppUrl) {
+          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
+        }
+        return fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ operation: 'saveFinalPDF', base64Data: base64Data, orderNo: orderNo })
+        })
+        .then(response => response.json())
+        .then(result => {
+          if (result.status === 'success') {
+            return result.data; // El Web App devuelve status success y data contiene el objeto {fileId, drivePreviewUrl, viewerUrl}
+          } else {
+            throw new Error(result.message || 'Error desconocido al guardar el PDF.');
+          }
         });
       }
 
       function updateTraceabilityAsync(orderNo, userId, totalPages, printType) {
-        return new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .updateTraceability(orderNo, userId, totalPages, printType);
+        if (!globalWebAppUrl) {
+          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
+        }
+        return fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ operation: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: totalPages, printType: printType })
+        })
+        .then(response => response.json())
+        .then(result => {
+          if (result.status === 'success') {
+            return result.message;
+          } else {
+            throw new Error(result.message || 'Error desconocido al registrar trazabilidad.');
+          }
         });
       }
 
@@ -669,6 +714,7 @@
 
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
+          globalWebAppUrl = data.webAppUrl;
           globalTemplates = data.templates;
 
           // Store preloaded static template base64 strings in memory
@@ -715,6 +761,7 @@
           }
 
           document.getElementById('loader').style.display = 'none';
+          updateGoButtonState();
           
           // Add event listener for background preloading on orderNo input
           const orderNoInput = document.getElementById('orderNo');

@@ -432,8 +432,8 @@ function getInitialData() {
       throw new Error("Error al leer la hoja 'templates': " + e.message);
     }
 
-    var result = { users: users, templates: templates };
-    
+    var webAppUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL') || '';
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl };
     // Force hardcoded sort order for templates
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
@@ -455,8 +455,7 @@ function getInitialData() {
       return 0;
     });
     
-    // Clonar templates sin base64 para no exceder el límite de 100KB de CacheService
-    var dataToCache = { users: users, templates: [] };
+    var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];
       dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, hasAccess: t.hasAccess });
@@ -2095,8 +2094,8 @@ function doPost(e) {
 
       // Llamar a la función existente de guardado
       try {
-        saveFinalUnifiedPDF(base64Data, orderNo);
-        result = { status: 'success', message: 'PDF final guardado exitosamente para orden ' + orderNo };
+        var saveResult = saveFinalUnifiedPDF(base64Data, orderNo);
+        result = { status: 'success', message: 'PDF final guardado exitosamente para orden ' + orderNo, data: saveResult };
       } catch (saveError) {
         Logger.log("Error en saveFinalUnifiedPDF dentro de doPost: " + saveError.message);
         result = { 
@@ -2104,6 +2103,37 @@ function doPost(e) {
           message: "Error al guardar el PDF final: " + saveError.message,
           diagnostic: 'SAVE_FINAL_PDF_ERROR',
           details: saveError.message
+        };
+      }
+
+    } else if (operation === 'updateTraceability') {
+      // Operación: Actualizar trazabilidad (updateTraceability)
+      var orderNo = params.orderNo;
+      var userId = params.userId;
+      var pagesPrinted = params.pagesPrinted;
+      var printType = params.printType;
+
+      Logger.log("doPost - Actualizar trazabilidad para orden: " + orderNo);
+
+      if (!orderNo || !userId || !pagesPrinted || !printType) {
+        Logger.log("Error en doPost updateTraceability: Faltan parámetros");
+        return ContentService.createTextOutput(JSON.stringify({
+          status: 'error',
+          message: 'Faltan parámetros requeridos para actualizar trazabilidad.',
+          diagnostic: 'MISSING_REQUIRED_PARAMS'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      try {
+        var msg = internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
+        result = { status: 'success', message: msg };
+      } catch (updateError) {
+        Logger.log("Error en internalUpdateTraceability dentro de doPost: " + updateError.message);
+        result = { 
+          status: 'error', 
+          message: "Error al actualizar trazabilidad: " + updateError.message,
+          diagnostic: 'UPDATE_TRACEABILITY_ERROR',
+          details: updateError.message
         };
       }
 
