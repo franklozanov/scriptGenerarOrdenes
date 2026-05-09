@@ -2138,13 +2138,43 @@ function doPost(e) {
         };
       }
 
+    } else if (operation === 'finalizeFinalPdf') {
+      // Operación: Finalizar post-guardado de PDF (finalizeFinalPdfPostSave)
+      var orderNo = params.orderNo;
+      var fileId = params.fileId;
+      var archivoReemplazado = params.archivoReemplazado || false;
+
+      Logger.log("doPost - Finalizar post-guardado para orden: " + orderNo);
+
+      if (!orderNo || !fileId) {
+        Logger.log("Error en doPost finalizeFinalPdf: Faltan parámetros");
+        return ContentService.createTextOutput(JSON.stringify({
+          status: 'error',
+          message: 'Faltan parámetros requeridos para finalizar post-guardado.',
+          diagnostic: 'MISSING_REQUIRED_PARAMS'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      try {
+        var msg = finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado);
+        result = { status: 'success', message: msg };
+      } catch (finalizeError) {
+        Logger.log("Error en finalizeFinalPdfPostSave dentro de doPost: " + finalizeError.message);
+        result = { 
+          status: 'error', 
+          message: "Error al finalizar post-guardado: " + finalizeError.message,
+          diagnostic: 'FINALIZE_PDF_ERROR',
+          details: finalizeError.message
+        };
+      }
+
     } else {
       Logger.log("Error en doPost: Operación no reconocida: " + operation);
       return ContentService.createTextOutput(JSON.stringify({
         status: 'error',
         message: 'Operación no reconocida: ' + operation,
         diagnostic: 'UNKNOWN_OPERATION',
-        supportedOperations: ['uploadDocument', 'saveFinalPDF']
+        supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf']
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

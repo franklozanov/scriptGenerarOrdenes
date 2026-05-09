@@ -635,7 +635,7 @@
         .then(response => response.json())
         .then(result => {
           if (result.status === 'success') {
-            return result.data; // El Web App devuelve status success y data contiene el objeto {fileId, drivePreviewUrl, viewerUrl}
+            return result.data;
           } else {
             throw new Error(result.message || 'Error desconocido al guardar el PDF.');
           }
@@ -643,20 +643,40 @@
       }
 
       function updateTraceabilityAsync(orderNo, userId, totalPages, printType) {
-        return new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .updateTraceability(orderNo, userId, totalPages, printType);
+        if (!globalWebAppUrl) {
+          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
+        }
+        return fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ operation: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: totalPages, printType: printType })
+        })
+        .then(response => response.json())
+        .then(result => {
+          if (result.status === 'success') {
+            return result.message;
+          } else {
+            throw new Error(result.message || 'Error desconocido al registrar trazabilidad.');
+          }
         });
       }
 
       function finalizeFinalPdfPostSaveAsync(orderNo, fileId, archivoReemplazado) {
-        return new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado);
+        if (!globalWebAppUrl) {
+          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
+        }
+        return fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ operation: 'finalizeFinalPdf', orderNo: orderNo, fileId: fileId, archivoReemplazado: archivoReemplazado })
+        })
+        .then(response => response.json())
+        .then(result => {
+          if (result.status === 'success') {
+            return result.message;
+          } else {
+            throw new Error(result.message || 'Error desconocido al finalizar post-guardado.');
+          }
         });
       }
 
