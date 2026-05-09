@@ -481,6 +481,7 @@
     var globalPendingOrders = [];
     var rowCounter = 0;
     var globalWebAppUrl = ''; // Variable para almacenar la URL de la Web App
+    var globalUserEmail = ''; // Email del usuario actual para autenticación
 
     var loadingOverlay = document.getElementById('loadingOverlay');
     var mainContent = document.getElementById('mainContent');
@@ -522,22 +523,26 @@
 
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
-      // Primero obtener la URL de la Web App y guardarla globalmente
+      // Primero obtener datos iniciales (URL y userEmail)
       google.script.run
-        .withSuccessHandler(function(url) {
-          globalWebAppUrl = url;
-          if (!url) {
+        .withSuccessHandler(function(data) {
+          globalWebAppUrl = data.webAppUrl;
+          globalUserEmail = data.userEmail;
+          console.log('✅ UploadModal - globalWebAppUrl:', globalWebAppUrl);
+          console.log('✅ UploadModal - globalUserEmail:', globalUserEmail);
+          if (!globalWebAppUrl) {
             console.error("La URL de la Web App no pudo ser obtenida. La subida de archivos fallará.");
           }
-          // Una vez obtenida la URL, cargar el resto de los datos
+          // Una vez obtenidos los datos, cargar el resto
           loadPendingOrders();
         })
         .withFailureHandler(function(error) {
-          console.error('Error CRÍTICO al obtener la URL de la Web App:', error.message);
+          console.error('Error CRÍTICO al obtener datos iniciales:', error.message);
           globalWebAppUrl = '';
+          globalUserEmail = '';
           loadPendingOrders();
         })
-        .getWebAppUrl();
+        .getInitialData();
     };
 
     function addRow() {
@@ -845,7 +850,8 @@
             fileName: file.name,
             referenceNo: referenceNo,
             docType: docType,
-            overwriteConfirmed: overwriteConfirmed
+            overwriteConfirmed: overwriteConfirmed,
+            userEmail: globalUserEmail
           };
           
           // Enviar a Web App usando fetch

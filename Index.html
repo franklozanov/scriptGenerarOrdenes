@@ -375,6 +375,7 @@
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
       let debounceTimer = null; // Timer for debounce function
       let globalWebAppUrl = ''; // Almacena la URL del Web App para llamadas seguras
+      let globalUserEmail = ''; // Email del usuario actual para autenticación en Web App
 
       // Debounce function to avoid multiple backend calls while typing
       function debounce(func, delay) {
@@ -638,7 +639,7 @@
         return fetch(globalWebAppUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'saveFinalPDF', base64Data: base64Data, orderNo: orderNo })
+          body: JSON.stringify({ operation: 'saveFinalPDF', base64Data: base64Data, orderNo: orderNo, userEmail: globalUserEmail })
         })
         .then(response => {
           console.log('📡 Response status:', response.status, response.statusText);
@@ -673,7 +674,7 @@
         return fetch(globalWebAppUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: totalPages, printType: printType })
+          body: JSON.stringify({ operation: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: totalPages, printType: printType, userEmail: globalUserEmail })
         })
         .then(response => {
           console.log('📡 updateTraceability - Response status:', response.status, response.statusText);
@@ -707,7 +708,7 @@
         return fetch(globalWebAppUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'finalizeFinalPdf', orderNo: orderNo, fileId: fileId, archivoReemplazado: archivoReemplazado })
+          body: JSON.stringify({ operation: 'finalizeFinalPdf', orderNo: orderNo, fileId: fileId, archivoReemplazado: archivoReemplazado, userEmail: globalUserEmail })
         })
         .then(response => {
           console.log('📡 finalizeFinalPdf - Response status:', response.status, response.statusText);
@@ -749,7 +750,9 @@
         google.script.run.withSuccessHandler(data => {
           console.log('🚀 Inicializando modal - data recibida:', data);
           globalWebAppUrl = data.webAppUrl;
+          globalUserEmail = data.userEmail;
           console.log('✅ globalWebAppUrl configurada:', globalWebAppUrl);
+          console.log('✅ globalUserEmail configurado:', globalUserEmail);
           globalTemplates = data.templates;
 
           // Store preloaded static template base64 strings in memory

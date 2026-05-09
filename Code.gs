@@ -434,7 +434,8 @@ function getInitialData() {
 
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl };
+    var userEmail = Session.getActiveUser().getEmail();
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userEmail: userEmail };
     // Force hardcoded sort order for templates
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
@@ -2007,19 +2008,6 @@ function isUserAuthorized(email) {
  */
 function doPost(e) {
   try {
-    // --- CONTROL DE ACCESO BASADO EN ROLES (RBAC) ---
-    // Identificar al usuario que realiza la llamada, no al que ejecuta el script.
-    var callingUserEmail = Session.getActiveUser().getEmail();
-    if (!isUserAuthorized(callingUserEmail)) {
-      Logger.log("Acceso denegado para el usuario no autorizado: " + callingUserEmail);
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'error',
-        message: 'Acceso denegado. No tienes permiso para realizar esta acción.',
-        diagnostic: 'ACCESS_DENIED'
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    // --- FIN DE CONTROL DE ACCESO ---
-
     // Validar que se haya proporcionado el cuerpo de la solicitud
     if (!e || !e.postData) {
       Logger.log("Error en doPost: No se recibieron datos en la solicitud");
@@ -2043,10 +2031,34 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // --- CONTROL DE ACCESO BASADO EN ROLES (RBAC) ---
+    // El email del usuario debe venir en el payload porque Session.getActiveUser() no funciona con fetch
+    var callingUserEmail = params.userEmail || '';
+    if (!callingUserEmail) {
+      Logger.log("Error en doPost: No se proporcionó userEmail en el payload");
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Error de autenticación: no se pudo identificar al usuario.',
+        diagnostic: 'MISSING_USER_EMAIL'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    if (!isUserAuthorized(callingUserEmail)) {
+      Logger.log("Acceso denegado para el usuario no autorizado: " + callingUserEmail);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Acceso denegado. No tienes permiso para realizar esta acción.',
+        diagnostic: 'ACCESS_DENIED',
+        userEmail: callingUserEmail
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    Logger.log("✓ Usuario autorizado: " + callingUserEmail);
+    // --- FIN DE CONTROL DE ACCESO ---
+
     // Determinar el tipo de operación basado en los parámetros
     var operation = params.operation || '';
     Logger.log("doPost - Operación solicitada: " + operation);
-    Logger.log("doPost - Usuario: " + Session.getActiveUser().getEmail());
+    Logger.log("doPost - Usuario: " + callingUserEmail);
 
     var result;
 
