@@ -643,21 +643,11 @@
       }
 
       function updateTraceabilityAsync(orderNo, userId, totalPages, printType) {
-        if (!globalWebAppUrl) {
-          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
-        }
-        return fetch(globalWebAppUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: totalPages, printType: printType })
-        })
-        .then(response => response.json())
-        .then(result => {
-          if (result.status === 'success') {
-            return result.message;
-          } else {
-            throw new Error(result.message || 'Error desconocido al registrar trazabilidad.');
-          }
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .updateTraceability(orderNo, userId, totalPages, printType);
         });
       }
 
@@ -679,36 +669,12 @@
         return btoa(binary);
       }
 
-      function setPreviewWindowContent(previewWindow, message, isError) {
-        if (!previewWindow || previewWindow.closed) return;
-        previewWindow.document.open();
-        previewWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="UTF-8">
-              <title>Preparando vista previa</title>
-              <style>
-                body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; color: ${isError ? '#c62828' : '#1976d2'}; }
-                .box { text-align: center; padding: 24px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); max-width: 520px; }
-              </style>
-            </head>
-            <body><div class="box">${message}</div></body>
-          </html>
-        `);
-        previewWindow.document.close();
-      }
-
-      function openSavedPdfPreview(previewWindow, saveResult) {
-        const viewerUrl = saveResult.drivePreviewUrl || saveResult.viewerUrl;
-        if (previewWindow && !previewWindow.closed) {
-          previewWindow.location.href = viewerUrl;
-        } else {
-          const opened = window.open(viewerUrl, '_blank');
-          if (!opened) {
-            const status = document.getElementById('status');
-            status.innerHTML = `✅ PDF guardado. <a href="${viewerUrl}" target="_blank">Abrir vista previa</a>`;
-          }
+      function openSavedPdfPreview(saveResult) {
+        const directUrl = 'https://drive.google.com/uc?export=view&id=' + saveResult.fileId;
+        const opened = window.open(directUrl, '_blank');
+        if (!opened) {
+          const status = document.getElementById('status');
+          status.innerHTML = `✅ PDF guardado. <a href="${directUrl}" target="_blank">Abrir PDF</a>`;
         }
       }
 
@@ -795,7 +761,7 @@
       };
 
       // PDF generation processing function (extracted for reuse)
-      async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status, previewWindow) {
+      async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status) {
         try {
           status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
 
@@ -1008,7 +974,6 @@
           console.timeEnd('base64-conversion');
 
           status.innerText = "🔄 Guardando en Drive y registrando impresión...";
-          setPreviewWindowContent(previewWindow, "⏳ Guardando documento final en Drive para abrir vista previa...", false);
 
           console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
           console.time('drive-save');
@@ -1017,13 +982,9 @@
             .then(saveResult => {
               console.timeEnd('drive-save');
               const normalizedResult = typeof saveResult === 'string'
-                ? {
-                    fileId: saveResult,
-                    drivePreviewUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/view',
-                    viewerUrl: 'https://drive.google.com/file/d/' + encodeURIComponent(saveResult) + '/view'
-                  }
+                ? { fileId: saveResult }
                 : saveResult;
-              openSavedPdfPreview(previewWindow, normalizedResult);
+              openSavedPdfPreview(normalizedResult);
               finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado)
                 .catch(e => console.error('Error en finalizeFinalPdfPostSave:', e.message));
               return normalizedResult;
@@ -1031,7 +992,6 @@
             .catch(e => {
               console.timeEnd('drive-save');
               console.error('Error en saveFinalUnifiedPDF:', e.message);
-              setPreviewWindowContent(previewWindow, "❌ Error al guardar PDF en Drive: " + e.message, true);
               throw e;
             });
 
@@ -1073,9 +1033,8 @@
           }
 
         } catch (pdfError) {
-          setPreviewWindowContent(previewWindow, "❌ Error generando PDF: " + pdfError.message, true);
           alert("Error generando PDF: " + pdfError.message);
-          status.innerText = "Proceso cancelado.";
+          status.innerText = "❌ Error: " + pdfError.message;
           status.className = "error-text";
           btn.disabled = false;
         }
@@ -1134,16 +1093,12 @@
         }
 
         btn.disabled = true;
-        const previewWindow = window.open('', '_blank');
-        if (previewWindow) {
-          setPreviewWindowContent(previewWindow, "⏳ Preparando documento final...", false);
-        }
 
         status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
         status.className = "info-text";
         console.log(`✓ Usando documentos dinámicos precargados para orden ${orderNo}`);
         const payload = buildPayloadFromPreload(config);
-        processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status, previewWindow);
+        processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
       }
     </script>
   </body>

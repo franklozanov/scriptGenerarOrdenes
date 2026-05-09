@@ -432,7 +432,8 @@ function getInitialData() {
       throw new Error("Error al leer la hoja 'templates': " + e.message);
     }
 
-    var webAppUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL') || '';
+    var webAppUrl = '';
+    try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
     var result = { users: users, templates: templates, webAppUrl: webAppUrl };
     // Force hardcoded sort order for templates
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
