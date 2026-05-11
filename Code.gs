@@ -1511,11 +1511,13 @@ function configureOrdenesProtection() {
     Logger.log("✓ Eliminada protección: " + p.getDescription());
   });
   
-  // 2. Columnas que SOLO el administrador/propietario puede editar
+  // 2. Columnas que SOLO el administrador/propietario puede editar directamente en la hoja.
+  // Las columnas de trazabilidad (STATUS, NoPags, ImpresoPor, Reimpresion, ReimpresoPor, TotalPags)
+  // NO se protegen aquí porque el script las escribe desde el modal (google.script.run corre
+  // como el usuario activo, no como propietario). Su acceso se controla exclusivamente por código.
   var colsToProtect = [
-    "VerifLote", "VerifCant. Disponible", "VerifExp", 
-    "Fabricante", "Decision", "STATUS", "ImpresoPor", "NoPags", 
-    "ReimpresoPor", "Reimpresion", "TotalPags"
+    "VerifLote", "VerifCant. Disponible", "VerifExp",
+    "Fabricante", "Decision"
   ];
   
   var filaEncabezados = 1;
