@@ -1229,17 +1229,43 @@ function logInitialization() {
 
 function removeLegacyProtections() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var protections = ss.getProtections(SpreadsheetApp.ProtectionType.SHEET)
-                      .concat(ss.getProtections(SpreadsheetApp.ProtectionType.RANGE));
   
-  var legacyDescriptions = ['Bloqueo_Usuarios', 'Bloqueo_Templates', 'Bloqueo_Ordenes_IT', 'Bloqueo_Ordenes_IS', 'Bloqueo_Ordenes_Dinamico'];
+  // Obtener TODAS las protecciones de hoja y rango en todo el libro
+  var allSheetProtections = ss.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var allRangeProtections = ss.getProtections(SpreadsheetApp.ProtectionType.RANGE);
   
-  for (var i = 0; i < protections.length; i++) {
-    if (legacyDescriptions.indexOf(protections[i].getDescription()) !== -1) {
-      protections[i].remove();
-      Logger.log("✓ Eliminada protección legacy: " + protections[i].getDescription());
+  var totalRemoved = 0;
+  
+  // Eliminar TODAS las protecciones de hoja
+  Logger.log("=== Eliminando protecciones de hoja ===");
+  for (var i = 0; i < allSheetProtections.length; i++) {
+    var desc = allSheetProtections[i].getDescription() || "(sin descripción)";
+    var sheetName = allSheetProtections[i].getRange().getSheet().getName();
+    try {
+      allSheetProtections[i].remove();
+      Logger.log("✓ Eliminada protección de hoja: " + desc + " en hoja: " + sheetName);
+      totalRemoved++;
+    } catch (e) {
+      Logger.log("✗ Error al eliminar protección de hoja: " + desc + " - " + e.message);
     }
   }
+  
+  // Eliminar TODAS las protecciones de rango
+  Logger.log("=== Eliminando protecciones de rango ===");
+  for (var j = 0; j < allRangeProtections.length; j++) {
+    var desc = allRangeProtections[j].getDescription() || "(sin descripción)";
+    var sheetName = allRangeProtections[j].getRange().getSheet().getName();
+    var rangeA1 = allRangeProtections[j].getRange().getA1Notation();
+    try {
+      allRangeProtections[j].remove();
+      Logger.log("✓ Eliminada protección de rango: " + desc + " en " + sheetName + "!" + rangeA1);
+      totalRemoved++;
+    } catch (e) {
+      Logger.log("✗ Error al eliminar protección de rango: " + desc + " - " + e.message);
+    }
+  }
+  
+  Logger.log("=== TOTAL: " + totalRemoved + " protecciones eliminadas ===");
 }
 
 function applyNewProtectionScheme() {
@@ -1290,7 +1316,7 @@ function configureOrdenesProtection() {
   
   // 2. Columnas que SOLO el administrador/propietario puede editar
   var colsToProtect = [
-    "VerifLote", "CantDispAFecha", "VerifCant. Disponible", "VerifExp", 
+    "VerifLote", "VerifCant. Disponible", "VerifExp", 
     "Fabricante", "Decision", "STATUS", "ImpresoPor", "NoPags", 
     "ReimpresoPor", "Reimpresion", "TotalPags"
   ];
