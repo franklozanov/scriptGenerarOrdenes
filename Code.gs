@@ -1082,6 +1082,15 @@ function initializeApp(ui) {
 
 function initializeCompleteSystem(ui) {
   var summary = [];
+  
+  // Limpiar caché al inicio para forzar recarga de plantillas actualizadas
+  try {
+    clearInitialDataCache();
+    summary.push("✓ Caché de plantillas limpiado");
+  } catch (e) {
+    summary.push("✗ Error limpiando caché: " + e.message);
+  }
+  
   try {
     initializeWorkbookStructure_(ui);
     summary.push("✓ Estructura de hojas validada/corregida");
