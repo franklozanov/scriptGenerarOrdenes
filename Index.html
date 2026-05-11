@@ -375,7 +375,6 @@
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
       let debounceTimer = null; // Timer for debounce function
       let globalWebAppUrl = ''; // Almacena la URL del Web App para llamadas seguras
-      let globalUserEmail = ''; // Email del usuario actual para autenticación en Web App
 
       // Debounce function to avoid multiple backend calls while typing
       function debounce(func, delay) {
@@ -628,11 +627,10 @@
         if (!globalWebAppUrl) {
           return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
         }
-        if (!globalUserEmail) {
-          return Promise.reject(new Error("No se pudo identificar el usuario activo."));
+        if (!payload.userId) {
+          return Promise.reject(new Error("No se pudo identificar el UserID del usuario seleccionado."));
         }
 
-        payload.userEmail = globalUserEmail;
         return fetch(globalWebAppUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -650,11 +648,12 @@
         });
       }
 
-      function saveFinalUnifiedPdfAsync(base64Data, orderNo) {
+      function saveFinalUnifiedPdfAsync(base64Data, orderNo, userId) {
         return callWebAppOperation({
           operation: 'saveFinalPDF',
           base64Data: base64Data,
-          orderNo: orderNo
+          orderNo: orderNo,
+          userId: userId
         })
         .then(result => {
           return result.data;
@@ -674,12 +673,13 @@
         });
       }
 
-      function finalizeFinalPdfPostSaveAsync(orderNo, fileId, archivoReemplazado) {
+      function finalizeFinalPdfPostSaveAsync(orderNo, fileId, archivoReemplazado, userId) {
         return callWebAppOperation({
           operation: 'finalizeFinalPdf',
           orderNo: orderNo,
           fileId: fileId,
-          archivoReemplazado: archivoReemplazado
+          archivoReemplazado: archivoReemplazado,
+          userId: userId
         })
         .then(result => {
           return result.message;
@@ -708,9 +708,7 @@
         google.script.run.withSuccessHandler(data => {
           console.log('🚀 Inicializando modal - data recibida:', data);
           globalWebAppUrl = data.webAppUrl;
-          globalUserEmail = data.userEmail;
           console.log('✅ globalWebAppUrl configurada:', globalWebAppUrl);
-          console.log('✅ globalUserEmail configurado:', globalUserEmail);
           globalTemplates = data.templates;
 
           // Store preloaded static template base64 strings in memory
@@ -1008,14 +1006,14 @@
           console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
           console.time('drive-save');
           console.time('traceability-update');
-          const savePromise = saveFinalUnifiedPdfAsync(base64Data, orderNo)
+          const savePromise = saveFinalUnifiedPdfAsync(base64Data, orderNo, userId)
             .then(saveResult => {
               console.timeEnd('drive-save');
               const normalizedResult = typeof saveResult === 'string'
                 ? { fileId: saveResult }
                 : saveResult;
               openSavedPdfPreview(normalizedResult);
-              finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado)
+              finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado, userId)
                 .catch(e => console.error('Error en finalizeFinalPdfPostSave:', e.message));
               return normalizedResult;
             })

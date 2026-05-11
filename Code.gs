@@ -79,9 +79,7 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
 function onOpen() {
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
-    .addItem('� Inicializar Sistema Completo', 'promptInitializeApp')
-    .addItem('🛡️ Aplicar Nuevo Esquema de Protección', 'promptApplyNewProtection')
-    .addItem('▶️ Activar Auditoría', 'promptSetupAuditTrail');
+    .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
 
   // 2. Menú de Configuración General
   var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
@@ -239,10 +237,56 @@ function getStaticTemplateBase64_(key, fileId) {
   return base64;
 }
 
+function getUserRecordByUserId_(userId) {
+  if (!userId) return null;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) return null;
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
+
+  var headers = data[0];
+  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
+  var colNombreCompletoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Completo', false);
+  var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
+  var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
+  var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+
+  if (!colUserIdIdx) return null;
+
+  colUserIdIdx -= 1;
+  colNombreCompletoIdx = colNombreCompletoIdx ? colNombreCompletoIdx - 1 : null;
+  colNombreCortoIdx = colNombreCortoIdx ? colNombreCortoIdx - 1 : null;
+  colEmailIdx = colEmailIdx ? colEmailIdx - 1 : null;
+  colRolIdx = colRolIdx ? colRolIdx - 1 : null;
+
+  var targetUserId = userId.toString().trim();
+  for (var i = 1; i < data.length; i++) {
+    var rowUserId = data[i][colUserIdIdx] ? data[i][colUserIdIdx].toString().trim() : "";
+    if (rowUserId === targetUserId) {
+      return {
+        userId: rowUserId,
+        nombreCompleto: colNombreCompletoIdx !== null && data[i][colNombreCompletoIdx] ? data[i][colNombreCompletoIdx].toString().trim() : "",
+        nombreCorto: colNombreCortoIdx !== null && data[i][colNombreCortoIdx] ? data[i][colNombreCortoIdx].toString().trim() : "",
+        email: colEmailIdx !== null && data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim() : "",
+        rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : ""
+      };
+    }
+  }
+  return null;
+}
+
+function getUserIdentityStringByUserId_(userId) {
+  var user = getUserRecordByUserId_(userId);
+  if (!user) return userId || "Usuario no identificado";
+  return user.userId + " - " + (user.nombreCorto || user.userId);
+}
+
 function getInitialData() {
   try {
     var cache = CacheService.getScriptCache();
-    var cached = cache.get('initialData_v1');
+    var cached = cache.get('initialData_v2');
     if (cached) {
       try { 
         var parsedData = JSON.parse(cached); 
@@ -253,6 +297,9 @@ function getInitialData() {
           } else {
             t.base64 = null;
           }
+        }
+        if (!parsedData.webAppUrl) {
+          try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
         }
         return parsedData; 
       } catch (e) {
@@ -277,6 +324,8 @@ function getInitialData() {
         var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
         var colNombreCompletoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Completo', false);
         var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
+        var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
+        var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
         
         // Si alguna columna no existe, usar índices por defecto
         if (!colUserIdIdx) colUserIdIdx = 1;
@@ -287,13 +336,21 @@ function getInitialData() {
         colUserIdIdx = colUserIdIdx - 1;
         colNombreCompletoIdx = colNombreCompletoIdx - 1;
         colNombreCortoIdx = colNombreCortoIdx - 1;
+        if (colEmailIdx) colEmailIdx = colEmailIdx - 1;
+        if (colRolIdx) colRolIdx = colRolIdx - 1;
         
         for (var j = 1; j < userData.length; j++) {
           if (colUserIdIdx !== undefined && colNombreCompletoIdx !== undefined && userData[j][colUserIdIdx] && userData[j][colNombreCompletoIdx]) {
             var userId = userData[j][colUserIdIdx].toString().trim();
             var nombreCompleto = userData[j][colNombreCompletoIdx].toString().trim();
             if (userId && nombreCompleto) {
-              users.push({ userId: userId, nombreCompleto: nombreCompleto });
+              users.push({
+                userId: userId,
+                nombreCompleto: nombreCompleto,
+                nombreCorto: colNombreCortoIdx !== undefined && userData[j][colNombreCortoIdx] ? userData[j][colNombreCortoIdx].toString().trim() : "",
+                email: colEmailIdx !== undefined && colEmailIdx !== null && userData[j][colEmailIdx] ? userData[j][colEmailIdx].toString().trim() : "",
+                rol: colRolIdx !== undefined && colRolIdx !== null && userData[j][colRolIdx] ? userData[j][colRolIdx].toString().trim() : ""
+              });
             }
           }
         }
@@ -434,8 +491,7 @@ function getInitialData() {
 
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
-    var userEmail = Session.getActiveUser().getEmail();
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userEmail: userEmail };
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl };
     // Force hardcoded sort order for templates
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
@@ -463,7 +519,7 @@ function getInitialData() {
       dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, hasAccess: t.hasAccess });
     }
     
-    try { cache.put('initialData_v1', JSON.stringify(dataToCache), 600); } catch (e) {
+    try { cache.put('initialData_v2', JSON.stringify(dataToCache), 600); } catch (e) {
       Logger.log("Error caching data: " + e.message);
     }
     return result;
@@ -478,6 +534,7 @@ function getInitialData() {
 function clearInitialDataCache() {
   var cache = CacheService.getScriptCache();
   cache.remove('initialData_v1');
+  cache.remove('initialData_v2');
   cache.remove('printConfig_v1');
   for (var i = 0; i < STATIC_TEMPLATE_KEYS_.length; i++) {
     var prefix = getStaticTemplateCachePrefix_(STATIC_TEMPLATE_KEYS_[i]);
@@ -966,28 +1023,9 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   if (!sheet) throw new Error("Sheet 'Ordenes' not found.");
 
   // Obtener NombreCorto a partir de userId
-  var nombreCorto = userId; // Fallback si no se encuentra
-  var usersSheet = ss.getSheetByName('Usuarios');
-  if (usersSheet) {
-    var uData = usersSheet.getDataRange().getValues();
-    if (uData.length > 0) {
-      var uHeaders = uData[0];
-      var colUserIdIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'UserID', false);
-      var colCortoIdx = getColumnIndexByNameCaseInsensitive(uHeaders, 'NombreCorto', false);
-      if (colUserIdIdx && colCortoIdx) {
-        var userIdIdx = colUserIdIdx - 1;
-        var cortoIdx = colCortoIdx - 1;
-        for (var u = 1; u < uData.length; u++) {
-          var userIdEnFila = uData[u][userIdIdx] ? uData[u][userIdIdx].toString().trim() : "";
-          if (userIdEnFila === userId) {
-            var nc = uData[u][cortoIdx];
-            if (nc) nombreCorto = nc.toString().trim();
-            break;
-          }
-        }
-      }
-    }
-  }
+  var userRecord = getUserRecordByUserId_(userId);
+  if (!userRecord) throw new Error("UserID no existe en la hoja Usuarios: " + userId);
+  var nombreCorto = userRecord.nombreCorto || userRecord.userId;
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
@@ -1056,7 +1094,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
   'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden'],
-  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email'],
+  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
 };
 
@@ -1304,8 +1342,7 @@ function logInitialization() {
   }
   
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
-  var userEmail = Session.getActiveUser().getEmail();
-  var user = getUserIdentityString(userEmail);
+  var user = "Sistema";
   var tipoCambio = "INICIALIZACION";
   var descripcion = "Inicialización de estructura del libro de trabajo";
   
@@ -1661,8 +1698,7 @@ function onEditInstalled(e) {
       }
     }
     
-    var userEmail = getUserEmail(e);
-    var userIdentity = getUserIdentityString(userEmail);
+    var userIdentity = "Usuario no identificado (edición directa)";
     
     if (!hasPermission) {
       // Revertir al valor anterior si no tiene permiso
@@ -1673,7 +1709,7 @@ function onEditInstalled(e) {
         5
       );
       var cellAddress = editedRange.getA1Notation();
-      var violationDesc = "Intento de edición denegado al usuario " + userEmail + " en la celda " + cellAddress + " de la hoja " + sheetName;
+      var violationDesc = "Intento de edición denegado en la celda " + cellAddress + " de la hoja " + sheetName;
       logChange('VIOLACION_PERMISO', violationDesc, userIdentity);
       return;
     }
@@ -1740,54 +1776,6 @@ function onEditInstalled(e) {
   }
 }
 
-function getUserEmail(e) {
-  var email = "";
-  try {
-    email = Session.getActiveUser().getEmail();
-  } catch (err) {}
-  
-  if (!email || email === "") {
-    try { email = e.user.email; } catch (err) {}
-  }
-  
-  if (!email || email === "") {
-    email = "Usuario no identificado (Ejecución vía Trigger)";
-  }
-  return email;
-}
-
-function getUserIdentityString(email) {
-  if (!email || email.indexOf("Usuario no identificado") !== -1) return email;
-  
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Usuarios');
-  if (!sheet) return email; // Fallback
-  
-  var data = sheet.getDataRange().getValues();
-  var headers = data[0];
-  
-  // Obtener índices de columnas por nombre
-  var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
-  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
-  var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
-  
-  // Si alguna columna no existe, retornar email como fallback
-  if (!colEmailIdx || !colUserIdIdx || !colNombreCortoIdx) return email;
-  
-  // Convertir a base-0 para acceso a array
-  colEmailIdx = colEmailIdx - 1;
-  colUserIdIdx = colUserIdIdx - 1;
-  colNombreCortoIdx = colNombreCortoIdx - 1;
-  
-  // Iterar saltando el encabezado (fila 1 / índice 0)
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][colEmailIdx] && data[i][colEmailIdx].toString().trim().toLowerCase() === email.toLowerCase()) {
-      return (data[i][colUserIdIdx] || "N/A") + " - " + (data[i][colNombreCortoIdx] || "N/A");
-    }
-  }
-  return email; // Fallback si el correo no está en la tabla
-}
-
 function logChange(tipoCambio, descripcion, userIdentity) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetLogs = ss.getSheetByName('Logs');
@@ -1799,7 +1787,7 @@ function logChange(tipoCambio, descripcion, userIdentity) {
   }
   
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
-  var user = userIdentity || Session.getActiveUser().getEmail(); // Usar parámetro con fallback adicional
+  var user = userIdentity || "Sistema";
   
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
   Logger.log("✓ " + tipoCambio + " registrado en Logs");
@@ -1913,7 +1901,7 @@ function abrirModalSubidaGeneral() {
  * @param {boolean} overwriteConfirmed - Indica si el usuario confirmó la sobrescritura del archivo existente
  * @returns {Object} Resultado de la operación
  */
-function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed, actingUserEmail) {
+function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed, actingUserId) {
   try {
     // Validación de seguridad: solo permitir PDF
     if (mimeType !== 'application/pdf') {
@@ -2073,8 +2061,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     }
 
     // Auditoría obligatoria
-    var userEmail = actingUserEmail || Session.getActiveUser().getEmail();
-    var userIdentity = getUserIdentityString(userEmail);
+    var userIdentity = getUserIdentityStringByUserId_(actingUserId);
     var logMessage = archivoReemplazado 
       ? "Se REEMPLAZÓ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado"
       : "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
@@ -2149,11 +2136,10 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
   }
 }
 
-function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUserEmail) {
+function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUserId) {
   try {
     var file = DriveApp.getFileById(fileId);
-    var userEmail = actingUserEmail || Session.getActiveUser().getEmail();
-    var userIdentity = getUserIdentityString(userEmail);
+    var userIdentity = getUserIdentityStringByUserId_(actingUserId);
     var logMessage = archivoReemplazado
       ? "Se REEMPLAZÓ el documento unificado final para la orden " + orderNo
       : "Se generó y guardó el documento unificado final para la orden " + orderNo;
@@ -2196,52 +2182,15 @@ function doGet(e) {
 
 /**
  * Verifica si un usuario está autorizado para realizar acciones de escritura.
- * Lee la hoja 'Usuarios' y comprueba si el email del usuario tiene un rol permitido ('ADMIN', 'QA', 'STANDARD').
- * @param {string} email - El correo electrónico del usuario a verificar.
+ * Lee la hoja 'Usuarios' y comprueba si el UserID tiene un rol permitido ('ADMIN', 'QA', 'STANDARD').
+ * @param {string} userId - El UserID del usuario a verificar.
  * @returns {boolean} - True si está autorizado, false en caso contrario.
  */
-function isUserAuthorized(email) {
-  if (!email) return false;
-
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var userSheet = ss.getSheetByName('Usuarios');
-    if (!userSheet) {
-      Logger.log("ADVERTENCIA: La hoja 'Usuarios' no existe. Denegando todas las acciones de escritura.");
-      return false;
-    }
-
-    var data = userSheet.getDataRange().getValues();
-    var headers = data[0];
-    
-    // Usar la función helper para encontrar columnas por nombre, insensible a mayúsculas/minúsculas
-    var emailColIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
-    var rolColIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
-    
-    if (!emailColIdx) {
-      Logger.log("ADVERTENCIA: La hoja 'Usuarios' no tiene la columna 'Email'. Denegando acceso.");
-      return false;
-    }
-    
-    // Convertir a índice base-0 para acceder al array
-    emailColIdx -= 1;
-    rolColIdx = rolColIdx ? rolColIdx - 1 : null;
-    
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][emailColIdx] && data[i][emailColIdx].toString().trim().toLowerCase() === email.toLowerCase()) {
-        if (rolColIdx === null) {
-          Logger.log("ADVERTENCIA: La hoja 'Usuarios' no tiene columna 'Rol'. Autorizando usuario listado por Email: " + email);
-          return true;
-        }
-        var userRole = data[i][rolColIdx] ? data[i][rolColIdx].toString().trim().toUpperCase() : "";
-        return userRole === 'ADMIN' || userRole === 'QA' || userRole === 'STANDARD';
-      }
-    }
-    return false; // Usuario no encontrado en la lista
-  } catch (e) {
-    Logger.log("Error en isUserAuthorized: " + e.message);
-    return false; // Denegar acceso en caso de error
-  }
+function isUserAuthorized(userId) {
+  var user = getUserRecordByUserId_(userId);
+  if (!user) return false;
+  if (!user.rol) return true;
+  return user.rol === 'ADMIN' || user.rol === 'QA' || user.rol === 'STANDARD';
 }
 
 function jsonResponse_(payload) {
@@ -2249,21 +2198,21 @@ function jsonResponse_(payload) {
 }
 
 function requireAuthorizedUser_(params) {
-  var callingUserEmail = params.userEmail || '';
-  if (!callingUserEmail) {
-    throw new Error('MISSING_USER_EMAIL: No se proporcionó userEmail en la solicitud.');
+  var callingUserId = params.userId || '';
+  if (!callingUserId) {
+    throw new Error('MISSING_USER_ID: No se proporcionó userId en la solicitud.');
   }
-  if (!isUserAuthorized(callingUserEmail)) {
-    throw new Error('ACCESS_DENIED: Acceso denegado para ' + callingUserEmail + '.');
+  if (!isUserAuthorized(callingUserId)) {
+    throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + callingUserId + '.');
   }
-  return callingUserEmail;
+  return callingUserId;
 }
 
 function handlePrivilegedOperation_(params) {
-  var callingUserEmail = requireAuthorizedUser_(params);
+  var callingUserId = requireAuthorizedUser_(params);
   var operation = params.operation || '';
   Logger.log("WebApp - Operación solicitada: " + operation);
-  Logger.log("WebApp - Usuario validado: " + callingUserEmail);
+  Logger.log("WebApp - UserID validado: " + callingUserId);
 
   if (operation === 'uploadDocument') {
     if (!params.base64Data || !params.mimeType || !params.fileName || !params.referenceNo || !params.docType) {
@@ -2272,7 +2221,7 @@ function handlePrivilegedOperation_(params) {
     if (params.mimeType !== 'application/pdf') {
       return { status: 'error', message: 'Solo se permiten archivos PDF.', diagnostic: 'INVALID_MIME_TYPE', receivedMimeType: params.mimeType };
     }
-    return procesarSubidaDocumentoCentral(params.base64Data, params.mimeType, params.fileName, params.referenceNo, params.docType, params.overwriteConfirmed || false, callingUserEmail);
+    return procesarSubidaDocumentoCentral(params.base64Data, params.mimeType, params.fileName, params.referenceNo, params.docType, params.overwriteConfirmed || false, callingUserId);
   }
 
   if (operation === 'saveFinalPDF') {
@@ -2295,7 +2244,7 @@ function handlePrivilegedOperation_(params) {
     if (!params.orderNo || !params.fileId) {
       return { status: 'error', message: 'Faltan parámetros requeridos para finalizar post-guardado.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
-    var finalizeMsg = finalizeFinalPdfPostSave(params.orderNo, params.fileId, params.archivoReemplazado || false, callingUserEmail);
+    var finalizeMsg = finalizeFinalPdfPostSave(params.orderNo, params.fileId, params.archivoReemplazado || false, callingUserId);
     return { status: 'success', message: finalizeMsg };
   }
 
@@ -2373,6 +2322,8 @@ function setWebAppUrl(url) {
   }
 
   PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', cleanUrl);
+  CacheService.getScriptCache().remove('initialData_v1');
+  CacheService.getScriptCache().remove('initialData_v2');
   Logger.log("WEB_APP_URL guardada correctamente: " + cleanUrl);
   return "WEB_APP_URL guardada correctamente.";
 }
