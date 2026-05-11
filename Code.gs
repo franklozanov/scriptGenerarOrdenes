@@ -2091,7 +2091,8 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var fileId = file.getId();
     
     var drivePreviewUrl = file.getUrl();
-    var viewerUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
+    var webAppUrl = getWebAppUrl();
+    var viewerUrl = webAppUrl + '?action=viewpdf&fileId=' + fileId;
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
     // Retornar URLs listas para abrir vista previa desde Drive
@@ -2133,13 +2134,31 @@ function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUse
 // --- FUNCIÓN doGet PARA SERVIR VISOR PDF ---
 
 /**
- * Sirve el visor de PDF cuando se accede a la Web App con parámetro fileId.
+ * Maneja las solicitudes GET a la Web App.
  * @param {Object} e - Objeto de evento
- * @returns {HtmlOutput} HTML del visor de PDF
+ * @returns {HtmlOutput|ContentService} HTML del visor de PDF o PDF directo
  */
 function doGet(e) {
   var fileId = e.parameter.fileId;
+  var action = e.parameter.action;
   
+  // Si action=viewpdf, servir el PDF directamente con headers inline
+  if (action === 'viewpdf' && fileId) {
+    try {
+      var file = DriveApp.getFileById(fileId);
+      var blob = file.getBlob();
+      
+      // Servir el PDF con Content-Disposition: inline para que se abra en el navegador
+      return ContentService.createTextOutput()
+        .setMimeType(ContentService.MimeType.PDF)
+        .setContent(blob.getBytes());
+    } catch (error) {
+      return ContentService.createTextOutput('Error al cargar el PDF: ' + error.message)
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+  }
+  
+  // Comportamiento original: mostrar visor HTML
   var html = HtmlService.createTemplateFromFile('PDFViewer')
     .evaluate()
     .setTitle('Visor de PDF')
