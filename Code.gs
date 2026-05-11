@@ -2091,7 +2091,7 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var fileId = file.getId();
     
     var drivePreviewUrl = file.getUrl();
-    var viewerUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
+    var viewerUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
     // Retornar URLs listas para abrir vista previa desde Drive

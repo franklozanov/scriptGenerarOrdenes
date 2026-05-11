@@ -657,7 +657,7 @@
 
       function openSavedPdfPreview(saveResult) {
         const viewerUrl = saveResult.viewerUrl
-          || ('https://drive.google.com/file/d/' + saveResult.fileId + '/preview');
+          || ('https://drive.google.com/uc?export=download&id=' + saveResult.fileId);
         const opened = window.open(viewerUrl, '_blank');
         if (!opened) {
           throw new Error('POPUP_BLOCKED:' + viewerUrl);
