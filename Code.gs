@@ -131,55 +131,6 @@ function promptInitializeApp() {
   });
 }
 
-
-
-// --- PROTECCIÓN AUTOMÁTICA CONTRA EDICIÓN MANUAL ---
-// NOTA: Esta función simple onEdit(e) será migrada a un disparador instalable onEditInstalled en Fase 2
-// Se mantiene comentada como referencia durante la transición
-
-/*
-function onEdit(e) {
-  if (!e) return;
-  
-  var user = Session.getActiveUser().getEmail();
-  var effectiveUser = Session.getEffectiveUser().getEmail();
-  
-  // Si el usuario que edita es el efectivo (admin/Web App), permitir
-  if (user === effectiveUser) return;
-  
-  var editedRange = e.range;
-  var sheet = editedRange.getSheet();
-  
-  // Obtener protecciones de hoja y rango
-  var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-  var rangeProtections = editedRange.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  
-  var allProtections = sheetProtections.concat(rangeProtections);
-  var shouldRevert = false;
-  var protectionDesc = "";
-  
-  // Verificar si el usuario puede editar según las protecciones reales
-  for (var i = 0; i < allProtections.length; i++) {
-    var protection = allProtections[i];
-    if (!protection.canEdit()) {
-      shouldRevert = true;
-      protectionDesc = protection.getDescription() || "protegido";
-      break;
-    }
-  }
-  
-  if (shouldRevert) {
-    // Revertir al valor anterior
-    editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
-      "⚠️ Edición no permitida",
-      5
-    );
-  }
-}
-*/
-
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
 
 var STATIC_TEMPLATE_KEYS_ = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
@@ -1677,7 +1628,13 @@ function onEditInstalled(e) {
     // Filtrar solo las protecciones que afectan a la celda editada
     var eRow = editedRange.getRow();
     var eCol = editedRange.getColumn();
-    
+
+    // Si quien editó es el propietario del script, permitir siempre (escrituras programáticas)
+    var effectiveOwner = Session.getEffectiveUser().getEmail();
+    var editingUser = "";
+    try { editingUser = Session.getActiveUser().getEmail(); } catch(eu) {}
+    if (effectiveOwner && editingUser && editingUser === effectiveOwner) return;
+
     for (var j = 0; j < allRangeProtections.length; j++) {
       var pRange = allRangeProtections[j].getRange();
       if (eRow >= pRange.getRow() && eRow <= pRange.getLastRow() &&
@@ -1791,17 +1748,6 @@ function logChange(tipoCambio, descripcion, userIdentity) {
   
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
   Logger.log("✓ " + tipoCambio + " registrado en Logs");
-}
-
-/**
- * Se ejecuta cuando el usuario cambia la selección en la hoja.
- * NOTA: La lógica de subida de archivos ha sido centralizada en el modal UploadCentralModal.html.
- * Esta función ya no maneja la apertura de modales de subida por fila.
- * @param {Object} e El objeto de evento de onSelectionChange.
- */
-function onSelectionChange(e) {
-  // Función vacía - la lógica de subida ha sido centralizada
-  // Se mantiene para compatibilidad con disparadores existentes
 }
 
 // --- FUNCIÓN PARA OBTENER LISTA DE ÓRDENES PENDIENTES ---
@@ -2073,6 +2019,23 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);
     return { status: 'error', message: "Error interno del servidor: " + e.message };
   }
+}
+
+// --- WRAPPERS PARA google.script.run (desde Index.html) ---
+
+function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  return saveFinalUnifiedPDF(base64Data, orderNo);
+}
+
+function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  return finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, userId);
+}
+
+function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
 
 // --- FUNCIÓN PARA GUARDAR PDF UNIFICADO FINAL ---
