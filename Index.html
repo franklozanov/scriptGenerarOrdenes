@@ -656,10 +656,8 @@
       }
 
       function openSavedPdfPreview(saveResult) {
-        const viewerUrl = saveResult.viewerUrl;
-        if (!viewerUrl) {
-          throw new Error('No se recibió URL del visor de PDF');
-        }
+        const viewerUrl = saveResult.viewerUrl
+          || ('https://drive.google.com/file/d/' + saveResult.fileId + '/view');
         const opened = window.open(viewerUrl, '_blank');
         if (!opened) {
           throw new Error('POPUP_BLOCKED:' + viewerUrl);
