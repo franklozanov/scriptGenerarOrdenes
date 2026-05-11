@@ -1268,11 +1268,127 @@ function removeLegacyProtections() {
   Logger.log("=== TOTAL: " + totalRemoved + " protecciones eliminadas ===");
 }
 
+function hideAllSheetsExcept(visibleSheetNames) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var allSheets = ss.getSheets();
+  
+  Logger.log("=== Ocultando hojas ===");
+  var hiddenCount = 0;
+  
+  for (var i = 0; i < allSheets.length; i++) {
+    var sheet = allSheets[i];
+    var sheetName = sheet.getName();
+    
+    // Si la hoja NO está en la lista de hojas visibles, ocultarla
+    if (visibleSheetNames.indexOf(sheetName) === -1) {
+      try {
+        sheet.hideSheet();
+        Logger.log("✓ Hoja ocultada: " + sheetName);
+        hiddenCount++;
+      } catch (e) {
+        Logger.log("✗ Error al ocultar hoja: " + sheetName + " - " + e.message);
+      }
+    } else {
+      // Asegurarse de que las hojas visibles estén mostradas
+      if (sheet.isSheetHidden()) {
+        sheet.showSheet();
+        Logger.log("✓ Hoja mostrada: " + sheetName);
+      }
+    }
+  }
+  
+  Logger.log("=== TOTAL: " + hiddenCount + " hojas ocultadas ===");
+}
+
+function ensureFolderPermissions() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tplSheet = ss.getSheetByName('templates');
+  
+  if (!tplSheet) {
+    Logger.log("⚠️ Hoja templates no existe");
+    return;
+  }
+  
+  var tplData = tplSheet.getDataRange().getValues();
+  var tplHeaders = tplData[0];
+  var folderKeys = ['DOC_ORDENES', 'DOC_ANALISIS', 'DOC_COMPLETO'];
+  var ownerEmail = Session.getEffectiveUser().getEmail();
+  
+  // Obtener índices de columnas
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+  var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+  
+  // Si alguna columna no existe, usar índices por defecto
+  if (!colClaveIdx) colClaveIdx = 1;
+  if (!colValorIdx) colValorIdx = 2;
+  
+  // Convertir a base-0 para acceso a array
+  colClaveIdx = colClaveIdx - 1;
+  colValorIdx = colValorIdx - 1;
+  
+  Logger.log("=== Verificando permisos de carpetas de Drive ===");
+  
+  for (var i = 1; i < tplData.length; i++) {
+    var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+    var folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+    
+    if (folderKeys.indexOf(key) !== -1 && folderId) {
+      try {
+        var folder = DriveApp.getFolderById(folderId);
+        
+        // Verificar si el propietario tiene acceso de escritura
+        var editors = folder.getEditors();
+        var hasAccess = false;
+        
+        for (var j = 0; j < editors.length; j++) {
+          if (editors[j].getEmail() === ownerEmail) {
+            hasAccess = true;
+            break;
+          }
+        }
+        
+        // Si el propietario es el dueño de la carpeta, también tiene acceso
+        try {
+          if (folder.getOwner().getEmail() === ownerEmail) {
+            hasAccess = true;
+          }
+        } catch (ownerError) {
+          // En algunos casos getOwner() puede fallar, continuar
+          Logger.log("⚠️ No se pudo verificar propietario de carpeta " + key);
+        }
+        
+        if (hasAccess) {
+          Logger.log("✓ Carpeta " + key + " (" + folderId + ") tiene permisos correctos");
+        } else {
+          Logger.log("⚠️ Carpeta " + key + " requiere permisos. Agregando editor...");
+          try {
+            folder.addEditor(ownerEmail);
+            Logger.log("✓ Permisos agregados a carpeta " + key);
+          } catch (addError) {
+            Logger.log("✗ No se pudo agregar editor a carpeta " + key + ": " + addError.message);
+          }
+        }
+        
+      } catch (e) {
+        Logger.log("✗ Error al verificar carpeta " + key + " (" + folderId + "): " + e.message);
+      }
+    }
+  }
+  
+  Logger.log("=== Verificación de permisos completada ===");
+}
+
 function applyNewProtectionScheme() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // Primero eliminar protecciones legacy
   removeLegacyProtections();
+  
+  // Ocultar todas las hojas excepto Ordenes y Logs
+  hideAllSheetsExcept(['Ordenes', 'Logs']);
+  
+  // Verificar y asegurar permisos de carpetas de Drive
+  ensureFolderPermissions();
   
   // Proteger hoja templates
   var sheetTemplates = ss.getSheetByName('templates');
@@ -1299,6 +1415,13 @@ function protectSheetFully(sheet, description) {
   var protection = sheet.protect().setDescription(description);
   protection.removeEditors(protection.getEditors());
   if (protection.canDomainEdit()) protection.setDomainEdit(false);
+  
+  // Agregar al propietario como editor para que el script pueda escribir
+  var ownerEmail = Session.getEffectiveUser().getEmail();
+  if (ownerEmail) {
+    protection.addEditor(ownerEmail);
+  }
+  
   Logger.log("✓ Hoja protegida completamente: " + sheet.getName());
 }
 
@@ -1337,6 +1460,12 @@ function configureOrdenesProtection() {
       // Eliminar editores para que solo el propietario/admin pueda editar
       proteccion.removeEditors(proteccion.getEditors());
       if (proteccion.canDomainEdit()) proteccion.setDomainEdit(false);
+      
+      // Agregar al propietario como editor para que el script pueda escribir
+      var ownerEmail = Session.getEffectiveUser().getEmail();
+      if (ownerEmail) {
+        proteccion.addEditor(ownerEmail);
+      }
       
       Logger.log("✓ Protección aplicada a columna: " + header);
     }
