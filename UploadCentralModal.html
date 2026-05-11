@@ -480,8 +480,8 @@
     var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     var globalPendingOrders = [];
     var rowCounter = 0;
-    var globalWebAppUrl = ''; // Variable para almacenar la URL de la Web App
-    var globalUserEmail = ''; // Email del usuario actual para autenticación
+    var globalWebAppUrl = '';
+    var globalUserEmail = '';
 
     var loadingOverlay = document.getElementById('loadingOverlay');
     var mainContent = document.getElementById('mainContent');
@@ -523,24 +523,15 @@
 
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
-      // Primero obtener datos iniciales (URL y userEmail)
       google.script.run
         .withSuccessHandler(function(data) {
           globalWebAppUrl = data.webAppUrl;
           globalUserEmail = data.userEmail;
-          console.log('✅ UploadModal - globalWebAppUrl:', globalWebAppUrl);
-          console.log('✅ UploadModal - globalUserEmail:', globalUserEmail);
-          if (!globalWebAppUrl) {
-            console.error("La URL de la Web App no pudo ser obtenida. La subida de archivos fallará.");
-          }
-          // Una vez obtenidos los datos, cargar el resto
           loadPendingOrders();
         })
         .withFailureHandler(function(error) {
-          console.error('Error CRÍTICO al obtener datos iniciales:', error.message);
-          globalWebAppUrl = '';
-          globalUserEmail = '';
-          loadPendingOrders();
+          loadingOverlay.classList.add('hidden');
+          alert('Error al obtener configuración inicial: ' + error.message);
         })
         .getInitialData();
     };
@@ -833,38 +824,41 @@
         var reader = new FileReader();
         
         reader.onload = function(e) {
-          // Usar la URL global que ya fue obtenida al cargar el modal
-          if (!globalWebAppUrl) {
-            reject(new Error('No se pudo obtener la URL de la Web App. Contacte al administrador.'));
-            return;
-          }
-
           var base64Data = e.target.result;
           var base64Content = base64Data.split(',')[1];
           
-          // Preparar datos para enviar a Web App
-          var payload = {
-            operation: 'uploadDocument',  // Especificar tipo de operación
-            base64Data: base64Content,
-            mimeType: file.type,
-            fileName: file.name,
-            referenceNo: referenceNo,
-            docType: docType,
-            overwriteConfirmed: overwriteConfirmed,
-            userEmail: globalUserEmail
-          };
-          
-          // Enviar a Web App usando fetch
+          if (!globalWebAppUrl) {
+            reject(new Error('URL de Web App no configurada. Ejecute setWebAppUrl con la URL del despliegue.'));
+            return;
+          }
+          if (!globalUserEmail) {
+            reject(new Error('No se pudo identificar el usuario activo.'));
+            return;
+          }
+
           fetch(globalWebAppUrl, {
             method: 'POST',
-            body: JSON.stringify(payload),
-            headers: {
-              'Content-Type': 'application/json'
-            }
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              operation: 'uploadDocument',
+              base64Data: base64Content,
+              mimeType: file.type,
+              fileName: file.name,
+              referenceNo: referenceNo,
+              docType: docType,
+              overwriteConfirmed: overwriteConfirmed,
+              userEmail: globalUserEmail
+            })
           })
-          .then(response => response.json())
-          .then(result => resolve(result))
-          .catch(error => reject(new Error('Error al comunicarse con la Web App: ' + error.message)));
+          .then(function(response) {
+            return response.json();
+          })
+          .then(function(result) {
+            resolve(result);
+          })
+          .catch(function(error) {
+            reject(new Error('Error al comunicarse con la Web App: ' + error.message));
+          });
         };
         
         reader.onerror = function() {

@@ -624,107 +624,65 @@
         };
       }
 
-      function saveFinalUnifiedPdfAsync(base64Data, orderNo) {
-        console.log('🔍 DEBUG - globalWebAppUrl:', globalWebAppUrl);
-        console.log('🔍 DEBUG - orderNo:', orderNo);
-        console.log('🔍 DEBUG - base64Data length:', base64Data.length);
-        
+      function callWebAppOperation(payload) {
         if (!globalWebAppUrl) {
-          console.error('❌ globalWebAppUrl está vacío');
           return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
         }
-        
-        console.log('🔗 Haciendo fetch a:', globalWebAppUrl);
-        
+        if (!globalUserEmail) {
+          return Promise.reject(new Error("No se pudo identificar el usuario activo."));
+        }
+
+        payload.userEmail = globalUserEmail;
         return fetch(globalWebAppUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'saveFinalPDF', base64Data: base64Data, orderNo: orderNo, userEmail: globalUserEmail })
+          body: JSON.stringify(payload)
         })
         .then(response => {
-          console.log('📡 Response status:', response.status, response.statusText);
           return response.json();
         })
         .then(result => {
-          console.log('📥 Result:', result);
           if (result.status === 'success') {
-            return result.data;
+            return result;
           } else {
-            throw new Error(result.message || 'Error desconocido al guardar el PDF.');
+            throw new Error(result.message || 'Error desconocido en Web App.');
           }
+        });
+      }
+
+      function saveFinalUnifiedPdfAsync(base64Data, orderNo) {
+        return callWebAppOperation({
+          operation: 'saveFinalPDF',
+          base64Data: base64Data,
+          orderNo: orderNo
         })
-        .catch(error => {
-          console.error('❌ Catch error:', error);
-          console.error('❌ Error message:', error.message);
-          throw error;
+        .then(result => {
+          return result.data;
         });
       }
 
       function updateTraceabilityAsync(orderNo, userId, totalPages, printType) {
-        console.log('🔍 DEBUG updateTraceability - globalWebAppUrl:', globalWebAppUrl);
-        console.log('🔍 DEBUG updateTraceability - params:', {orderNo, userId, totalPages, printType});
-        
-        if (!globalWebAppUrl) {
-          console.error('❌ updateTraceability - globalWebAppUrl está vacío');
-          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
-        }
-        
-        console.log('🔗 updateTraceability - Haciendo fetch a:', globalWebAppUrl);
-        
-        return fetch(globalWebAppUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'updateTraceability', orderNo: orderNo, userId: userId, pagesPrinted: totalPages, printType: printType, userEmail: globalUserEmail })
-        })
-        .then(response => {
-          console.log('📡 updateTraceability - Response status:', response.status, response.statusText);
-          return response.json();
+        return callWebAppOperation({
+          operation: 'updateTraceability',
+          orderNo: orderNo,
+          userId: userId,
+          pagesPrinted: totalPages,
+          printType: printType
         })
         .then(result => {
-          console.log('📥 updateTraceability - Result:', result);
-          if (result.status === 'success') {
-            return result.message;
-          } else {
-            throw new Error(result.message || 'Error desconocido al registrar trazabilidad.');
-          }
-        })
-        .catch(error => {
-          console.error('❌ updateTraceability - Catch error:', error);
-          throw error;
+          return result.message;
         });
       }
 
       function finalizeFinalPdfPostSaveAsync(orderNo, fileId, archivoReemplazado) {
-        console.log('🔍 DEBUG finalizeFinalPdf - globalWebAppUrl:', globalWebAppUrl);
-        console.log('🔍 DEBUG finalizeFinalPdf - params:', {orderNo, fileId, archivoReemplazado});
-        
-        if (!globalWebAppUrl) {
-          console.error('❌ finalizeFinalPdf - globalWebAppUrl está vacío');
-          return Promise.reject(new Error("URL del Web App no configurada. Inicialice la aplicación."));
-        }
-        
-        console.log('🔗 finalizeFinalPdf - Haciendo fetch a:', globalWebAppUrl);
-        
-        return fetch(globalWebAppUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ operation: 'finalizeFinalPdf', orderNo: orderNo, fileId: fileId, archivoReemplazado: archivoReemplazado, userEmail: globalUserEmail })
-        })
-        .then(response => {
-          console.log('📡 finalizeFinalPdf - Response status:', response.status, response.statusText);
-          return response.json();
+        return callWebAppOperation({
+          operation: 'finalizeFinalPdf',
+          orderNo: orderNo,
+          fileId: fileId,
+          archivoReemplazado: archivoReemplazado
         })
         .then(result => {
-          console.log('📥 finalizeFinalPdf - Result:', result);
-          if (result.status === 'success') {
-            return result.message;
-          } else {
-            throw new Error(result.message || 'Error desconocido al finalizar post-guardado.');
-          }
-        })
-        .catch(error => {
-          console.error('❌ finalizeFinalPdf - Catch error:', error);
-          throw error;
+          return result.message;
         });
       }
 

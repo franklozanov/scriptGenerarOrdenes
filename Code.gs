@@ -79,7 +79,7 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
 function onOpen() {
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
-    .addItem('🔧 Inicializar App', 'promptInitializeApp')
+    .addItem('� Inicializar Sistema Completo', 'promptInitializeApp')
     .addItem('🛡️ Aplicar Nuevo Esquema de Protección', 'promptApplyNewProtection')
     .addItem('▶️ Activar Auditoría', 'promptSetupAuditTrail');
 
@@ -128,8 +128,8 @@ function withAdminAuth(title, action) {
 
 
 function promptInitializeApp() {
-  withAdminAuth('Inicializar App (Admin)', function(ui) {
-    initializeApp(ui);
+  withAdminAuth('Inicializar Sistema Completo (Admin)', function(ui) {
+    initializeCompleteSystem(ui);
   });
 }
 
@@ -1093,6 +1093,94 @@ function initializeApp(ui) {
   }
 }
 
+function initializeCompleteSystem(ui) {
+  var summary = [];
+  try {
+    initializeWorkbookStructure_(ui);
+    summary.push("✓ Estructura de hojas validada/corregida");
+  } catch (e) {
+    summary.push("✗ Error en estructura: " + e.message);
+    throw e;
+  }
+
+  try {
+    ensureWebAppUrlConfigured_(ui);
+    summary.push("✓ URL de Web App configurada");
+  } catch (e) {
+    summary.push("✗ Error configurando Web App URL: " + e.message);
+    throw e;
+  }
+
+  try {
+    applyNewProtectionScheme();
+    summary.push("✓ Nuevo esquema de protección aplicado");
+  } catch (e) {
+    summary.push("✗ Error aplicando protecciones: " + e.message);
+    throw e;
+  }
+
+  try {
+    setupAuditTrailTrigger();
+    summary.push("✓ Auditoría activada/verificada");
+  } catch (e) {
+    summary.push("✗ Error activando auditoría: " + e.message);
+    throw e;
+  }
+
+  try {
+    logInitialization();
+  } catch (e) {
+    Logger.log("No se pudo registrar inicialización completa: " + e.message);
+  }
+
+  ui.alert("✅ Sistema inicializado completamente:\n\n" + summary.join("\n"));
+}
+
+function initializeWorkbookStructure_(ui) {
+  var report = validateStructure();
+  if (report.missingSheets.length > 0) {
+    createMissingSheets(ui);
+  }
+  if (report.incorrectHeaders.length > 0) {
+    fixHeaders(ui);
+  }
+}
+
+function ensureWebAppUrlConfigured_(ui) {
+  var currentUrl = "";
+  try {
+    currentUrl = ScriptApp.getService().getUrl();
+  } catch (e) {
+    Logger.log("No se pudo obtener URL automática de Web App: " + e.message);
+  }
+
+  if (currentUrl) {
+    setWebAppUrl(currentUrl);
+    return currentUrl;
+  }
+
+  var savedUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
+  var promptMessage = "No fue posible obtener automáticamente la URL del despliegue Web App.\n\n" +
+    "Pegue aquí la URL terminada en /exec para dejar la app lista:";
+
+  if (savedUrl) {
+    promptMessage += "\n\nURL guardada actualmente:\n" + savedUrl + "\n\nPuede presionar OK sin cambios para conservarla, o pegar una nueva.";
+  }
+
+  var response = ui.prompt("Configurar Web App URL", promptMessage, ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    throw new Error("Configuración de Web App URL cancelada por el usuario.");
+  }
+
+  var enteredUrl = response.getResponseText().trim();
+  if (!enteredUrl && savedUrl) {
+    return savedUrl;
+  }
+
+  setWebAppUrl(enteredUrl);
+  return enteredUrl;
+}
+
 function validateStructure() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var missingSheets = [];
@@ -1488,7 +1576,7 @@ function configureLogsProtection() {
   if (protection.canDomainEdit()) protection.setDomainEdit(false);
   
   // Agregar permiso de escritura para el script (propietario)
-  var ownerEmail = Session.getActiveUser().getEmail();
+  var ownerEmail = Session.getEffectiveUser().getEmail();
   if (ownerEmail) {
     protection.addEditor(ownerEmail);
     Logger.log("✓ Hoja Logs protegida con permisos de escritura para script");
@@ -1825,7 +1913,7 @@ function abrirModalSubidaGeneral() {
  * @param {boolean} overwriteConfirmed - Indica si el usuario confirmó la sobrescritura del archivo existente
  * @returns {Object} Resultado de la operación
  */
-function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed) {
+function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed, actingUserEmail) {
   try {
     // Validación de seguridad: solo permitir PDF
     if (mimeType !== 'application/pdf') {
@@ -1985,7 +2073,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     }
 
     // Auditoría obligatoria
-    var userEmail = Session.getActiveUser().getEmail();
+    var userEmail = actingUserEmail || Session.getActiveUser().getEmail();
     var userIdentity = getUserIdentityString(userEmail);
     var logMessage = archivoReemplazado 
       ? "Se REEMPLAZÓ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado"
@@ -2061,10 +2149,10 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
   }
 }
 
-function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado) {
+function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUserEmail) {
   try {
     var file = DriveApp.getFileById(fileId);
-    var userEmail = Session.getActiveUser().getEmail();
+    var userEmail = actingUserEmail || Session.getActiveUser().getEmail();
     var userIdentity = getUserIdentityString(userEmail);
     var logMessage = archivoReemplazado
       ? "Se REEMPLAZÓ el documento unificado final para la orden " + orderNo
@@ -2130,17 +2218,21 @@ function isUserAuthorized(email) {
     var emailColIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
     var rolColIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
     
-    if (emailColIdx === -1 || rolColIdx === -1) {
-      Logger.log("ADVERTENCIA: La hoja 'Usuarios' no tiene las columnas 'Email' y/o 'Rol'. Denegando acceso.");
+    if (!emailColIdx) {
+      Logger.log("ADVERTENCIA: La hoja 'Usuarios' no tiene la columna 'Email'. Denegando acceso.");
       return false;
     }
     
     // Convertir a índice base-0 para acceder al array
     emailColIdx -= 1;
-    rolColIdx -= 1;
+    rolColIdx = rolColIdx ? rolColIdx - 1 : null;
     
     for (var i = 1; i < data.length; i++) {
       if (data[i][emailColIdx] && data[i][emailColIdx].toString().trim().toLowerCase() === email.toLowerCase()) {
+        if (rolColIdx === null) {
+          Logger.log("ADVERTENCIA: La hoja 'Usuarios' no tiene columna 'Rol'. Autorizando usuario listado por Email: " + email);
+          return true;
+        }
         var userRole = data[i][rolColIdx] ? data[i][rolColIdx].toString().trim().toUpperCase() : "";
         return userRole === 'ADMIN' || userRole === 'QA' || userRole === 'STANDARD';
       }
@@ -2152,211 +2244,89 @@ function isUserAuthorized(email) {
   }
 }
 
-/**
- * Maneja solicitudes POST para operaciones de Drive con permisos de propietario.
- * Esta función se ejecuta como el propietario del script, no como el usuario que accede.
- * Soporta dos tipos de operaciones:
- * 1. Subida de documentos (procesarSubidaDocumentoCentral)
- * 2. Guardado de PDF final (saveFinalUnifiedPDF)
- * @param {Object} e - Objeto de evento con parámetros de la solicitud
- * @returns {ContentService} Respuesta JSON
- */
+function jsonResponse_(payload) {
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function requireAuthorizedUser_(params) {
+  var callingUserEmail = params.userEmail || '';
+  if (!callingUserEmail) {
+    throw new Error('MISSING_USER_EMAIL: No se proporcionó userEmail en la solicitud.');
+  }
+  if (!isUserAuthorized(callingUserEmail)) {
+    throw new Error('ACCESS_DENIED: Acceso denegado para ' + callingUserEmail + '.');
+  }
+  return callingUserEmail;
+}
+
+function handlePrivilegedOperation_(params) {
+  var callingUserEmail = requireAuthorizedUser_(params);
+  var operation = params.operation || '';
+  Logger.log("WebApp - Operación solicitada: " + operation);
+  Logger.log("WebApp - Usuario validado: " + callingUserEmail);
+
+  if (operation === 'uploadDocument') {
+    if (!params.base64Data || !params.mimeType || !params.fileName || !params.referenceNo || !params.docType) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para subir documento.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    if (params.mimeType !== 'application/pdf') {
+      return { status: 'error', message: 'Solo se permiten archivos PDF.', diagnostic: 'INVALID_MIME_TYPE', receivedMimeType: params.mimeType };
+    }
+    return procesarSubidaDocumentoCentral(params.base64Data, params.mimeType, params.fileName, params.referenceNo, params.docType, params.overwriteConfirmed || false, callingUserEmail);
+  }
+
+  if (operation === 'saveFinalPDF') {
+    if (!params.base64Data || !params.orderNo) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para guardar el PDF final.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    var saveResult = saveFinalUnifiedPDF(params.base64Data, params.orderNo);
+    return { status: 'success', message: 'PDF final guardado exitosamente para orden ' + params.orderNo, data: saveResult };
+  }
+
+  if (operation === 'updateTraceability') {
+    if (!params.orderNo || !params.userId || !params.pagesPrinted || !params.printType) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para actualizar trazabilidad.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    var traceMsg = internalUpdateTraceability(params.orderNo, params.userId, params.pagesPrinted, params.printType);
+    return { status: 'success', message: traceMsg };
+  }
+
+  if (operation === 'finalizeFinalPdf') {
+    if (!params.orderNo || !params.fileId) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para finalizar post-guardado.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    var finalizeMsg = finalizeFinalPdfPostSave(params.orderNo, params.fileId, params.archivoReemplazado || false, callingUserEmail);
+    return { status: 'success', message: finalizeMsg };
+  }
+
+  return {
+    status: 'error',
+    message: 'Operación no reconocida: ' + operation,
+    diagnostic: 'UNKNOWN_OPERATION',
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf']
+  };
+}
+
 function doPost(e) {
   try {
-    // Validar que se haya proporcionado el cuerpo de la solicitud
     if (!e || !e.postData) {
-      Logger.log("Error en doPost: No se recibieron datos en la solicitud");
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'error',
-        message: 'No se recibieron datos en la solicitud.',
-        diagnostic: 'MISSING_POST_DATA'
-      })).setMimeType(ContentService.MimeType.JSON);
+      return jsonResponse_({ status: 'error', message: 'No se recibieron datos en la solicitud.', diagnostic: 'MISSING_POST_DATA' });
     }
 
     var params;
     try {
       params = JSON.parse(e.postData.contents);
     } catch (parseError) {
-      Logger.log("Error en doPost al parsear JSON: " + parseError.message);
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'error',
-        message: 'Error al procesar los datos enviados. Formato JSON inválido.',
-        diagnostic: 'JSON_PARSE_ERROR',
-        details: parseError.message
-      })).setMimeType(ContentService.MimeType.JSON);
+      return jsonResponse_({ status: 'error', message: 'Error al procesar los datos enviados. Formato JSON inválido.', diagnostic: 'JSON_PARSE_ERROR', details: parseError.message });
     }
 
-    // --- CONTROL DE ACCESO BASADO EN ROLES (RBAC) ---
-    // El email del usuario debe venir en el payload porque Session.getActiveUser() no funciona con fetch
-    var callingUserEmail = params.userEmail || '';
-    if (!callingUserEmail) {
-      Logger.log("Error en doPost: No se proporcionó userEmail en el payload");
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'error',
-        message: 'Error de autenticación: no se pudo identificar al usuario.',
-        diagnostic: 'MISSING_USER_EMAIL'
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    if (!isUserAuthorized(callingUserEmail)) {
-      Logger.log("Acceso denegado para el usuario no autorizado: " + callingUserEmail);
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'error',
-        message: 'Acceso denegado. No tienes permiso para realizar esta acción.',
-        diagnostic: 'ACCESS_DENIED',
-        userEmail: callingUserEmail
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    Logger.log("✓ Usuario autorizado: " + callingUserEmail);
-    // --- FIN DE CONTROL DE ACCESO ---
-
-    // Determinar el tipo de operación basado en los parámetros
-    var operation = params.operation || '';
-    Logger.log("doPost - Operación solicitada: " + operation);
-    Logger.log("doPost - Usuario: " + callingUserEmail);
-
-    var result;
-
-    if (operation === 'uploadDocument') {
-      // Operación: Subida de documento (procesarSubidaDocumentoCentral)
-      var base64Data = params.base64Data;
-      var mimeType = params.mimeType;
-      var fileName = params.fileName;
-      var referenceNo = params.referenceNo;
-      var docType = params.docType;
-      var overwriteConfirmed = params.overwriteConfirmed || false;
-
-      Logger.log("doPost - Subida de documento: " + fileName + " para " + referenceNo);
-
-      // Validación de seguridad: solo permitir PDF
-      if (mimeType !== 'application/pdf') {
-        Logger.log("Error en doPost: Tipo MIME no permitido: " + mimeType);
-        return ContentService.createTextOutput(JSON.stringify({
-          status: 'error',
-          message: 'Solo se permiten archivos PDF.',
-          diagnostic: 'INVALID_MIME_TYPE',
-          receivedMimeType: mimeType
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      // Llamar a la función existente de procesamiento
-      result = procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed);
-
-    } else if (operation === 'saveFinalPDF') {
-      // Operación: Guardado de PDF final (saveFinalUnifiedPDF)
-      var base64Data = params.base64Data;
-      var orderNo = params.orderNo;
-
-      Logger.log("doPost - Guardado de PDF final para orden: " + orderNo);
-
-      // Validación de seguridad: verificar que se proporcionaron los datos necesarios
-      if (!base64Data || !orderNo) {
-        Logger.log("Error en doPost saveFinalPDF: Faltan parámetros requeridos");
-        return ContentService.createTextOutput(JSON.stringify({
-          status: 'error',
-          message: 'Faltan parámetros requeridos para guardar el PDF final.',
-          diagnostic: 'MISSING_REQUIRED_PARAMS',
-          provided: { base64Data: !!base64Data, orderNo: !!orderNo }
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      // Llamar a la función existente de guardado
-      try {
-        var saveResult = saveFinalUnifiedPDF(base64Data, orderNo);
-        result = { status: 'success', message: 'PDF final guardado exitosamente para orden ' + orderNo, data: saveResult };
-      } catch (saveError) {
-        Logger.log("Error en saveFinalUnifiedPDF dentro de doPost: " + saveError.message);
-        result = { 
-          status: 'error', 
-          message: "Error al guardar el PDF final: " + saveError.message,
-          diagnostic: 'SAVE_FINAL_PDF_ERROR',
-          details: saveError.message
-        };
-      }
-
-    } else if (operation === 'updateTraceability') {
-      // Operación: Actualizar trazabilidad (updateTraceability)
-      var orderNo = params.orderNo;
-      var userId = params.userId;
-      var pagesPrinted = params.pagesPrinted;
-      var printType = params.printType;
-
-      Logger.log("doPost - Actualizar trazabilidad para orden: " + orderNo);
-
-      if (!orderNo || !userId || !pagesPrinted || !printType) {
-        Logger.log("Error en doPost updateTraceability: Faltan parámetros");
-        return ContentService.createTextOutput(JSON.stringify({
-          status: 'error',
-          message: 'Faltan parámetros requeridos para actualizar trazabilidad.',
-          diagnostic: 'MISSING_REQUIRED_PARAMS'
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      try {
-        var msg = internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
-        result = { status: 'success', message: msg };
-      } catch (updateError) {
-        Logger.log("Error en internalUpdateTraceability dentro de doPost: " + updateError.message);
-        result = { 
-          status: 'error', 
-          message: "Error al actualizar trazabilidad: " + updateError.message,
-          diagnostic: 'UPDATE_TRACEABILITY_ERROR',
-          details: updateError.message
-        };
-      }
-
-    } else if (operation === 'finalizeFinalPdf') {
-      // Operación: Finalizar post-guardado de PDF (finalizeFinalPdfPostSave)
-      var orderNo = params.orderNo;
-      var fileId = params.fileId;
-      var archivoReemplazado = params.archivoReemplazado || false;
-
-      Logger.log("doPost - Finalizar post-guardado para orden: " + orderNo);
-
-      if (!orderNo || !fileId) {
-        Logger.log("Error en doPost finalizeFinalPdf: Faltan parámetros");
-        return ContentService.createTextOutput(JSON.stringify({
-          status: 'error',
-          message: 'Faltan parámetros requeridos para finalizar post-guardado.',
-          diagnostic: 'MISSING_REQUIRED_PARAMS'
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      try {
-        var msg = finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado);
-        result = { status: 'success', message: msg };
-      } catch (finalizeError) {
-        Logger.log("Error en finalizeFinalPdfPostSave dentro de doPost: " + finalizeError.message);
-        result = { 
-          status: 'error', 
-          message: "Error al finalizar post-guardado: " + finalizeError.message,
-          diagnostic: 'FINALIZE_PDF_ERROR',
-          details: finalizeError.message
-        };
-      }
-
-    } else {
-      Logger.log("Error en doPost: Operación no reconocida: " + operation);
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'error',
-        message: 'Operación no reconocida: ' + operation,
-        diagnostic: 'UNKNOWN_OPERATION',
-        supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf']
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    Logger.log("doPost - Resultado: " + result.status);
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-    
+    var result = handlePrivilegedOperation_(params);
+    Logger.log("WebApp - Resultado: " + result.status);
+    return jsonResponse_(result);
   } catch (error) {
     Logger.log("Error general en doPost: " + error.message);
     Logger.log("Stack trace: " + error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'error',
-      message: "Error interno del servidor: " + error.message,
-      diagnostic: 'INTERNAL_SERVER_ERROR',
-      stack: error.stack
-    })).setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse_({ status: 'error', message: error.message, diagnostic: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
