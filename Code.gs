@@ -1014,27 +1014,25 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   if (printType === "Reimpresion") {
     sheet.getRange(rowIndex, cols.STATUS).setValue("Reimpreso");
     
-    var currentReimpresion = sheet.getRange(rowIndex, cols.Reimpresion).getValue() || "";
-    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion ? currentReimpresion + ", " + pagesPrinted : pagesPrinted);
+    var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
+    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
     
     var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
     sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
   } else {
     sheet.getRange(rowIndex, cols.STATUS).setValue("Impreso");
     
-    var currentNoPags = sheet.getRange(rowIndex, cols.NoPags).getValue() || "";
-    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags ? currentNoPags + ", " + pagesPrinted : pagesPrinted);
+    var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
+    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
     
     var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
     sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry); 
   }
 
-  // Recalcular TotalPags leyendo los nuevos valores
-  var finalNoPagsStr = sheet.getRange(rowIndex, cols.NoPags).getValue() || "";
-  var finalReimpresionStr = sheet.getRange(rowIndex, cols.Reimpresion).getValue() || "";
-  
-  var total = sumCsv(finalNoPagsStr) + sumCsv(finalReimpresionStr);
-  sheet.getRange(rowIndex, cols.TotalPags).setValue(total);
+  // Recalcular TotalPags sumando los valores numéricos actuales
+  var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
+  var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
+  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
 
   return "Record updated successfully.";
 }
@@ -2082,7 +2080,7 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var fileId = file.getId();
     
     var drivePreviewUrl = file.getUrl();
-    var viewerUrl = drivePreviewUrl;
+    var viewerUrl = 'https://drive.google.com/file/d/' + fileId + '/preview';
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
     // Retornar URLs listas para abrir vista previa desde Drive

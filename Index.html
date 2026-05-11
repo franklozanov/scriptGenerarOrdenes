@@ -656,11 +656,11 @@
       }
 
       function openSavedPdfPreview(saveResult) {
-        const directUrl = 'https://drive.google.com/uc?export=view&id=' + saveResult.fileId;
-        const opened = window.open(directUrl, '_blank');
+        const viewerUrl = saveResult.viewerUrl
+          || ('https://drive.google.com/file/d/' + saveResult.fileId + '/preview');
+        const opened = window.open(viewerUrl, '_blank');
         if (!opened) {
-          const status = document.getElementById('status');
-          status.innerHTML = `✅ PDF guardado. <a href="${directUrl}" target="_blank">Abrir PDF</a>`;
+          throw new Error('POPUP_BLOCKED:' + viewerUrl);
         }
       }
 
@@ -962,61 +962,68 @@
           status.innerText = "🔄 Guardando en Drive y registrando impresión...";
 
           console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
+
+          // Paso 1: Guardar en Drive
           console.time('drive-save');
-          console.time('traceability-update');
-          const savePromise = saveFinalUnifiedPdfAsync(base64Data, orderNo, userId)
-            .then(saveResult => {
-              console.timeEnd('drive-save');
-              const normalizedResult = typeof saveResult === 'string'
-                ? { fileId: saveResult }
-                : saveResult;
-              openSavedPdfPreview(normalizedResult);
-              finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado, userId)
-                .catch(e => console.error('Error en finalizeFinalPdfPostSave:', e.message));
-              return normalizedResult;
-            })
-            .catch(e => {
-              console.timeEnd('drive-save');
-              console.error('Error en saveFinalUnifiedPDF:', e.message);
-              throw e;
-            });
-
-          const tracePromise = updateTraceabilityAsync(orderNo, userId, totalPages, printType)
-            .then(msg => {
-              console.timeEnd('traceability-update');
-              return msg;
-            })
-            .catch(e => {
-              console.timeEnd('traceability-update');
-              console.error('Error en updateTraceability:', e.message);
-              throw e;
-            });
-
-          const results = await Promise.allSettled([savePromise, tracePromise]);
-          const saveOutcome = results[0];
-          const traceOutcome = results[1];
-
-          if (saveOutcome.status === 'fulfilled' && traceOutcome.status === 'fulfilled') {
-            status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
-            status.className = "success-text";
-            document.getElementById('orderNo').value = '';
-            resetPreloadState();
-            setPreloadBanner('', '');
-            document.getElementById('orderNo').focus();
-            setTimeout(() => {
-              if (status.innerText.includes("Listo para la siguiente orden")) {
-                status.innerText = '';
-              }
-            }, 3000);
-          } else if (saveOutcome.status === 'fulfilled') {
-            status.innerText = "⚠️ PDF guardado en Drive, pero error al registrar: " + traceOutcome.reason.message;
+          let saveResult;
+          try {
+            saveResult = await saveFinalUnifiedPdfAsync(base64Data, orderNo, userId);
+            console.timeEnd('drive-save');
+          } catch (saveErr) {
+            console.timeEnd('drive-save');
+            console.error('Error en saveFinalUnifiedPDF:', saveErr.message);
+            status.innerText = "⚠️ Error al guardar PDF en Drive: " + saveErr.message;
             status.className = "error-text";
             btn.disabled = false;
-          } else {
-            status.innerText = "⚠️ Error al guardar PDF en Drive: " + saveOutcome.reason.message;
-            status.className = "error-text";
-            btn.disabled = false;
+            return;
           }
+
+          const normalizedResult = typeof saveResult === 'string'
+            ? { fileId: saveResult }
+            : saveResult;
+
+          // Paso 2: Abrir visualizador — si popup bloqueado, mostrar enlace y NO registrar impresión
+          try {
+            openSavedPdfPreview(normalizedResult);
+          } catch (previewErr) {
+            const url = previewErr.message.replace('POPUP_BLOCKED:', '');
+            status.innerHTML = '⚠️ PDF guardado en Drive, pero las ventanas emergentes están bloqueadas. '
+              + 'Habilítelas para que se registre la impresión. '
+              + '<a href="' + url + '" target="_blank">Abrir PDF</a>';
+            status.className = "error-text";
+            btn.disabled = false;
+            return;
+          }
+
+          // Paso 3: Log post-guardado (sin bloquear)
+          finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado, userId)
+            .catch(e => console.error('Error en finalizeFinalPdfPostSave:', e.message));
+
+          // Paso 4: Registrar trazabilidad solo si el PDF se abrió correctamente
+          console.time('traceability-update');
+          try {
+            await updateTraceabilityAsync(orderNo, userId, totalPages, printType);
+            console.timeEnd('traceability-update');
+          } catch (traceErr) {
+            console.timeEnd('traceability-update');
+            console.error('Error en updateTraceability:', traceErr.message);
+            status.innerText = "⚠️ PDF guardado y abierto, pero error al registrar impresión: " + traceErr.message;
+            status.className = "error-text";
+            btn.disabled = false;
+            return;
+          }
+
+          status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
+          status.className = "success-text";
+          document.getElementById('orderNo').value = '';
+          resetPreloadState();
+          setPreloadBanner('', '');
+          document.getElementById('orderNo').focus();
+          setTimeout(() => {
+            if (status.innerText.includes("Listo para la siguiente orden")) {
+              status.innerText = '';
+            }
+          }, 3000);
 
         } catch (pdfError) {
           alert("Error generando PDF: " + pdfError.message);
