@@ -1962,7 +1962,11 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     }
     
     // Leer consecutivo actual e incrementar
-    var currentConsecutivo = Number(sheet.getRange(rowIndex, colConsecutivo).getValue()) || 0;
+    var rawConsecutivo = sheet.getRange(rowIndex, colConsecutivo).getValue();
+    Logger.log('DEBUG: rawConsecutivo = ' + rawConsecutivo + ' (tipo: ' + typeof rawConsecutivo + ')');
+    
+    var currentConsecutivo = Number(rawConsecutivo);
+    Logger.log('DEBUG: currentConsecutivo después de Number() = ' + currentConsecutivo);
     
     // Validar que sea un número válido
     if (isNaN(currentConsecutivo) || currentConsecutivo < 0) {
@@ -1971,10 +1975,11 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     }
     
     var nextConsecutivo = currentConsecutivo + 1;
+    Logger.log('DEBUG: nextConsecutivo = ' + nextConsecutivo);
     
     // Validar que no exceda límite razonable
-    if (nextConsecutivo > 9999) {
-      throw new Error("El consecutivo de impresión excede el límite permitido (9999).");
+    if (isNaN(nextConsecutivo) || nextConsecutivo > 9999) {
+      throw new Error("El consecutivo de impresión es inválido o excede el límite permitido (9999). Valor actual: " + rawConsecutivo + ", siguiente: " + nextConsecutivo);
     }
     
     // Actualizar consecutivo en la hoja
