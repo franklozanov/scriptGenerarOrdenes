@@ -1204,61 +1204,117 @@
       }
 
       // --- Lógica para redimensionar el diálogo ---
-      const resizeHandle = document.getElementById('resize-handle');
-      let isResizing = false;
-      let startWidth, startHeight, startX, startY;
+      (function() {
+        const resizeHandle = document.getElementById('resize-handle');
+        let isResizing = false;
+        let startWidth = 0;
+        let startHeight = 0;
+        let startX = 0;
+        let startY = 0;
+        let rafId = null;
 
-      resizeHandle.addEventListener('mousedown', function(e) {
-        // Solo activar con clic izquierdo
-        if (e.button !== 0) return;
-        
-        isResizing = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        
-        // Obtener dimensiones actuales del diálogo
-        startWidth = window.innerWidth;
-        startHeight = window.innerHeight;
-        
-        // Añadir clase para feedback visual
-        document.body.style.cursor = 'nwse-resize';
-        document.body.style.userSelect = 'none';
-        resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%)';
-        
-        document.addEventListener('mousemove', onResizeMove);
-        document.addEventListener('mouseup', onResizeUp);
-        e.preventDefault();
-        e.stopPropagation();
-      });
+        function startResize(e) {
+          // Solo activar con clic izquierdo
+          if (e.button !== 0) return;
+          
+          // Prevenir múltiples activaciones
+          if (isResizing) return;
+          
+          isResizing = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          
+          // Obtener dimensiones actuales del diálogo
+          startWidth = window.innerWidth;
+          startHeight = window.innerHeight;
+          
+          // Añadir feedback visual
+          document.body.style.cursor = 'nwse-resize';
+          document.body.style.userSelect = 'none';
+          resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%)';
+          
+          // Añadir listeners
+          document.addEventListener('mousemove', handleResize, { passive: false });
+          document.addEventListener('mouseup', stopResize, { once: true });
+          
+          e.preventDefault();
+          e.stopPropagation();
+        }
 
-      function onResizeMove(e) {
-        if (!isResizing) return;
-        
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-        
-        const newWidth = Math.max(400, startWidth + deltaX);
-        const newHeight = Math.max(500, startHeight + deltaY);
-        
-        google.script.host.setWidth(newWidth);
-        google.script.host.setHeight(newHeight);
-        
-        e.preventDefault();
-      }
+        function handleResize(e) {
+          if (!isResizing) return;
+          
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Cancelar frame anterior si existe
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+          }
+          
+          // Usar requestAnimationFrame para suavizar
+          rafId = requestAnimationFrame(() => {
+            if (!isResizing) return;
+            
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            const newWidth = Math.max(400, Math.min(1200, startWidth + deltaX));
+            const newHeight = Math.max(500, Math.min(1000, startHeight + deltaY));
+            
+            try {
+              google.script.host.setWidth(newWidth);
+              google.script.host.setHeight(newHeight);
+            } catch (err) {
+              console.error('Error al redimensionar:', err);
+            }
+            
+            rafId = null;
+          });
+        }
 
-      function onResizeUp() {
-        if (!isResizing) return;
-        
-        isResizing = false;
-        
-        // Restaurar estilos normales
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #94a3b8 50%, #94a3b8 100%)';
-        
-        document.removeEventListener('mousemove', onResizeMove);
-        document.removeEventListener('mouseup', onResizeUp);
-      }
+        function stopResize(e) {
+          // Forzar detención inmediata
+          isResizing = false;
+          
+          // Cancelar cualquier frame pendiente
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          
+          // Restaurar estilos normales
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #94a3b8 50%, #94a3b8 100%)';
+          
+          // Remover listener de mousemove
+          document.removeEventListener('mousemove', handleResize);
+          
+          // Resetear variables
+          startX = 0;
+          startY = 0;
+          startWidth = 0;
+          startHeight = 0;
+          
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }
+
+        // Event listener principal
+        if (resizeHandle) {
+          resizeHandle.addEventListener('mousedown', startResize);
+          
+          // Seguridad adicional: detener en mouseleave del documento
+          document.addEventListener('mouseleave', function() {
+            if (isResizing) {
+              stopResize();
+            }
+          });
+        }
+      })();
     </script>
   </body>
 </html>
