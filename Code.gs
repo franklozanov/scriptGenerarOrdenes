@@ -84,6 +84,7 @@ function onOpen() {
   // 2. Menú de Configuración General
   var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
     .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
+    .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp')
     .addSeparator()
     .addSubMenu(adminMenu);
 
@@ -107,7 +108,7 @@ function onOpen() {
 function openPrintDialog() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
     .setWidth(550).setHeight(700).setTitle('Panel de Impresión');
-  SpreadsheetApp.getUi().showModelessDialog(html, 'Panel de Impresión');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
 }
 
 // --- SISTEMA DE SEGURIDAD Y BLOQUEO ---
@@ -987,6 +988,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
     NoPags: getColumnIndexByNameCaseInsensitive(headers, "NoPags", true),
     Reimpresion: getColumnIndexByNameCaseInsensitive(headers, "Reimpresion", true),
     TotalPags: getColumnIndexByNameCaseInsensitive(headers, "TotalPags", true),
+    ConsecutivoImp: getColumnIndexByNameCaseInsensitive(headers, "ConsecutivoImp", true),
     ImpresoPor: getColumnIndexByNameCaseInsensitive(headers, "ImpresoPor", true),
     ReimpresoPor: getColumnIndexByNameCaseInsensitive(headers, "Reimpreso", false) || getColumnIndexByNameCaseInsensitive(headers, "ReimpresoPor", true)
   };
@@ -997,8 +999,13 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 
   if (rowIndex === -1) throw new Error("Row lost during update.");
 
+  // === NUEVO: Leer consecutivo actual ===
+  var consecutivo = Number(sheet.getRange(rowIndex, cols.ConsecutivoImp).getValue()) || 0;
+  
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
-  var newEntry = nombreCorto + " " + timestamp + " (" + pagesPrinted + ")";
+  
+  // === MODIFICADO: Incluir consecutivo en el formato ===
+  var newEntry = consecutivo + "-" + nombreCorto + " " + timestamp + " (" + pagesPrinted + ")";
 
   // Helper para sumar CSVs (ej: "5, 2" -> 7)
   function sumCsv(csvString) {
@@ -1042,7 +1049,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 // Estructura esperada del libro de trabajo
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden', 'ConsecutivoImp', 'ImpresoPor'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
 };
@@ -1236,6 +1243,65 @@ function createMissingSheets(ui) {
   }
 }
 
+/**
+ * Verifica si existe la columna ConsecutivoImp y la crea si no existe.
+ * La inserta ANTES de la columna ImpresoPor.
+ * @param {Sheet} sheet - Hoja de Ordenes
+ * @returns {boolean} true si se creó la columna, false si ya existía
+ */
+function ensureConsecutivoImpColumn_(sheet) {
+  try {
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Verificar si ya existe (case-insensitive)
+    var colConsecutivoIdx = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', false);
+    
+    if (colConsecutivoIdx) {
+      Logger.log('✓ Columna ConsecutivoImp ya existe en posición ' + colConsecutivoIdx);
+      return false;
+    }
+    
+    // Buscar posición de ImpresoPor
+    var colImpresoIdx = getColumnIndexByNameCaseInsensitive(headers, 'ImpresoPor', false);
+    
+    if (!colImpresoIdx) {
+      // Si no existe ImpresoPor, agregar al final
+      var lastCol = sheet.getLastColumn();
+      sheet.insertColumnAfter(lastCol);
+      sheet.getRange(1, lastCol + 1).setValue('ConsecutivoImp');
+      Logger.log('✓ Columna ConsecutivoImp creada al final (columna ' + (lastCol + 1) + ')');
+    } else {
+      // Insertar ANTES de ImpresoPor
+      sheet.insertColumnBefore(colImpresoIdx);
+      sheet.getRange(1, colImpresoIdx).setValue('ConsecutivoImp');
+      Logger.log('✓ Columna ConsecutivoImp creada antes de ImpresoPor (columna ' + colImpresoIdx + ')');
+    }
+    
+    // Inicializar todas las filas existentes con valor 0
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      var newColIdx = getColumnIndexByNameCaseInsensitive(
+        sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0], 
+        'ConsecutivoImp', 
+        true
+      );
+      var range = sheet.getRange(2, newColIdx, lastRow - 1, 1);
+      var values = [];
+      for (var i = 0; i < lastRow - 1; i++) {
+        values.push([0]);
+      }
+      range.setValues(values);
+      Logger.log('✓ Inicializadas ' + (lastRow - 1) + ' filas con valor 0');
+    }
+    
+    return true;
+    
+  } catch (e) {
+    Logger.log('❌ Error en ensureConsecutivoImpColumn_: ' + e.message);
+    throw new Error('Error al verificar/crear columna ConsecutivoImp: ' + e.message);
+  }
+}
+
 function fixHeaders(ui) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
@@ -1243,6 +1309,20 @@ function fixHeaders(ui) {
     var sheet = ss.getSheetByName(sheetName);
     
     if (!sheet) continue;
+    
+    // === NUEVO: Verificar ConsecutivoImp en hoja Ordenes ===
+    if (sheetName === 'Ordenes') {
+      try {
+        var columnCreated = ensureConsecutivoImpColumn_(sheet);
+        if (columnCreated) {
+          Logger.log('✓ Columna ConsecutivoImp agregada a Ordenes');
+        }
+      } catch (e) {
+        Logger.log('⚠️ Error al verificar ConsecutivoImp: ' + e.message);
+        ui.alert('Error', 'No se pudo verificar/crear la columna ConsecutivoImp: ' + e.message, ui.ButtonSet.OK);
+      }
+    }
+    // === FIN NUEVO ===
     
     var expectedHeaders = REQUIRED_SHEETS[sheetName];
     var actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -1286,6 +1366,64 @@ function fixHeaders(ui) {
       sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
       Logger.log("✓ Encabezados corregidos en hoja: " + sheetName);
     }
+  }
+}
+
+/**
+ * Función de diagnóstico para verificar la columna ConsecutivoImp
+ */
+function diagnosticarConsecutivoImp() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert("❌ Hoja 'Ordenes' no encontrada");
+      return;
+    }
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colIdx = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', false);
+    
+    if (!colIdx) {
+      SpreadsheetApp.getUi().alert("❌ Columna 'ConsecutivoImp' no existe. Ejecute 'Inicializar Sistema Completo'.");
+      return;
+    }
+    
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      SpreadsheetApp.getUi().alert("✓ Columna 'ConsecutivoImp' en posición " + colIdx + "\n✓ No hay órdenes para verificar.");
+      return;
+    }
+    
+    var values = sheet.getRange(2, colIdx, lastRow - 1, 1).getValues();
+    var invalidCount = 0;
+    var maxConsecutivo = 0;
+    
+    for (var i = 0; i < values.length; i++) {
+      var val = Number(values[i][0]);
+      if (isNaN(val) || val < 0) {
+        invalidCount++;
+      } else if (val > maxConsecutivo) {
+        maxConsecutivo = val;
+      }
+    }
+    
+    var report = "✓ Columna 'ConsecutivoImp' en posición " + colIdx + "\n";
+    report += "✓ Total de órdenes: " + (lastRow - 1) + "\n";
+    report += "✓ Consecutivo máximo: " + maxConsecutivo + "\n";
+    
+    if (invalidCount > 0) {
+      report += "⚠️ Valores inválidos encontrados: " + invalidCount;
+    } else {
+      report += "✓ Todos los valores son válidos";
+    }
+    
+    Logger.log(report);
+    SpreadsheetApp.getUi().alert("Diagnóstico ConsecutivoImp\n\n" + report);
+    
+  } catch (e) {
+    SpreadsheetApp.getUi().alert("❌ Error en diagnóstico: " + e.message);
   }
 }
 
@@ -2066,18 +2204,60 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     }
     
     var folder = DriveApp.getFolderById(folderId);
-    var targetFileName = 'Orden_' + orderNo + '_Final.pdf'; 
-
-    // --- MEJORA DE ROBUSTEZ: MANEJO DE SOBRESCRITURA ---
-    // Busca si el archivo ya existe para manejar la sobrescritura de forma segura.
-    var existingFiles = folder.getFilesByName(targetFileName);
-    var archivoReemplazado = false;
-    while (existingFiles.hasNext()) {
-      var oldFile = existingFiles.next();
-      Logger.log("Sobrescribiendo archivo final existente: " + oldFile.getName() + ". Moviendo a la papelera.");
-      oldFile.setTrashed(true); // Envía el archivo antiguo a la papelera en lugar de borrarlo permanentemente.
-      archivoReemplazado = true;
+    
+    // --- OBTENER CONSECUTIVO DESDE LA HOJA ORDENES ---
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    if (!sheet) {
+      throw new Error("Sheet 'Ordenes' not found.");
     }
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Buscar columnas por nombre
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colConsecutivo = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', true);
+    
+    // Buscar fila de la orden
+    var orderValues = sheet.getRange(1, colNoOrden, sheet.getLastRow(), 1).getValues();
+    var rowIndex = -1;
+    var normalizedOrderNo = orderNo != null ? orderNo.toString().trim().toLowerCase() : "";
+    
+    for (var idx = 1; idx < orderValues.length; idx++) {
+      var rowOrderNo = orderValues[idx][0] != null ? orderValues[idx][0].toString().trim().toLowerCase() : "";
+      if (rowOrderNo === normalizedOrderNo) {
+        rowIndex = idx + 1;
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      throw new Error("No se encontró la orden " + orderNo + " en la hoja Ordenes.");
+    }
+    
+    // Leer consecutivo actual e incrementar
+    var currentConsecutivo = Number(sheet.getRange(rowIndex, colConsecutivo).getValue()) || 0;
+    
+    // Validar que sea un número válido
+    if (isNaN(currentConsecutivo) || currentConsecutivo < 0) {
+      Logger.log('⚠️ Consecutivo inválido detectado: ' + currentConsecutivo + '. Reiniciando a 0.');
+      currentConsecutivo = 0;
+    }
+    
+    var nextConsecutivo = currentConsecutivo + 1;
+    
+    // Validar que no exceda límite razonable
+    if (nextConsecutivo > 9999) {
+      throw new Error("El consecutivo de impresión excede el límite permitido (9999).");
+    }
+    
+    // Actualizar consecutivo en la hoja
+    sheet.getRange(rowIndex, colConsecutivo).setValue(nextConsecutivo);
+    
+    // Construir nombre de archivo
+    var targetFileName = 'Orden_' + orderNo + '_' + nextConsecutivo + '.pdf';
+    
+    Logger.log("Guardando versión #" + nextConsecutivo + ": " + targetFileName);
     
     // Decodificar base64 y crear el archivo
     var decodeStartedAt = new Date().getTime();
@@ -2094,12 +2274,13 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var viewerUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
-    // Retornar URLs listas para abrir vista previa desde Drive
+    // Retornar URLs y consecutivo
     return {
       fileId: fileId,
       drivePreviewUrl: drivePreviewUrl,
       viewerUrl: viewerUrl,
-      archivoReemplazado: archivoReemplazado
+      archivoReemplazado: false,
+      consecutivo: nextConsecutivo
     };
     
   } catch (e) {
