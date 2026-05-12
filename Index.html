@@ -17,10 +17,10 @@
       .card { 
         background: white; 
         padding: 20px; 
-        border-radius: 0 0 12px 12px; 
+        border-radius: 12px; 
         box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
         position: absolute;
-        top: 30px;
+        top: 0;
         left: 0;
         right: 0;
         bottom: 0;
@@ -50,41 +50,6 @@
       }
       @media (min-width: 600px) {
         .card { padding: 32px; }
-      }
-
-      #drag-handle {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 30px;
-        background-color: #1976d2;
-        color: white;
-        cursor: move;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 12px;
-        user-select: none;
-        box-sizing: border-box;
-        z-index: 9999;
-        font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
-      }
-
-      #drag-handle-title {
-        font-weight: 500;
-        font-size: 14px;
-      }
-
-      #drag-handle-close {
-        font-size: 22px;
-        cursor: pointer;
-        font-weight: bold;
-        line-height: 1;
-      }
-
-      #drag-handle-close:hover {
-        color: #ffcdd2;
       }
 
       #resize-handle {
@@ -460,10 +425,6 @@
     </style>
   </head>
   <body>
-    <div id="drag-handle">
-      <div id="drag-handle-title">Panel de Impresión</div>
-      <div id="drag-handle-close" onclick="google.script.host.close()">×</div>
-    </div>
     <div id="resize-handle"></div>
     <div class="card">
       <div id="loader">
@@ -1242,40 +1203,15 @@
         processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
       }
 
-      // --- Lógica para hacer el diálogo arrastrable ---
-      const dragHandle = document.getElementById('drag-handle');
-      let offsetX, offsetY;
-
-      dragHandle.addEventListener('mousedown', function(e) {
-        offsetX = e.clientX;
-        offsetY = e.clientY;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-      });
-
-      function onMouseMove(e) {
-        const dx = e.clientX - offsetX;
-        const dy = e.clientY - offsetY;
-        
-        // Actualizar las coordenadas de referencia para el próximo movimiento
-        offsetX = e.clientX;
-        offsetY = e.clientY;
-        
-        // Mover la ventana usando la API de Google Apps Script
-        google.script.host.moveBy(dx, dy);
-      }
-
-      function onMouseUp() {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-      }
-
       // --- Lógica para redimensionar el diálogo ---
       const resizeHandle = document.getElementById('resize-handle');
       let isResizing = false;
       let startWidth, startHeight, startX, startY;
 
       resizeHandle.addEventListener('mousedown', function(e) {
+        // Solo activar con clic izquierdo
+        if (e.button !== 0) return;
+        
         isResizing = true;
         startX = e.clientX;
         startY = e.clientY;
@@ -1284,9 +1220,15 @@
         startWidth = window.innerWidth;
         startHeight = window.innerHeight;
         
+        // Añadir clase para feedback visual
+        document.body.style.cursor = 'nwse-resize';
+        document.body.style.userSelect = 'none';
+        resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%)';
+        
         document.addEventListener('mousemove', onResizeMove);
         document.addEventListener('mouseup', onResizeUp);
         e.preventDefault();
+        e.stopPropagation();
       });
 
       function onResizeMove(e) {
@@ -1300,10 +1242,20 @@
         
         google.script.host.setWidth(newWidth);
         google.script.host.setHeight(newHeight);
+        
+        e.preventDefault();
       }
 
       function onResizeUp() {
+        if (!isResizing) return;
+        
         isResizing = false;
+        
+        // Restaurar estilos normales
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #94a3b8 50%, #94a3b8 100%)';
+        
         document.removeEventListener('mousemove', onResizeMove);
         document.removeEventListener('mouseup', onResizeUp);
       }
