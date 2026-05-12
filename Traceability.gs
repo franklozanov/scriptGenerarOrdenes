@@ -187,10 +187,10 @@ function onEditInstalled(e) {
           var numNewValue = Number(newValue);
           if (numNewValue > 0) {
             var rowIdx = editedRange.getRow();
-            var cantDispAFechaColIdx = headers.indexOf('CantDispAFecha');
+            var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
             
-            if (cantDispAFechaColIdx !== -1) {
-              sheet.getRange(rowIdx, cantDispAFechaColIdx + 1).setValue(numNewValue);
+            if (cantDispAFechaCol) {
+              sheet.getRange(rowIdx, cantDispAFechaCol).setValue(numNewValue);
               logChange(
                 'AUTO_COPY_VERIFCANT', 
                 'Copiado automáticamente ' + numNewValue + ' de "VerifCant. Disponible" a "CantDispAFecha" en fila ' + rowIdx, 
@@ -208,20 +208,20 @@ function onEditInstalled(e) {
         }
       }
 
-      var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-      var colOrdenIdx = headers.indexOf('NoOrden') + 1;
+      var colAdjuntoCol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOrden', false);
+      var colOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
 
-      if (colOrdenIdx > 0 && editedRange.getColumn() === colOrdenIdx) {
+      if (colOrdenCol && editedRange.getColumn() === colOrdenCol) {
         var rowIdx = editedRange.getRow();
-        var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoIdx).getValue();
+        var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoCol).getValue();
         var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
         
         if (adjuntoStr === "✅ Cargado") {
           var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
           var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
           
-          sheet.getRange(rowIdx, colAdjuntoIdx).setValue("Pendiente");
-          sheet.getRange(rowIdx, colAdjuntoIdx).clearNote();
+          sheet.getRange(rowIdx, colAdjuntoCol).setValue("Pendiente");
+          sheet.getRange(rowIdx, colAdjuntoCol).clearNote();
           
           logChange('RESET_CARGA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado devuelto a Pendiente.', userIdentity);
           SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. El estado del adjunto ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
@@ -229,7 +229,7 @@ function onEditInstalled(e) {
         }
         
         if (adjuntoStr === "" && e.value !== undefined && e.value !== "") {
-          sheet.getRange(rowIdx, colAdjuntoIdx).setValue("Pendiente");
+          sheet.getRange(rowIdx, colAdjuntoCol).setValue("Pendiente");
           logChange('ASIGNACION_PENDIENTE', 'NoOrden asignado. Estado de AdjuntoOrden establecido a Pendiente.', userIdentity);
           return;
         }

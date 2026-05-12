@@ -22,8 +22,7 @@ function onOpen() {
   // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();
-    // TEMPORALMENTE DESHABILITADO: syncVerifCantDisponible() causa sobrescritura de encabezados
-    // syncVerifCantDisponible();
+    syncVerifCantDisponible();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Plantillas estáticas listas.', 'Sistema QMS', 5);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
@@ -48,15 +47,16 @@ function syncVerifCantDisponible() {
 
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    var verifCantIdx = headers.indexOf('VerifCant. Disponible');
-    var cantDispIdx = headers.indexOf('CantDispAFecha');
+    // CORREGIDO: Usar getColumnIndexByNameCaseInsensitive (devuelve base-1)
+    var verifCantCol = getColumnIndexByNameCaseInsensitive(headers, 'VerifCant. Disponible', false);
+    var cantDispCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
 
-    if (verifCantIdx === -1) {
+    if (!verifCantCol) {
       Logger.log("syncVerifCantDisponible: Columna 'VerifCant. Disponible' no encontrada.");
       return;
     }
     
-    if (cantDispIdx === -1) {
+    if (!cantDispCol) {
       Logger.log("syncVerifCantDisponible: Columna 'CantDispAFecha' no encontrada.");
       return;
     }
@@ -66,8 +66,8 @@ function syncVerifCantDisponible() {
     var updates = [];
 
     for (var i = 0; i < values.length; i++) {
-      var verifCantValue = values[i][verifCantIdx];
-      var cantDispValue = values[i][cantDispIdx];
+      var verifCantValue = values[i][verifCantCol - 1]; // -1 para acceso a array base-0
+      var cantDispValue = values[i][cantDispCol - 1];
 
       // Si VerifCant. Disponible es un número >= 0 (no "-")
       if (verifCantValue !== '-' && verifCantValue !== '' && !isNaN(verifCantValue)) {
@@ -87,7 +87,7 @@ function syncVerifCantDisponible() {
     if (updates.length > 0) {
       Logger.log("syncVerifCantDisponible: Actualizando " + updates.length + " filas.");
       updates.forEach(function(update) {
-        sheet.getRange(update.row, cantDispIdx + 1).setValue(update.value);
+        sheet.getRange(update.row, cantDispCol).setValue(update.value); // cantDispCol ya es base-1
       });
       SpreadsheetApp.getActiveSpreadsheet().toast(
         'Se sincronizaron ' + updates.length + ' valores de Cantidad Disponible.', 
@@ -375,10 +375,10 @@ function fetchOrderData(orderNo) {
   var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
   
   // --- VALIDACIÓN DE STATUS PARA IMPRESIÓN ---
-  var colStatusIdx = headers.indexOf('STATUS');
+  var colStatusCol = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
   var statusValue = "";
-  if (colStatusIdx !== -1) {
-    statusValue = targetRowData[colStatusIdx] ? targetRowData[colStatusIdx].toString().trim() : "";
+  if (colStatusCol) {
+    statusValue = targetRowData[colStatusCol - 1] ? targetRowData[colStatusCol - 1].toString().trim() : "";
   }
   
   // Bloquear impresión si STATUS es RecibidaQA, DevueltaQA o Cerrada
@@ -394,13 +394,13 @@ function fetchOrderData(orderNo) {
         var userData = userSheet.getDataRange().getValues();
         if (userData.length >= 2) {
           var userHeaders = userData[0];
-          var colEmailIdx = userHeaders.indexOf('Email');
-          var colUserIdIdx = userHeaders.indexOf('UserID');
-          if (colEmailIdx !== -1 && colUserIdIdx !== -1) {
+          var colEmailCol = getColumnIndexByNameCaseInsensitive(userHeaders, 'Email', false);
+          var colUserIdCol = getColumnIndexByNameCaseInsensitive(userHeaders, 'UserID', false);
+          if (colEmailCol && colUserIdCol) {
             for (var u = 1; u < userData.length; u++) {
-              var userEmail = userData[u][colEmailIdx] ? userData[u][colEmailIdx].toString().trim() : "";
+              var userEmail = userData[u][colEmailCol - 1] ? userData[u][colEmailCol - 1].toString().trim() : "";
               if (userEmail === currentUser) {
-                userId = userData[u][colUserIdIdx] ? userData[u][colUserIdIdx].toString().trim() : "";
+                userId = userData[u][colUserIdCol - 1] ? userData[u][colUserIdCol - 1].toString().trim() : "";
                 break;
               }
             }
@@ -441,9 +441,9 @@ function fetchOrderData(orderNo) {
   var noAnalisisStr = "";
   
   fieldNames.forEach(function(name) {
-    var hIdx = headers.indexOf(name);
-    if (hIdx !== -1) {
-      var val = targetRowData[hIdx];
+    var hCol = getColumnIndexByNameCaseInsensitive(headers, name, false);
+    if (hCol) {
+      var val = targetRowData[hCol - 1];
       if (name === "NoAnalisis" && val != null) noAnalisisStr = val.toString().trim();
       
       if (val instanceof Date) {
@@ -555,9 +555,9 @@ function preparePrintPayload(orderNo, templateConfig) {
   var noAnalisisStr = "";
   
   fieldNames.forEach(function(name) {
-    var hIdx = headers.indexOf(name);
-    if (hIdx !== -1) {
-      var val = targetRowData[hIdx];
+    var hCol = getColumnIndexByNameCaseInsensitive(headers, name, false);
+    if (hCol) {
+      var val = targetRowData[hCol - 1];
       if (name === "NoAnalisis" && val != null) noAnalisisStr = val.toString().trim();
       
       if (val instanceof Date) {
@@ -1457,13 +1457,9 @@ function getPendingOrdersList() {
     }
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var colNoOrdenIdx = headers.indexOf('NoOrden') + 1;
-    var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
-    var colNoAnalisisIdx = headers.indexOf('NoAnalisis') + 1;
-    
-    if (colNoOrdenIdx === 0 || colAdjuntoIdx === 0) {
-      throw new Error("No se encontraron las columnas 'NoOrden' y/o 'AdjuntoOrden'.");
-    }
+    var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colAdjuntoCol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOrden', true);
+    var colNoAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
     
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) {
@@ -1478,9 +1474,9 @@ function getPendingOrdersList() {
     var analisis = [];
     
     for (var i = 0; i < data.length; i++) {
-      var noOrden = data[i][colNoOrdenIdx - 1];
-      var adjuntoEstado = data[i][colAdjuntoIdx - 1];
-      var noAnalisis = colNoAnalisisIdx > 0 ? data[i][colNoAnalisisIdx - 1] : null;
+      var noOrden = data[i][colNoOrdenCol - 1];
+      var adjuntoEstado = data[i][colAdjuntoCol - 1];
+      var noAnalisis = colNoAnalisisCol ? data[i][colNoAnalisisCol - 1] : null;
       
       // Manejo seguro de valores nulos o indefinidos
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
@@ -1550,24 +1546,20 @@ function getOrdenesParaNovedad() {
 
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    var colNoOrdenIdx = headers.indexOf('NoOrden');
-    var colCodigoIdx = headers.indexOf('Codigo');
-    var colTotalPagsIdx = headers.indexOf('TotalPags');
-    var colStatusIdx = headers.indexOf('STATUS');
-
-    if (colNoOrdenIdx === -1 || colCodigoIdx === -1) {
-      throw new Error("No se encontraron las columnas 'NoOrden' y/o 'Codigo' en la hoja Ordenes.");
-    }
+    var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colCodigoCol = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', true);
+    var colTotalPagsCol = getColumnIndexByNameCaseInsensitive(headers, 'TotalPags', false);
+    var colStatusCol = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
 
     var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     var values = dataRange.getValues();
     var ordenes = [];
 
     for (var i = 0; i < values.length; i++) {
-      var noOrden = values[i][colNoOrdenIdx];
-      var codigo = values[i][colCodigoIdx];
-      var status = colStatusIdx !== -1 ? values[i][colStatusIdx] : "";
-      var totalPags = colTotalPagsIdx !== -1 ? values[i][colTotalPagsIdx] : 0;
+      var noOrden = values[i][colNoOrdenCol - 1];
+      var codigo = values[i][colCodigoCol - 1];
+      var status = colStatusCol ? values[i][colStatusCol - 1] : "";
+      var totalPags = colTotalPagsCol ? values[i][colTotalPagsCol - 1] : 0;
 
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
       var codigoStr = codigo ? codigo.toString().trim() : "";
@@ -1619,10 +1611,10 @@ function procesarRegistroNovedad(params, userId) {
     }
 
     var headersOrdenes = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
-    var colNoOrdenIdx = headersOrdenes.indexOf('NoOrden');
-    var colStatusIdx = headersOrdenes.indexOf('STATUS');
+    var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoOrden', false);
+    var colStatusCol = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
 
-    if (colNoOrdenIdx === -1 || colStatusIdx === -1) {
+    if (!colNoOrdenCol || !colStatusCol) {
       return { status: 'error', message: 'No se encontraron las columnas NoOrden y/o STATUS en Ordenes.' };
     }
 
@@ -1631,7 +1623,7 @@ function procesarRegistroNovedad(params, userId) {
     var filaEncontrada = -1;
 
     for (var i = 0; i < valuesOrdenes.length; i++) {
-      var rowNoOrden = valuesOrdenes[i][colNoOrdenIdx];
+      var rowNoOrden = valuesOrdenes[i][colNoOrdenCol - 1];
       var rowNoOrdenStr = rowNoOrden ? rowNoOrden.toString().trim() : "";
       if (rowNoOrdenStr === noOrden) {
         filaEncontrada = i + 2; // +2 por header y base-1
@@ -1644,7 +1636,7 @@ function procesarRegistroNovedad(params, userId) {
     }
 
     // Actualizar STATUS
-    sheetOrdenes.getRange(filaEncontrada, colStatusIdx + 1).setValue(nuevoStatus);
+    sheetOrdenes.getRange(filaEncontrada, colStatusCol).setValue(nuevoStatus);
 
     // Insertar registro en hoja RegistroNovedad
     var sheetRegistro = ss.getSheetByName('RegistroNovedad');
