@@ -208,6 +208,10 @@ function fetchOrderData(orderNo) {
 
   var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
   
+  // Declarar arrays de errores y PDFs al inicio
+  var errors = [];
+  var dynamicPdfs = [];
+  
   // --- VALIDACIÓN DE STATUS PARA IMPRESIÓN ---
   var colStatusCol = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
   var statusValue = "";
@@ -288,9 +292,6 @@ function fetchOrderData(orderNo) {
       }
     }
   });
-
-  var dynamicPdfs = [];
-  var errors = [];
 
   try {
     var orderFile = findOrderPdfInFolder(printConfig.DOC_ORDENES, orderNo);
