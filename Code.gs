@@ -103,79 +103,10 @@ function syncVerifCantDisponible() {
   }
 }
 
-function openPrintDialog() {
-  var html = HtmlService.createHtmlOutputFromFile('Index')
-    .setWidth(550).setHeight(700).setTitle('Panel de Impresión');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
-}
-
 function promptInitializeApp() {
   withAdminAuth('Inicializar Sistema Completo (Admin)', function(ui) {
     initializeCompleteSystem(ui);
   });
-}
-
-// --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
-
-
-function getPrintConfig_() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('printConfig_v1');
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (e) {
-      Logger.log("Error parsing printConfig_v1: " + e.message);
-    }
-  }
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tplSheet = ss.getSheetByName('templates');
-  if (!tplSheet) throw new Error("La hoja 'templates' no existe.");
-  var tplData = tplSheet.getDataRange().getValues();
-  var tplHeaders = tplData[0];
-  var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
-  var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
-  if (!colClaveIdx) colClaveIdx = 1;
-  if (!colValorIdx) colValorIdx = 2;
-  colClaveIdx = colClaveIdx - 1;
-  colValorIdx = colValorIdx - 1;
-
-  var config = {
-    DOC_ORDENES: "",
-    DOC_ANALISIS: "",
-    DOC_COMPLETO: "",
-    coords: {
-      "Fabricante": { x: 450, y: 585 },
-      "Exp":        { x: 360, y: 495 },
-      "NoAnalisis": { x: 155, y: 385 }
-    }
-  };
-
-  function parseXY(str) {
-    var matchX = str.match(/x:\s*([0-9.]+)/i);
-    var matchY = str.match(/y:\s*([0-9.]+)/i);
-    return { x: matchX ? parseFloat(matchX[1]) : 0, y: matchY ? parseFloat(matchY[1]) : 0 };
-  }
-
-  for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
-    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
-    if (k === "DOC_ORDENES") config.DOC_ORDENES = v;
-    if (k === "DOC_ANALISIS") config.DOC_ANALISIS = v;
-    if (k === "DOC_COMPLETO") config.DOC_COMPLETO = v;
-    if (k === "COORD_FABRICANTE" && v) config.coords["Fabricante"] = parseXY(v);
-    if (k === "COORD_EXP" && v) config.coords["Exp"] = parseXY(v);
-    if (k === "COORD_NoANALISIS" && v) config.coords["NoAnalisis"] = parseXY(v);
-  }
-
-  try {
-    cache.put('printConfig_v1', JSON.stringify(config), 21600);
-  } catch (e) {
-    Logger.log("Error caching printConfig_v1: " + e.message);
-  }
-
-  return config;
 }
 
 
@@ -1269,23 +1200,6 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);
     return { status: 'error', message: "Error interno del servidor: " + e.message };
   }
-}
-
-// --- WRAPPERS PARA google.script.run (desde Index.html) ---
-
-function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId) {
-  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
-  return saveFinalUnifiedPDF(base64Data, orderNo);
-}
-
-function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
-  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
-  return finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, userId);
-}
-
-function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
-  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
-  return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
 
 // --- FUNCIÓN PARA GUARDAR PDF UNIFICADO FINAL ---

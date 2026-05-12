@@ -3,13 +3,99 @@
  * 
  * Módulo de lógica de impresión de órdenes.
  * Contiene funciones para:
+ * - Apertura de diálogo de impresión
+ * - Configuración de impresión (con caché)
  * - Búsqueda de PDFs en carpetas de Drive
  * - Obtención de datos de órdenes para impresión
  * - Preparación de payload de impresión
  * - Guardado y finalización de PDFs unificados
+ * - Wrappers de autenticación para llamadas desde cliente
  * 
- * FASE 3 - Batch 3.4: Print Logic
+ * FASE 4 - Batch 4.1: Print Logic (Completado)
  */
+
+// --- UI: APERTURA DE DIÁLOGO ---
+
+/**
+ * Abre el modal de impresión de órdenes.
+ * Muestra el panel Index.html con las opciones de impresión.
+ */
+function openPrintDialog() {
+  var html = HtmlService.createHtmlOutputFromFile('Index')
+    .setWidth(550).setHeight(700).setTitle('Panel de Impresión');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
+}
+
+// --- CONFIGURACIÓN DE IMPRESIÓN ---
+
+/**
+ * Obtiene la configuración de impresión desde la hoja templates.
+ * Utiliza caché para optimizar rendimiento (21600 segundos = 6 horas).
+ * 
+ * @returns {Object} Configuración con IDs de carpetas y coordenadas de campos
+ * @private
+ */
+function getPrintConfig_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('printConfig_v1');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      Logger.log("Error parsing printConfig_v1: " + e.message);
+    }
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tplSheet = ss.getSheetByName('templates');
+  if (!tplSheet) throw new Error("La hoja 'templates' no existe.");
+  var tplData = tplSheet.getDataRange().getValues();
+  var tplHeaders = tplData[0];
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+  var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+  if (!colClaveIdx) colClaveIdx = 1;
+  if (!colValorIdx) colValorIdx = 2;
+  colClaveIdx = colClaveIdx - 1;
+  colValorIdx = colValorIdx - 1;
+
+  var config = {
+    DOC_ORDENES: "",
+    DOC_ANALISIS: "",
+    DOC_COMPLETO: "",
+    coords: {
+      "Fabricante": { x: 450, y: 585 },
+      "Exp":        { x: 360, y: 495 },
+      "NoAnalisis": { x: 155, y: 385 }
+    }
+  };
+
+  function parseXY(str) {
+    var matchX = str.match(/x:\s*([0-9.]+)/i);
+    var matchY = str.match(/y:\s*([0-9.]+)/i);
+    return { x: matchX ? parseFloat(matchX[1]) : 0, y: matchY ? parseFloat(matchY[1]) : 0 };
+  }
+
+  for (var i = 1; i < tplData.length; i++) {
+    var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+    if (k === "DOC_ORDENES") config.DOC_ORDENES = v;
+    if (k === "DOC_ANALISIS") config.DOC_ANALISIS = v;
+    if (k === "DOC_COMPLETO") config.DOC_COMPLETO = v;
+    if (k === "COORD_FABRICANTE" && v) config.coords["Fabricante"] = parseXY(v);
+    if (k === "COORD_EXP" && v) config.coords["Exp"] = parseXY(v);
+    if (k === "COORD_NoANALISIS" && v) config.coords["NoAnalisis"] = parseXY(v);
+  }
+
+  try {
+    cache.put('printConfig_v1', JSON.stringify(config), 21600);
+  } catch (e) {
+    Logger.log("Error caching printConfig_v1: " + e.message);
+  }
+
+  return config;
+}
+
+// --- BÚSQUEDA DE PDFs ---
 
 /**
  * Busca un PDF de orden en una carpeta de Drive.
@@ -536,4 +622,53 @@ function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUse
     Logger.log("Error en finalizeFinalPdfPostSave: " + e.message);
     return "Error en post-guardado: " + e.message;
   }
+}
+
+// --- WRAPPERS DE AUTENTICACIÓN PARA google.script.run ---
+
+/**
+ * Wrapper con autenticación para saveFinalUnifiedPDF.
+ * Llamado desde Index.html vía google.script.run.
+ * 
+ * @param {string} base64Data - Datos del PDF en base64
+ * @param {string} orderNo - Número de orden
+ * @param {string} userId - UserID del usuario que ejecuta la acción
+ * @returns {Object} Resultado de saveFinalUnifiedPDF
+ * @throws {Error} Si el usuario no está autorizado
+ */
+function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  return saveFinalUnifiedPDF(base64Data, orderNo);
+}
+
+/**
+ * Wrapper con autenticación para finalizeFinalPdfPostSave.
+ * Llamado desde Index.html vía google.script.run.
+ * 
+ * @param {string} orderNo - Número de orden
+ * @param {string} fileId - ID del archivo guardado
+ * @param {boolean} archivoReemplazado - Si se reemplazó un archivo existente
+ * @param {string} userId - UserID del usuario que ejecuta la acción
+ * @returns {string} Mensaje de confirmación
+ * @throws {Error} Si el usuario no está autorizado
+ */
+function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  return finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, userId);
+}
+
+/**
+ * Wrapper con autenticación para updateTraceability.
+ * Llamado desde Index.html vía google.script.run.
+ * 
+ * @param {string} orderNo - Número de orden
+ * @param {string} userId - UserID del usuario que ejecuta la acción
+ * @param {number} pagesPrinted - Número de páginas impresas
+ * @param {string} printType - Tipo de impresión
+ * @returns {Object} Resultado de internalUpdateTraceability
+ * @throws {Error} Si el usuario no está autorizado
+ */
+function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
