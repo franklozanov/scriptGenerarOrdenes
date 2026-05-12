@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrar Entrega / Novedad</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    body {
+      background-color: #f5f5f5;
+      padding: 20px;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      width: 100%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #1976d2;
+      font-size: 20px;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .info {
+      background-color: #e3f2fd;
+      border-left: 4px solid #1976d2;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: #333;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #333;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      background: white;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #1976d2;
+      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: #1976d2;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #1565c0;
+    }
+
+    .btn-primary:disabled {
+      background-color: #b0bec5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e0e0e0;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .loading-overlay.hidden {
+      display: none;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1976d2;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #1976d2;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 16px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .message.success {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+      display: block;
+    }
+
+    .message.error {
+      background-color: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+      display: block;
+    }
+
+    .message.warning {
+      background-color: #fff3e0;
+      color: #e65100;
+      border: 1px solid #ffe0b2;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Registrar Entrega / Novedad</h2>
+    <div class="subtitle">Registre entregas y devoluciones de órdenes a QA</div>
+    
+    <div class="info">
+      Seleccione una orden, el tipo de novedad y el nuevo estado. El sistema actualizará automáticamente el STATUS de la orden y dejará un registro en el historial.
+    </div>
+
+    <form id="novedadForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="usuarioResponsable">Usuario Responsable</label>
+          <input type="text" id="usuarioResponsable" list="usuariosList" placeholder="Seleccione usuario" required>
+          <datalist id="usuariosList"></datalist>
+          <input type="hidden" id="usuarioUserId">
+        </div>
+        <div class="form-group">
+          <label for="noOrden">Número de Orden</label>
+          <select id="noOrden" required>
+            <option value="">Cargando órdenes...</option>
+          </select>
+          <input type="hidden" id="ordenCodigo">
+          <input type="hidden" id="ordenTotalPags">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="nuevoStatus">Nuevo Estado (STATUS)</label>
+          <select id="nuevoStatus" required>
+            <option value="">Seleccione estado</option>
+            <option value="RecibidaQA">RecibidaQA</option>
+            <option value="DevueltaQA">DevueltaQA</option>
+            <option value="Cerrada">Cerrada</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="tipoNovedad">Tipo de Novedad</label>
+          <select id="tipoNovedad" required>
+            <option value="">Seleccione tipo</option>
+            <option value="Entrega de orden de acondicionamiento">Entrega de orden de acondicionamiento</option>
+            <option value="Devolución de orden de acondicionamiento">Devolución de orden de acondicionamiento</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="noPagDevueltas">Páginas Devueltas</label>
+          <input type="number" id="noPagDevueltas" min="0" placeholder="0">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="comentario">Comentario</label>
+        <textarea id="comentario" placeholder="Ingrese comentarios adicionales (opcional)"></textarea>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" class="btn btn-primary" id="btnSubmit">Registrar Novedad</button>
+        <button type="button" class="btn btn-secondary" id="btnCancel">Cancelar</button>
+      </div>
+    </form>
+
+    <div class="message" id="message"></div>
+  </div>
+
+  <div class="loading-overlay hidden" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Procesando...</div>
+  </div>
+
+  <script>
+    var globalWebAppUrl = '';
+    var users = [];
+    var ordenes = [];
+
+    function initialize() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (data && data.webAppUrl) {
+            globalWebAppUrl = data.webAppUrl;
+          }
+          if (data && data.users) {
+            users = data.users;
+            populateUsuariosList();
+          }
+          loadOrdenes();
+        })
+        .withFailureHandler(function(error) {
+          showMessage('Error al cargar datos iniciales: ' + error.message, 'error');
+        })
+        .getInitialData();
+
+      document.getElementById('btnCancel').addEventListener('click', function() {
+        google.script.host.close();
+      });
+
+      document.getElementById('novedadForm').addEventListener('submit', handleSubmit);
+      document.getElementById('usuarioResponsable').addEventListener('change', handleUsuarioChange);
+      document.getElementById('noOrden').addEventListener('change', handleOrdenChange);
+    }
+
+    function populateUsuariosList() {
+      var datalist = document.getElementById('usuariosList');
+      datalist.innerHTML = '';
+      users.forEach(function(user) {
+        var option = document.createElement('option');
+        option.value = user.nombreCompleto;
+        option.setAttribute('data-userid', user.userId);
+        datalist.appendChild(option);
+      });
+    }
+
+    function handleUsuarioChange() {
+      var input = document.getElementById('usuarioResponsable');
+      var datalist = document.getElementById('usuariosList');
+      var userIdInput = document.getElementById('usuarioUserId');
+      
+      var selectedValue = input.value;
+      var selectedOption = null;
+      
+      for (var i = 0; i < datalist.options.length; i++) {
+        if (datalist.options[i].value === selectedValue) {
+          selectedOption = datalist.options[i];
+          break;
+        }
+      }
+      
+      if (selectedOption) {
+        userIdInput.value = selectedOption.getAttribute('data-userid');
+      } else {
+        userIdInput.value = '';
+      }
+    }
+
+    function loadOrdenes() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          ordenes = data || [];
+          populateOrdenesSelect();
+        })
+        .withFailureHandler(function(error) {
+          showMessage('Error al cargar órdenes: ' + error.message, 'error');
+          document.getElementById('noOrden').innerHTML = '<option value="">Error al cargar</option>';
+        })
+        .getOrdenesParaNovedad();
+    }
+
+    function populateOrdenesSelect() {
+      var select = document.getElementById('noOrden');
+      select.innerHTML = '<option value="">Seleccione orden</option>';
+      
+      ordenes.forEach(function(orden) {
+        var option = document.createElement('option');
+        option.value = orden.noOrden;
+        option.textContent = orden.noOrden + ' - ' + orden.codigo;
+        option.setAttribute('data-codigo', orden.codigo);
+        option.setAttribute('data-totalpags', orden.totalPags);
+        select.appendChild(option);
+      });
+    }
+
+    function handleOrdenChange() {
+      var select = document.getElementById('noOrden');
+      var selectedOption = select.options[select.selectedIndex];
+      
+      if (selectedOption) {
+        document.getElementById('ordenCodigo').value = selectedOption.getAttribute('data-codigo') || '';
+        document.getElementById('ordenTotalPags').value = selectedOption.getAttribute('data-totalpags') || '0';
+      } else {
+        document.getElementById('ordenCodigo').value = '';
+        document.getElementById('ordenTotalPags').value = '0';
+      }
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      
+      var usuarioUserId = document.getElementById('usuarioUserId').value;
+      var noOrden = document.getElementById('noOrden').value;
+      var codigo = document.getElementById('ordenCodigo').value;
+      var totalPags = document.getElementById('ordenTotalPags').value;
+      var nuevoStatus = document.getElementById('nuevoStatus').value;
+      var tipoNovedad = document.getElementById('tipoNovedad').value;
+      var noPagDevueltas = document.getElementById('noPagDevueltas').value;
+      var comentario = document.getElementById('comentario').value;
+
+      if (!usuarioUserId) {
+        showMessage('Seleccione un usuario válido de la lista.', 'error');
+        return;
+      }
+
+      if (!noOrden || !codigo) {
+        showMessage('Seleccione una orden válida.', 'error');
+        return;
+      }
+
+      if (!nuevoStatus) {
+        showMessage('Seleccione el nuevo estado.', 'error');
+        return;
+      }
+
+      if (!tipoNovedad) {
+        showMessage('Seleccione el tipo de novedad.', 'error');
+        return;
+      }
+
+      var params = {
+        operation: 'registrarNovedad',
+        userId: usuarioUserId,
+        noOrden: noOrden,
+        codigo: codigo,
+        tipoNovedad: tipoNovedad,
+        status: nuevoStatus,
+        comentario: comentario,
+        totalPags: Number(totalPags) || 0,
+        noPagDevueltas: Number(noPagDevueltas) || 0,
+        realizadoPor: usuarioUserId
+      };
+
+      showLoading(true, 'Registrando novedad...');
+
+      fetch(globalWebAppUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+      })
+      .then(function(response) {
+        showLoading(false);
+        showMessage('Novedad registrada exitosamente. La ventana se cerrará automáticamente.', 'success');
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
+      })
+      .catch(function(error) {
+        showLoading(false);
+        showMessage('Error al registrar novedad: ' + error.message, 'error');
+      });
+    }
+
+    function showLoading(show, text) {
+      var overlay = document.getElementById('loadingOverlay');
+      var loadingText = document.getElementById('loadingText');
+      
+      if (show) {
+        loadingText.textContent = text || 'Procesando...';
+        overlay.classList.remove('hidden');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function showMessage(text, type) {
+      var messageEl = document.getElementById('message');
+      messageEl.textContent = text;
+      messageEl.className = 'message ' + type;
+    }
+
+    // Inicializar al cargar
+    window.addEventListener('load', initialize);
+  </script>
+</body>
+</html>

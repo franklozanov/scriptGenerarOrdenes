@@ -92,6 +92,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
     .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
+    .addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad')
     .addSeparator()
     .addSubMenu(configMenu)
     .addToUi();
@@ -99,9 +100,83 @@ function onOpen() {
   // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();
+    syncVerifCantDisponible();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Plantillas estáticas listas.', 'Sistema QMS', 5);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
+  }
+}
+
+/**
+ * Sincroniza valores de VerifCant. Disponible a CantDispAFecha al abrir la hoja.
+ * Solo actualiza si VerifCant. Disponible tiene un número >= 0 y es diferente a CantDispAFecha.
+ */
+function syncVerifCantDisponible() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    if (!sheet) {
+      Logger.log("syncVerifCantDisponible: Hoja 'Ordenes' no encontrada.");
+      return;
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return; // No hay datos
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    var verifCantIdx = headers.indexOf('VerifCant. Disponible');
+    var cantDispIdx = headers.indexOf('CantDispAFecha');
+
+    if (verifCantIdx === -1) {
+      Logger.log("syncVerifCantDisponible: Columna 'VerifCant. Disponible' no encontrada.");
+      return;
+    }
+    
+    if (cantDispIdx === -1) {
+      Logger.log("syncVerifCantDisponible: Columna 'CantDispAFecha' no encontrada.");
+      return;
+    }
+
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    var values = dataRange.getValues();
+    var updates = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var verifCantValue = values[i][verifCantIdx];
+      var cantDispValue = values[i][cantDispIdx];
+
+      // Si VerifCant. Disponible es un número >= 0 (no "-")
+      if (verifCantValue !== '-' && verifCantValue !== '' && !isNaN(verifCantValue)) {
+        var numVerifCant = Number(verifCantValue);
+        if (numVerifCant >= 0) {
+          // Verificar si necesita actualización
+          if (numVerifCant !== Number(cantDispValue)) {
+            updates.push({
+              row: i + 2, // +2 porque i empieza en 0 y hay header
+              value: numVerifCant
+            });
+          }
+        }
+      }
+    }
+
+    if (updates.length > 0) {
+      Logger.log("syncVerifCantDisponible: Actualizando " + updates.length + " filas.");
+      updates.forEach(function(update) {
+        sheet.getRange(update.row, cantDispIdx + 1).setValue(update.value);
+      });
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Se sincronizaron ' + updates.length + ' valores de Cantidad Disponible.', 
+        'Sincronización', 
+        3
+      );
+    } else {
+      Logger.log("syncVerifCantDisponible: No se requieren actualizaciones.");
+    }
+  } catch (e) {
+    Logger.log("ERROR en syncVerifCantDisponible: " + e.message);
+    Logger.log("Stack trace: " + e.stack);
   }
 }
 
@@ -761,6 +836,69 @@ function fetchOrderData(orderNo) {
   }
 
   var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
+  
+  // --- VALIDACIÓN DE STATUS PARA IMPRESIÓN ---
+  var colStatusIdx = headers.indexOf('STATUS');
+  var statusValue = "";
+  if (colStatusIdx !== -1) {
+    statusValue = targetRowData[colStatusIdx] ? targetRowData[colStatusIdx].toString().trim() : "";
+  }
+  
+  // Bloquear impresión si STATUS es RecibidaQA, DevueltaQA o Cerrada
+  if (statusValue === "RecibidaQA" || statusValue === "DevueltaQA" || statusValue === "Cerrada") {
+    var currentUser = "";
+    try { currentUser = Session.getActiveUser().getEmail(); } catch(e) {}
+    
+    // Intentar obtener userId desde email
+    var userId = "";
+    if (currentUser) {
+      var userSheet = ss.getSheetByName('Usuarios');
+      if (userSheet) {
+        var userData = userSheet.getDataRange().getValues();
+        if (userData.length >= 2) {
+          var userHeaders = userData[0];
+          var colEmailIdx = userHeaders.indexOf('Email');
+          var colUserIdIdx = userHeaders.indexOf('UserID');
+          if (colEmailIdx !== -1 && colUserIdIdx !== -1) {
+            for (var u = 1; u < userData.length; u++) {
+              var userEmail = userData[u][colEmailIdx] ? userData[u][colEmailIdx].toString().trim() : "";
+              if (userEmail === currentUser) {
+                userId = userData[u][colUserIdIdx] ? userData[u][colUserIdIdx].toString().trim() : "";
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Verificar rol del usuario
+    var userRecord = userId ? getUserRecordByUserId_(userId) : null;
+    var userRol = userRecord ? userRecord.rol : "";
+    
+    // Bypass para ADMIN
+    if (userRol === "ADMIN") {
+      Logger.log("ADVERTENCIA: Usuario ADMIN imprimiendo orden con STATUS " + statusValue + " - Bypass aplicado");
+      errors.push({ 
+        key: "STATUS_WARNING", 
+        message: "ADVERTENCIA: Esta orden tiene STATUS '" + statusValue + "'. Como ADMIN, se permite la impresión, pero esto es inusual." 
+      });
+    } else {
+      // Bloquear para STANDARD y QA
+      return {
+        status: "error",
+        ready: false,
+        orderNo: orderNo,
+        noAnalisis: "",
+        formData: {},
+        coords: dynamicCoords,
+        pdfs: [],
+        errors: [{ key: "STATUS_BLOCKED", message: "No se puede imprimir esta orden. Su STATUS actual es '" + statusValue + "'. Contacte al administrador si necesita imprimir esta orden." }]
+      };
+    }
+  }
+  // --- FIN VALIDACIÓN DE STATUS ---
+  
   var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
   var formData = {};
   var noAnalisisStr = "";
@@ -1049,9 +1187,10 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 // Estructura esperada del libro de trabajo
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden', 'ConsecutivoImp', 'ImpresoPor'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden', 'ConsecutivoImp', 'ImpresoPor', 'STATUS'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
-  'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']
+  'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
+  'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']
 };
 
 function initializeApp(ui) {
@@ -1685,8 +1824,8 @@ function applyNewProtectionScheme() {
   // Primero eliminar protecciones legacy
   removeLegacyProtections();
   
-  // Ocultar todas las hojas excepto Ordenes y Logs
-  hideAllSheetsExcept(['Ordenes', 'Logs']);
+  // Ocultar todas las hojas excepto Ordenes, Logs y RegistroNovedad
+  hideAllSheetsExcept(['Ordenes', 'Logs', 'RegistroNovedad']);
   
   // Verificar y asegurar permisos de carpetas de Drive
   ensureFolderPermissions();
@@ -1904,6 +2043,41 @@ function onEditInstalled(e) {
     // Lógica de detección de cambio de NoOrden en filas ya cargadas
     if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+      // --- INICIO: Lógica para VerifCant. Disponible ---
+      var editedColName = headers[editedRange.getColumn() - 1];
+      
+      if (editedColName === 'VerifCant. Disponible') {
+        var oldValue = e.oldValue;
+        var newValue = e.value;
+
+        // Si cambia de "-" a un número > 0
+        if (oldValue === '-' && newValue !== undefined && newValue !== '' && !isNaN(newValue)) {
+          var numNewValue = Number(newValue);
+          if (numNewValue > 0) {
+            var rowIdx = editedRange.getRow();
+            var cantDispAFechaColIdx = headers.indexOf('CantDispAFecha');
+            
+            if (cantDispAFechaColIdx !== -1) {
+              sheet.getRange(rowIdx, cantDispAFechaColIdx + 1).setValue(numNewValue);
+              logChange(
+                'AUTO_COPY_VERIFCANT', 
+                'Copiado automáticamente ' + numNewValue + ' de "VerifCant. Disponible" a "CantDispAFecha" en fila ' + rowIdx, 
+                userIdentity
+              );
+              SpreadsheetApp.getActiveSpreadsheet().toast(
+                'Cantidad disponible copiada automáticamente: ' + numNewValue,
+                'Sistema QMS',
+                3
+              );
+            } else {
+              Logger.log("ADVERTENCIA: Columna 'CantDispAFecha' no encontrada para auto-copia.");
+            }
+          }
+        }
+      }
+      // --- FIN: Lógica para VerifCant. Disponible ---
+
       var colAdjuntoIdx = headers.indexOf('AdjuntoOrden') + 1;
       var colOrdenIdx = headers.indexOf('NoOrden') + 1;
 
@@ -2058,6 +2232,160 @@ function abrirModalSubidaGeneral() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Subida Masiva de Órdenes');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
+  }
+}
+
+function abrirModalRegistroNovedad() {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('ModalRegistroNovedad')
+      .setWidth(600)
+      .setHeight(650)
+      .setTitle('Registrar Entrega / Novedad');
+    SpreadsheetApp.getUi().showModalDialog(html, 'Registro de Novedad');
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
+  }
+}
+
+function getOrdenesParaNovedad() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    if (!sheet) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return []; // No hay datos
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    var colNoOrdenIdx = headers.indexOf('NoOrden');
+    var colCodigoIdx = headers.indexOf('Codigo');
+    var colTotalPagsIdx = headers.indexOf('TotalPags');
+    var colStatusIdx = headers.indexOf('STATUS');
+
+    if (colNoOrdenIdx === -1 || colCodigoIdx === -1) {
+      throw new Error("No se encontraron las columnas 'NoOrden' y/o 'Codigo' en la hoja Ordenes.");
+    }
+
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    var values = dataRange.getValues();
+    var ordenes = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var noOrden = values[i][colNoOrdenIdx];
+      var codigo = values[i][colCodigoIdx];
+      var status = colStatusIdx !== -1 ? values[i][colStatusIdx] : "";
+      var totalPags = colTotalPagsIdx !== -1 ? values[i][colTotalPagsIdx] : 0;
+
+      var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
+      var codigoStr = codigo ? codigo.toString().trim() : "";
+      var statusStr = status ? status.toString().trim() : "";
+
+      // Filtrar: excluir si STATUS es "Cerrada" o está vacío
+      if (noOrdenStr && codigoStr && statusStr !== "Cerrada" && statusStr !== "") {
+        ordenes.push({
+          noOrden: noOrdenStr,
+          codigo: codigoStr,
+          totalPags: totalPags ? Number(totalPags) : 0
+        });
+      }
+    }
+
+    Logger.log("getOrdenesParaNovedad: Se encontraron " + ordenes.length + " órdenes disponibles para novedad.");
+    return ordenes;
+  } catch (e) {
+    Logger.log("ERROR en getOrdenesParaNovedad: " + e.message);
+    throw e;
+  }
+}
+
+function procesarRegistroNovedad(params, userId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Obtener información del usuario
+    var user = getUserRecordByUserId_(userId);
+    if (!user) {
+      return { status: 'error', message: 'Usuario no encontrado: ' + userId };
+    }
+    var nombreCorto = user.nombreCorto || userId;
+
+    // Obtener parámetros
+    var noOrden = params.noOrden || "";
+    var codigo = params.codigo || "";
+    var tipoNovedad = params.tipoNovedad || "";
+    var comentario = params.comentario || "";
+    var totalPags = params.totalPags || 0;
+    var noPagDevueltas = params.noPagDevueltas || 0;
+    var nuevoStatus = params.status || "";
+    var realizadoPor = params.realizadoPor || userId;
+
+    // Actualizar STATUS en la hoja Ordenes
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (!sheetOrdenes) {
+      return { status: 'error', message: 'La hoja Ordenes no existe.' };
+    }
+
+    var headersOrdenes = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+    var colNoOrdenIdx = headersOrdenes.indexOf('NoOrden');
+    var colStatusIdx = headersOrdenes.indexOf('STATUS');
+
+    if (colNoOrdenIdx === -1 || colStatusIdx === -1) {
+      return { status: 'error', message: 'No se encontraron las columnas NoOrden y/o STATUS en Ordenes.' };
+    }
+
+    var dataRangeOrdenes = sheetOrdenes.getRange(2, 1, sheetOrdenes.getLastRow() - 1, sheetOrdenes.getLastColumn());
+    var valuesOrdenes = dataRangeOrdenes.getValues();
+    var filaEncontrada = -1;
+
+    for (var i = 0; i < valuesOrdenes.length; i++) {
+      var rowNoOrden = valuesOrdenes[i][colNoOrdenIdx];
+      var rowNoOrdenStr = rowNoOrden ? rowNoOrden.toString().trim() : "";
+      if (rowNoOrdenStr === noOrden) {
+        filaEncontrada = i + 2; // +2 por header y base-1
+        break;
+      }
+    }
+
+    if (filaEncontrada === -1) {
+      return { status: 'error', message: 'No se encontró la orden ' + noOrden + ' en la hoja Ordenes.' };
+    }
+
+    // Actualizar STATUS
+    sheetOrdenes.getRange(filaEncontrada, colStatusIdx + 1).setValue(nuevoStatus);
+
+    // Insertar registro en hoja RegistroNovedad
+    var sheetRegistro = ss.getSheetByName('RegistroNovedad');
+    if (!sheetRegistro) {
+      return { status: 'error', message: 'La hoja RegistroNovedad no existe.' };
+    }
+
+    var fechaNovedad = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+    // Orden exacto según REQUIRED_SHEETS: ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']
+    sheetRegistro.appendRow([fechaNovedad, noOrden, codigo, tipoNovedad, comentario, totalPags, noPagDevueltas, nombreCorto, nuevoStatus]);
+
+    // Registrar en Logs
+    var userIdentity = getUserIdentityStringByUserId_(userId);
+    var logDescripcion = 'Novedad registrada: Orden ' + noOrden + ', Tipo: ' + tipoNovedad + ', Nuevo STATUS: ' + nuevoStatus;
+    logChange('REGISTRO_NOVEDAD', logDescripcion, userIdentity);
+
+    Logger.log("procesarRegistroNovedad: Novedad registrada exitosamente para orden " + noOrden);
+    return { 
+      status: 'success', 
+      message: 'Novedad registrada exitosamente para orden ' + noOrden,
+      data: {
+        noOrden: noOrden,
+        nuevoStatus: nuevoStatus,
+        realizadoPor: nombreCorto
+      }
+    };
+  } catch (e) {
+    Logger.log("ERROR en procesarRegistroNovedad: " + e.message);
+    Logger.log("Stack trace: " + e.stack);
+    return { status: 'error', message: 'Error al procesar registro de novedad: ' + e.message };
   }
 }
 
@@ -2516,11 +2844,18 @@ function handlePrivilegedOperation_(params) {
     return { status: 'success', message: finalizeMsg };
   }
 
+  if (operation === 'registrarNovedad') {
+    if (!params.noOrden || !params.codigo || !params.tipoNovedad || !params.status || !params.realizadoPor) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para registrar novedad.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return procesarRegistroNovedad(params, callingUserId);
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad']
   };
 }
 
