@@ -1130,6 +1130,14 @@ function initializeCompleteSystem(ui) {
     throw e;
   }
 
+  // === NUEVO: Diagnóstico de ConsecutivoImp ===
+  try {
+    var diagnosticResult = runConsecutivoImpDiagnostic_();
+    summary.push("✓ " + diagnosticResult);
+  } catch (e) {
+    summary.push("⚠️ Diagnóstico ConsecutivoImp: " + e.message);
+  }
+
   try {
     logInitialization();
   } catch (e) {
@@ -1150,6 +1158,20 @@ function initializeWorkbookStructure_(ui) {
 }
 
 function ensureWebAppUrlConfigured_(ui) {
+  var savedUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
+  
+  // Si ya existe URL configurada, preguntar si desea mantenerla o modificarla
+  if (savedUrl) {
+    var confirmMessage = "URL de Web App ya configurada:\n\n" + savedUrl + "\n\n¿Desea mantener esta URL?";
+    var confirmResponse = ui.alert("Configuración Web App URL", confirmMessage, ui.ButtonSet.YES_NO);
+    
+    if (confirmResponse === ui.Button.YES) {
+      Logger.log("✓ URL de Web App mantenida: " + savedUrl);
+      return savedUrl;
+    }
+  }
+  
+  // Intentar obtener URL automáticamente
   var currentUrl = "";
   try {
     currentUrl = ScriptApp.getService().getUrl();
@@ -1157,30 +1179,50 @@ function ensureWebAppUrlConfigured_(ui) {
     Logger.log("No se pudo obtener URL automática de Web App: " + e.message);
   }
 
-  if (currentUrl) {
+  if (currentUrl && !savedUrl) {
     setWebAppUrl(currentUrl);
+    Logger.log("✓ URL de Web App configurada automáticamente: " + currentUrl);
     return currentUrl;
   }
 
-  var savedUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
-  var promptMessage = "No fue posible obtener automáticamente la URL del despliegue Web App.\n\n" +
-    "Pegue aquí la URL terminada en /exec para dejar la app lista:";
-
+  // Solicitar URL manualmente
+  var promptMessage = "Ingrese la URL del despliegue Web App (debe terminar en /exec):";
+  
   if (savedUrl) {
-    promptMessage += "\n\nURL guardada actualmente:\n" + savedUrl + "\n\nPuede presionar OK sin cambios para conservarla, o pegar una nueva.";
+    promptMessage += "\n\nURL anterior:\n" + savedUrl;
+  }
+  
+  if (currentUrl) {
+    promptMessage += "\n\nURL detectada automáticamente:\n" + currentUrl + "\n\n(Puede copiar esta URL o ingresar otra)";
   }
 
   var response = ui.prompt("Configurar Web App URL", promptMessage, ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) {
+    if (savedUrl) {
+      Logger.log("✓ Configuración cancelada, manteniendo URL anterior: " + savedUrl);
+      return savedUrl;
+    }
     throw new Error("Configuración de Web App URL cancelada por el usuario.");
   }
 
   var enteredUrl = response.getResponseText().trim();
-  if (!enteredUrl && savedUrl) {
-    return savedUrl;
+  
+  // Si no ingresó nada, usar la URL detectada automáticamente o la guardada
+  if (!enteredUrl) {
+    if (currentUrl) {
+      setWebAppUrl(currentUrl);
+      Logger.log("✓ URL de Web App configurada con URL detectada: " + currentUrl);
+      return currentUrl;
+    } else if (savedUrl) {
+      Logger.log("✓ Manteniendo URL anterior: " + savedUrl);
+      return savedUrl;
+    } else {
+      throw new Error("Debe ingresar una URL de Web App válida.");
+    }
   }
 
   setWebAppUrl(enteredUrl);
+  Logger.log("✓ URL de Web App configurada manualmente: " + enteredUrl);
   return enteredUrl;
 }
 
@@ -1370,29 +1412,68 @@ function fixHeaders(ui) {
 }
 
 /**
- * Función de diagnóstico para verificar la columna ConsecutivoImp
+ * Función interna de diagnóstico para verificar la columna ConsecutivoImp
+ * Retorna string con el resultado en lugar de mostrar alert
+ * @returns {string} Resultado del diagnóstico
+ */
+function runConsecutivoImpDiagnostic_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ordenes');
+  
+  if (!sheet) {
+    throw new Error("Hoja 'Ordenes' no encontrada");
+  }
+  
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colIdx = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', false);
+  
+  if (!colIdx) {
+    throw new Error("Columna 'ConsecutivoImp' no existe");
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return "ConsecutivoImp verificado (columna " + colIdx + ", sin órdenes)";
+  }
+  
+  var values = sheet.getRange(2, colIdx, lastRow - 1, 1).getValues();
+  var invalidCount = 0;
+  var maxConsecutivo = 0;
+  
+  for (var i = 0; i < values.length; i++) {
+    var val = Number(values[i][0]);
+    if (isNaN(val) || val < 0) {
+      invalidCount++;
+    } else if (val > maxConsecutivo) {
+      maxConsecutivo = val;
+    }
+  }
+  
+  var result = "ConsecutivoImp verificado: " + (lastRow - 1) + " órdenes, máx=" + maxConsecutivo;
+  if (invalidCount > 0) {
+    result += " (⚠️ " + invalidCount + " inválidos)";
+  }
+  
+  Logger.log("✓ " + result);
+  return result;
+}
+
+/**
+ * Función de diagnóstico para verificar la columna ConsecutivoImp (UI)
+ * Muestra el resultado en un alert para uso manual desde el menú
  */
 function diagnosticarConsecutivoImp() {
   try {
+    var result = runConsecutivoImpDiagnostic_();
+    
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
-    
-    if (!sheet) {
-      SpreadsheetApp.getUi().alert("❌ Hoja 'Ordenes' no encontrada");
-      return;
-    }
-    
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colIdx = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', false);
-    
-    if (!colIdx) {
-      SpreadsheetApp.getUi().alert("❌ Columna 'ConsecutivoImp' no existe. Ejecute 'Inicializar Sistema Completo'.");
-      return;
-    }
-    
     var lastRow = sheet.getLastRow();
+    
     if (lastRow < 2) {
-      SpreadsheetApp.getUi().alert("✓ Columna 'ConsecutivoImp' en posición " + colIdx + "\n✓ No hay órdenes para verificar.");
+      SpreadsheetApp.getUi().alert("Diagnóstico ConsecutivoImp\n\n✓ Columna en posición " + colIdx + "\n✓ No hay órdenes para verificar");
       return;
     }
     
@@ -1419,7 +1500,6 @@ function diagnosticarConsecutivoImp() {
       report += "✓ Todos los valores son válidos";
     }
     
-    Logger.log(report);
     SpreadsheetApp.getUi().alert("Diagnóstico ConsecutivoImp\n\n" + report);
     
   } catch (e) {
