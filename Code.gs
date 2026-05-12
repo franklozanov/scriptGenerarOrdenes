@@ -108,21 +108,6 @@ function openPrintDialog() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
 }
 
-// --- SISTEMA DE SEGURIDAD Y BLOQUEO ---
-
-function withAdminAuth(title, action) {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt(title, 'Ingrese la contraseña de administrador:', ui.ButtonSet.OK_CANCEL);
-  if (response.getSelectedButton() == ui.Button.OK) {
-    if (response.getResponseText() === ADMIN_PASS) {
-      action(ui);
-    } else {
-      ui.alert('❌ Contraseña incorrecta.');
-    }
-  }
-}
-
-
 function promptInitializeApp() {
   withAdminAuth('Inicializar Sistema Completo (Admin)', function(ui) {
     initializeCompleteSystem(ui);
@@ -180,52 +165,6 @@ function getStaticTemplateBase64_(key, fileId) {
   var base64 = Utilities.base64Encode(file.getBlob().getBytes());
   cacheStaticTemplateBase64_(key, base64);
   return base64;
-}
-
-function getUserRecordByUserId_(userId) {
-  if (!userId) return null;
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Usuarios');
-  if (!sheet) return null;
-
-  var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return null;
-
-  var headers = data[0];
-  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
-  var colNombreCompletoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Completo', false);
-  var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
-  var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
-  var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
-
-  if (!colUserIdIdx) return null;
-
-  colUserIdIdx -= 1;
-  colNombreCompletoIdx = colNombreCompletoIdx ? colNombreCompletoIdx - 1 : null;
-  colNombreCortoIdx = colNombreCortoIdx ? colNombreCortoIdx - 1 : null;
-  colEmailIdx = colEmailIdx ? colEmailIdx - 1 : null;
-  colRolIdx = colRolIdx ? colRolIdx - 1 : null;
-
-  var targetUserId = userId.toString().trim();
-  for (var i = 1; i < data.length; i++) {
-    var rowUserId = data[i][colUserIdIdx] ? data[i][colUserIdIdx].toString().trim() : "";
-    if (rowUserId === targetUserId) {
-      return {
-        userId: rowUserId,
-        nombreCompleto: colNombreCompletoIdx !== null && data[i][colNombreCompletoIdx] ? data[i][colNombreCompletoIdx].toString().trim() : "",
-        nombreCorto: colNombreCortoIdx !== null && data[i][colNombreCortoIdx] ? data[i][colNombreCortoIdx].toString().trim() : "",
-        email: colEmailIdx !== null && data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim() : "",
-        rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : ""
-      };
-    }
-  }
-  return null;
-}
-
-function getUserIdentityStringByUserId_(userId) {
-  var user = getUserRecordByUserId_(userId);
-  if (!user) return userId || "Usuario no identificado";
-  return user.userId + " - " + (user.nombreCorto || user.userId);
 }
 
 function getInitialData() {
@@ -2757,32 +2696,8 @@ function doGet(e) {
   return HtmlService.createHtmlOutput(html);
 }
 
-/**
- * Verifica si un usuario está autorizado para realizar acciones de escritura.
- * Lee la hoja 'Usuarios' y comprueba si el UserID tiene un rol permitido ('ADMIN', 'QA', 'STANDARD').
- * @param {string} userId - El UserID del usuario a verificar.
- * @returns {boolean} - True si está autorizado, false en caso contrario.
- */
-function isUserAuthorized(userId) {
-  var user = getUserRecordByUserId_(userId);
-  if (!user) return false;
-  if (!user.rol) return true;
-  return user.rol === 'ADMIN' || user.rol === 'QA' || user.rol === 'STANDARD';
-}
-
 function jsonResponse_(payload) {
   return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
-}
-
-function requireAuthorizedUser_(params) {
-  var callingUserId = params.userId || '';
-  if (!callingUserId) {
-    throw new Error('MISSING_USER_ID: No se proporcionó userId en la solicitud.');
-  }
-  if (!isUserAuthorized(callingUserId)) {
-    throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + callingUserId + '.');
-  }
-  return callingUserId;
 }
 
 function handlePrivilegedOperation_(params) {
@@ -2912,24 +2827,3 @@ function setWebAppUrl(url) {
   return "WEB_APP_URL guardada correctamente.";
 }
 
-// TEMPORAL: Test para Batch 2.2
-function testHelpers() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Ordenes');
-  
-  if (!sheet) {
-    Logger.log('ERROR: Hoja Ordenes no existe');
-    return;
-  }
-  
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-  Logger.log('✓ Test 1 - Índice de NoOrden: ' + colIdx);
-  
-  if (sheet.getLastRow() > 1) {
-    var valor = getCellValueByColumnName(sheet, 2, 'NoOrden');
-    Logger.log('✓ Test 2 - Valor NoOrden fila 2: ' + valor);
-  }
-  
-  Logger.log('✓ Helpers funcionan correctamente');
-}
