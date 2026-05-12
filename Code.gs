@@ -2364,8 +2364,37 @@ function procesarRegistroNovedad(params, userId) {
 
     var fechaNovedad = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
 
-    // Orden exacto según REQUIRED_SHEETS: ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']
-    sheetRegistro.appendRow([fechaNovedad, noOrden, codigo, tipoNovedad, comentario, totalPags, noPagDevueltas, nombreCorto, nuevoStatus]);
+    // --- INICIO MAPEO DINÁMICO DE COLUMNAS ---
+    // Obtener los encabezados actuales de la hoja
+    var lastColRegistro = Math.max(1, sheetRegistro.getLastColumn());
+    var headersRegistro = sheetRegistro.getRange(1, 1, 1, lastColRegistro).getValues()[0];
+    
+    // Crear array vacío del tamaño de las columnas
+    var rowData = new Array(headersRegistro.length).fill("");
+    
+    // Mapear los datos exactos a insertar
+    var dataMapping = {
+      'FechaNovedad': fechaNovedad,
+      'NoOrden': noOrden,
+      'Codigo': codigo,
+      'TipoNovedad': tipoNovedad,
+      'Comentario': comentario,
+      'TotalPags': totalPags,
+      'NoPagDevueltas': noPagDevueltas,
+      'RealizadoPor': nombreCorto,
+      'STATUS': nuevoStatus
+    };
+
+    // Inyectar por nombre de encabezado usando el helper
+    for (var colName in dataMapping) {
+      var colIdx = getColumnIndexByNameCaseInsensitive(headersRegistro, colName, false);
+      if (colIdx !== null && colIdx > 0) {
+        rowData[colIdx - 1] = dataMapping[colName];
+      }
+    }
+
+    sheetRegistro.appendRow(rowData);
+    // --- FIN MAPEO DINÁMICO DE COLUMNAS ---
 
     // Registrar en Logs
     var userIdentity = getUserIdentityStringByUserId_(userId);

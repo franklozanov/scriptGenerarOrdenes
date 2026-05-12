@@ -485,23 +485,47 @@
 
       fetch(globalWebAppUrl, {
         method: 'POST',
-        mode: 'no-cors',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'text/plain'
         },
         body: JSON.stringify(params)
       })
       .then(function(response) {
+        return response.json();
+      })
+      .then(function(result) {
         showLoading(false);
-        showMessage('Novedad registrada exitosamente. La ventana se cerrará automáticamente.', 'success');
-        setTimeout(function() {
-          google.script.host.close();
-        }, 2000);
+        if (result.status === 'success') {
+          showMessage('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
+          resetearCamposNovedad();
+        } else {
+          showMessage('Error al registrar novedad: ' + (result.message || 'Error desconocido'), 'error');
+        }
       })
       .catch(function(error) {
         showLoading(false);
         showMessage('Error al registrar novedad: ' + error.message, 'error');
       });
+    }
+
+    function resetearCamposNovedad() {
+      document.getElementById('noOrden').value = '';
+      document.getElementById('nuevoStatus').value = '';
+      document.getElementById('tipoNovedad').value = '';
+      document.getElementById('noPagDevueltas').value = '';
+      document.getElementById('comentario').value = '';
+      
+      document.getElementById('ordenCodigo').value = '';
+      document.getElementById('ordenTotalPags').value = '0';
+      document.getElementById('totalPagsMostrado').value = '';
+      
+      validarPaginas();
+      loadOrdenes();
+      
+      setTimeout(function() {
+        var messageEl = document.getElementById('message');
+        messageEl.style.display = 'none';
+      }, 4000);
     }
 
     function showLoading(show, text) {
