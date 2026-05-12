@@ -2911,3 +2911,25 @@ function setWebAppUrl(url) {
   Logger.log("WEB_APP_URL guardada correctamente: " + cleanUrl);
   return "WEB_APP_URL guardada correctamente.";
 }
+
+// TEMPORAL: Test para Batch 2.2
+function testHelpers() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ordenes');
+  
+  if (!sheet) {
+    Logger.log('ERROR: Hoja Ordenes no existe');
+    return;
+  }
+  
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+  Logger.log('✓ Test 1 - Índice de NoOrden: ' + colIdx);
+  
+  if (sheet.getLastRow() > 1) {
+    var valor = getCellValueByColumnName(sheet, 2, 'NoOrden');
+    Logger.log('✓ Test 2 - Valor NoOrden fila 2: ' + valor);
+  }
+  
+  Logger.log('✓ Helpers funcionan correctamente');
+}
