@@ -1842,11 +1842,20 @@ function applyNewProtectionScheme() {
     protectSheetFully(sheetUsuarios, 'Proteccion_Usuarios');
   }
   
+  // Proteger hoja RegistroNovedad
+  var sheetRegistroNovedad = ss.getSheetByName('RegistroNovedad');
+  if (sheetRegistroNovedad) {
+    protectSheetFully(sheetRegistroNovedad, 'Proteccion_RegistroNovedad');
+  }
+  
   // Configurar protección mixta para Ordenes
   configureOrdenesProtection();
   
   // Configurar protección para Logs
   configureLogsProtection();
+  
+  // Aplicar Validación de Datos a las columnas STATUS
+  applyStatusDataValidation();
   
   Logger.log("✓ Nuevo esquema de protección aplicado");
 }
@@ -1917,6 +1926,37 @@ function configureOrdenesProtection() {
   // por lo que respetarán los permisos generales de la hoja (permisos nativos de Drive)
   
   Logger.log("✓ Protección por columna configurada para Ordenes");
+}
+
+function applyStatusDataValidation() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var statusOptions = ['Impreso', 'Reimpreso', 'RecibidaQA', 'DevueltaQA', 'Cerrada'];
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(statusOptions, true)
+    .setAllowInvalid(false)
+    .build();
+    
+  var sheetsToUpdate = ['Ordenes', 'RegistroNovedad'];
+  
+  sheetsToUpdate.forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      var lastCol = sheet.getLastColumn();
+      if (lastCol > 0) {
+        var headers = sheet.getRange(1, 1, 1, lastCol).getValues();
+        var statusColIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+        
+        if (statusColIdx) {
+          var maxRows = sheet.getMaxRows();
+          if (maxRows > 1) {
+            var range = sheet.getRange(2, statusColIdx, maxRows - 1, 1);
+            range.setDataValidation(rule);
+            Logger.log("✓ Validación de datos aplicada a columna STATUS en hoja: " + sheetName);
+          }
+        }
+      }
+    }
+  });
 }
 
 function configureLogsProtection() {
@@ -2116,11 +2156,13 @@ function onEditInstalled(e) {
       var newValue = e.value !== undefined ? e.value : "(vacío)";
       var cellAddress = editedRange.getA1Notation();
       var editDesc = "Cambió '" + oldValue + "' por '" + newValue + "' en la celda " + cellAddress + " de la hoja " + sheetName;
-      logChange('EDICION_CELDA', editDesc, userIdentity);
+      var logType = (sheetName === 'RegistroNovedad') ? 'EDICION_MANUAL_NOVEDAD' : 'EDICION_CELDA';
+      logChange(logType, editDesc, userIdentity);
     } else {
       var rangeA1 = editedRange.getA1Notation();
       var massEditDesc = "Edición masiva en el rango " + rangeA1 + " de la hoja " + sheetName;
-      logChange('EDICION_MASIVA', massEditDesc, userIdentity);
+      var logTypeMass = (sheetName === 'RegistroNovedad') ? 'EDICION_MASIVA_NOVEDAD' : 'EDICION_MASIVA';
+      logChange(logTypeMass, massEditDesc, userIdentity);
     }
     
   } catch (error) {

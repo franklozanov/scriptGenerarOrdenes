@@ -207,7 +207,7 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="container" id="mainContainer" style="display: none;">
     <h2>Registrar Entrega / Novedad</h2>
     <div class="subtitle">Registre entregas y devoluciones de órdenes a QA</div>
     
@@ -221,7 +221,6 @@
           <label for="usuarioResponsable">Usuario Responsable</label>
           <input type="text" id="usuarioResponsable" list="usuariosList" placeholder="Seleccione usuario" required>
           <datalist id="usuariosList"></datalist>
-          <input type="hidden" id="usuarioUserId">
         </div>
         <div class="form-group">
           <label for="noOrden">Número de Orden</label>
@@ -282,7 +281,7 @@
     <div class="message" id="message"></div>
   </div>
 
-  <div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
     <div class="loading-text" id="loadingText">Procesando...</div>
   </div>
@@ -306,6 +305,8 @@
         })
         .withFailureHandler(function(error) {
           showMessage('Error al cargar datos iniciales: ' + error.message, 'error');
+          showLoading(false);
+          document.getElementById('mainContainer').style.display = 'block';
         })
         .getInitialData();
 
@@ -314,7 +315,6 @@
       });
 
       document.getElementById('novedadForm').addEventListener('submit', handleSubmit);
-      document.getElementById('usuarioResponsable').addEventListener('change', handleUsuarioChange);
       document.getElementById('noOrden').addEventListener('change', handleOrdenChange);
       document.getElementById('noPagDevueltas').addEventListener('input', validarPaginas);
     }
@@ -330,37 +330,20 @@
       });
     }
 
-    function handleUsuarioChange() {
-      var input = document.getElementById('usuarioResponsable');
-      var datalist = document.getElementById('usuariosList');
-      var userIdInput = document.getElementById('usuarioUserId');
-      
-      var selectedValue = input.value;
-      var selectedOption = null;
-      
-      for (var i = 0; i < datalist.options.length; i++) {
-        if (datalist.options[i].value === selectedValue) {
-          selectedOption = datalist.options[i];
-          break;
-        }
-      }
-      
-      if (selectedOption) {
-        userIdInput.value = selectedOption.getAttribute('data-userid');
-      } else {
-        userIdInput.value = '';
-      }
-    }
-
     function loadOrdenes() {
       google.script.run
         .withSuccessHandler(function(data) {
           ordenes = data || [];
           populateOrdenesSelect();
+          // Finaliza la carga completa
+          showLoading(false);
+          document.getElementById('mainContainer').style.display = 'block';
         })
         .withFailureHandler(function(error) {
           showMessage('Error al cargar órdenes: ' + error.message, 'error');
           document.getElementById('noOrden').innerHTML = '<option value="">Error al cargar</option>';
+          showLoading(false);
+          document.getElementById('mainContainer').style.display = 'block';
         })
         .getOrdenesParaNovedad();
     }
@@ -430,7 +413,17 @@
     function handleSubmit(e) {
       e.preventDefault();
       
-      var usuarioUserId = document.getElementById('usuarioUserId').value;
+      var inputUsuario = document.getElementById('usuarioResponsable').value.trim();
+      var usuarioUserId = "";
+      
+      // Búsqueda directa en memoria para evadir bugs del Datalist HTML
+      for (var i = 0; i < users.length; i++) {
+        if (users[i].nombreCompleto === inputUsuario) {
+          usuarioUserId = users[i].userId;
+          break;
+        }
+      }
+
       var noOrden = document.getElementById('noOrden').value;
       var codigo = document.getElementById('ordenCodigo').value;
       var totalPags = document.getElementById('ordenTotalPags').value;
