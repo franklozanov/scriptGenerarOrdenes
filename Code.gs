@@ -107,7 +107,7 @@ function onOpen() {
 function openPrintDialog() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
     .setWidth(550).setHeight(700).setTitle('Panel de Impresión');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Panel de Impresión');
+  SpreadsheetApp.getUi().showModelessDialog(html, 'Panel de Impresión');
 }
 
 // --- SISTEMA DE SEGURIDAD Y BLOQUEO ---

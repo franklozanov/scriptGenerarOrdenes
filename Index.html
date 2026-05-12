@@ -7,10 +7,12 @@
       * { box-sizing: border-box; }
       body { 
         font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; 
-        padding: 24px; 
+        padding: 0; 
         background: #f6f9fc;
         margin: 0; 
         min-height: 100vh;
+        position: relative;
+        overflow: hidden;
       }
       .card { 
         background: white; 
@@ -18,7 +20,44 @@
         border-radius: 12px; 
         box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
         position: relative; 
-        margin: 0 auto;
+        margin: 30px 0 0 0;
+        height: calc(100vh - 30px);
+        overflow-y: auto;
+      }
+
+      #drag-handle {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 30px;
+        background-color: #1976d2;
+        color: white;
+        cursor: move;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        user-select: none;
+        box-sizing: border-box;
+        z-index: 9999;
+        font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
+      }
+
+      #drag-handle-title {
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      #drag-handle-close {
+        font-size: 22px;
+        cursor: pointer;
+        font-weight: bold;
+        line-height: 1;
+      }
+
+      #drag-handle-close:hover {
+        color: #ffcdd2;
       }
       
       /* Section Groups */
@@ -317,6 +356,10 @@
     </style>
   </head>
   <body>
+    <div id="drag-handle">
+      <div id="drag-handle-title">Panel de Impresión</div>
+      <div id="drag-handle-close" onclick="google.script.host.close()">×</div>
+    </div>
     <div class="card">
       <div id="loader">
         <div class="spinner"></div>
@@ -1092,6 +1135,28 @@
         console.log(`✓ Usando documentos dinámicos precargados para orden ${orderNo}`);
         const payload = buildPayloadFromPreload(config);
         processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
+      }
+
+      // --- Lógica para hacer el diálogo arrastrable ---
+      const dragHandle = document.getElementById('drag-handle');
+      let offsetX, offsetY;
+
+      dragHandle.addEventListener('mousedown', function(e) {
+        offsetX = e.clientX;
+        offsetY = e.clientY;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      function onMouseMove(e) {
+        const dx = e.clientX - offsetX;
+        const dy = e.clientY - offsetY;
+        google.script.host.moveBy(dx, dy);
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
       }
     </script>
   </body>
