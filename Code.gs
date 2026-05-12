@@ -22,7 +22,8 @@ function onOpen() {
   // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();
-    syncVerifCantDisponible();
+    // TEMPORALMENTE DESHABILITADO: syncVerifCantDisponible() causa sobrescritura de encabezados
+    // syncVerifCantDisponible();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Plantillas estáticas listas.', 'Sistema QMS', 5);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
