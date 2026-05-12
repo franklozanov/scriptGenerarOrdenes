@@ -59,6 +59,22 @@
       #drag-handle-close:hover {
         color: #ffcdd2;
       }
+
+      #resize-handle {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 20px;
+        height: 20px;
+        cursor: nwse-resize;
+        z-index: 10000;
+        background: linear-gradient(135deg, transparent 0%, transparent 50%, #94a3b8 50%, #94a3b8 100%);
+        border-bottom-right-radius: 12px;
+      }
+
+      #resize-handle:hover {
+        background: linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%);
+      }
       
       /* Section Groups */
       .section { margin-bottom: 28px; }
@@ -360,6 +376,7 @@
       <div id="drag-handle-title">Panel de Impresión</div>
       <div id="drag-handle-close" onclick="google.script.host.close()">×</div>
     </div>
+    <div id="resize-handle"></div>
     <div class="card">
       <div id="loader">
         <div class="spinner"></div>
@@ -1151,12 +1168,56 @@
       function onMouseMove(e) {
         const dx = e.clientX - offsetX;
         const dy = e.clientY - offsetY;
+        
+        // Actualizar las coordenadas de referencia para el próximo movimiento
+        offsetX = e.clientX;
+        offsetY = e.clientY;
+        
+        // Mover la ventana usando la API de Google Apps Script
         google.script.host.moveBy(dx, dy);
       }
 
       function onMouseUp() {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+      }
+
+      // --- Lógica para redimensionar el diálogo ---
+      const resizeHandle = document.getElementById('resize-handle');
+      let isResizing = false;
+      let startWidth, startHeight, startX, startY;
+
+      resizeHandle.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        // Obtener dimensiones actuales del diálogo
+        startWidth = window.innerWidth;
+        startHeight = window.innerHeight;
+        
+        document.addEventListener('mousemove', onResizeMove);
+        document.addEventListener('mouseup', onResizeUp);
+        e.preventDefault();
+      });
+
+      function onResizeMove(e) {
+        if (!isResizing) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        const newWidth = Math.max(400, startWidth + deltaX);
+        const newHeight = Math.max(500, startHeight + deltaY);
+        
+        google.script.host.setWidth(newWidth);
+        google.script.host.setHeight(newHeight);
+      }
+
+      function onResizeUp() {
+        isResizing = false;
+        document.removeEventListener('mousemove', onResizeMove);
+        document.removeEventListener('mouseup', onResizeUp);
       }
     </script>
   </body>
