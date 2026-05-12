@@ -255,13 +255,21 @@
 
       <div class="form-row">
         <div class="form-group">
+          <label for="totalPagsMostrado">Páginas Entregadas</label>
+          <input type="number" id="totalPagsMostrado" readonly style="background-color: #f5f5f5;" placeholder="-">
+        </div>
+        <div class="form-group">
           <label for="noPagDevueltas">Páginas Devueltas</label>
           <input type="number" id="noPagDevueltas" min="0" placeholder="0">
         </div>
       </div>
 
+      <div id="paginasWarning" style="display: none; color: #e65100; font-size: 12px; margin-bottom: 16px; margin-top: -8px; background-color: #fff3e0; padding: 8px; border-radius: 4px; border-left: 3px solid #ffb74d;">
+        ⚠️ <strong>Atención:</strong> Las páginas devueltas no coinciden con las entregadas. Es <strong>obligatorio</strong> registrar el motivo en el comentario.
+      </div>
+
       <div class="form-group">
-        <label for="comentario">Comentario</label>
+        <label for="comentario">Comentario <span id="reqAsterisk" style="color: red; display: none;">*</span></label>
         <textarea id="comentario" placeholder="Ingrese comentarios adicionales (opcional)"></textarea>
       </div>
 
@@ -308,6 +316,7 @@
       document.getElementById('novedadForm').addEventListener('submit', handleSubmit);
       document.getElementById('usuarioResponsable').addEventListener('change', handleUsuarioChange);
       document.getElementById('noOrden').addEventListener('change', handleOrdenChange);
+      document.getElementById('noPagDevueltas').addEventListener('input', validarPaginas);
     }
 
     function populateUsuariosList() {
@@ -374,12 +383,47 @@
       var select = document.getElementById('noOrden');
       var selectedOption = select.options[select.selectedIndex];
       
-      if (selectedOption) {
+      if (selectedOption && selectedOption.value !== "") {
         document.getElementById('ordenCodigo').value = selectedOption.getAttribute('data-codigo') || '';
-        document.getElementById('ordenTotalPags').value = selectedOption.getAttribute('data-totalpags') || '0';
+        var totalPags = selectedOption.getAttribute('data-totalpags') || '0';
+        document.getElementById('ordenTotalPags').value = totalPags;
+        document.getElementById('totalPagsMostrado').value = totalPags;
       } else {
         document.getElementById('ordenCodigo').value = '';
         document.getElementById('ordenTotalPags').value = '0';
+        document.getElementById('totalPagsMostrado').value = '';
+      }
+      validarPaginas();
+    }
+
+    function validarPaginas() {
+      var totalPags = document.getElementById('totalPagsMostrado').value;
+      var devueltas = document.getElementById('noPagDevueltas').value;
+      var warning = document.getElementById('paginasWarning');
+      var comentario = document.getElementById('comentario');
+      var reqAsterisk = document.getElementById('reqAsterisk');
+      var noOrden = document.getElementById('noOrden').value;
+      
+      if (!noOrden || totalPags === "") {
+        warning.style.display = 'none';
+        comentario.required = false;
+        reqAsterisk.style.display = 'none';
+        return;
+      }
+      
+      var numTotal = Number(totalPags) || 0;
+      var numDevueltas = devueltas === "" ? -1 : Number(devueltas);
+      
+      if (numDevueltas >= 0 && numTotal !== numDevueltas) {
+        warning.style.display = 'block';
+        comentario.required = true;
+        reqAsterisk.style.display = 'inline';
+        comentario.placeholder = "Ingrese el motivo de la diferencia de páginas (Obligatorio)";
+      } else {
+        warning.style.display = 'none';
+        comentario.required = false;
+        reqAsterisk.style.display = 'none';
+        comentario.placeholder = "Ingrese comentarios adicionales (opcional)";
       }
     }
 
@@ -412,6 +456,15 @@
 
       if (!tipoNovedad) {
         showMessage('Seleccione el tipo de novedad.', 'error');
+        return;
+      }
+
+      var numTotal = Number(totalPags) || 0;
+      var numDevueltas = noPagDevueltas === "" ? -1 : Number(noPagDevueltas);
+      
+      if (numDevueltas >= 0 && numTotal !== numDevueltas && !comentario.trim()) {
+        showMessage('Las páginas devueltas no coinciden con las entregadas. Debe registrar el motivo en los comentarios.', 'warning');
+        document.getElementById('comentario').focus();
         return;
       }
 
