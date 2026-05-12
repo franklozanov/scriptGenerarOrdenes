@@ -131,10 +131,9 @@ function onEditInstalled(e) {
     var eRow = editedRange.getRow();
     var eCol = editedRange.getColumn();
 
-    var effectiveOwner = Session.getEffectiveUser().getEmail();
-    var editingUser = "";
-    try { editingUser = Session.getActiveUser().getEmail(); } catch(eu) {}
-    if (effectiveOwner && editingUser && editingUser === effectiveOwner) return;
+    // CORREGIDO: Solo ignorar si NO hay objeto evento (ediciones programáticas)
+    // Las ediciones manuales del propietario SÍ deben registrarse
+    if (!e || !e.range) return;
 
     for (var j = 0; j < allRangeProtections.length; j++) {
       var pRange = allRangeProtections[j].getRange();
