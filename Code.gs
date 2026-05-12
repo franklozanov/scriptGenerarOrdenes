@@ -1,6 +1,3 @@
-// Obtiene la contraseña desde las propiedades del script
-var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
-
 // --- FUNCIONES HELPER PARA ACCESO A COLUMNAS POR NOMBRE ---
 
 /**
@@ -208,10 +205,6 @@ function promptInitializeApp() {
 }
 
 // --- LÓGICA PRINCIPAL DE IMPRESIÓN ---
-
-var STATIC_TEMPLATE_KEYS_ = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
-var STATIC_TEMPLATE_CACHE_TTL_ = 21600;
-var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 
 function getStaticTemplateCachePrefix_(key) {
   return 'staticPdf_' + key + '_';
@@ -1185,14 +1178,6 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 // --- FASE 1: INICIALIZACIÓN Y VALIDACIÓN DE ESTRUCTURA ---
 
 // Estructura esperada del libro de trabajo
-const REQUIRED_SHEETS = {
-  'templates': ['Clave', 'Valor', 'NombreTemplate'],  // CORRECCIÓN: DOC_ORDENES es valor de fila, no columna
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoOrden', 'ConsecutivoImp', 'ImpresoPor', 'STATUS'],
-  'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
-  'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
-  'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']
-};
-
 function initializeApp(ui) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var report = validateStructure();
