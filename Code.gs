@@ -107,7 +107,7 @@ function onOpen() {
 function openPrintDialog() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
     .setWidth(550).setHeight(700);
-  SpreadsheetApp.getUi().showModelessDialog(html, '');
+  SpreadsheetApp.getUi().showModelessDialog(html, ' ');
 }
 
 // --- SISTEMA DE SEGURIDAD Y BLOQUEO ---

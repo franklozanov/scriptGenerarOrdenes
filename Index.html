@@ -5,24 +5,51 @@
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
     <style>
       * { box-sizing: border-box; }
-      body { 
+      html, body { 
         font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; 
         padding: 0; 
         background: #f6f9fc;
         margin: 0; 
-        min-height: 100vh;
-        position: relative;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
       }
       .card { 
         background: white; 
-        padding: 32px; 
-        border-radius: 12px; 
+        padding: 20px; 
+        border-radius: 0 0 12px 12px; 
         box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
-        position: relative; 
-        margin: 30px 0 0 0;
-        height: calc(100vh - 30px);
+        position: absolute;
+        top: 30px;
+        left: 0;
+        right: 0;
+        bottom: 0;
         overflow-y: auto;
+        overflow-x: hidden;
+      }
+      
+      /* Custom scrollbar for main container */
+      .card::-webkit-scrollbar {
+        width: 8px;
+      }
+      .card::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      .card::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .card::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      
+      /* Responsive padding */
+      @media (min-width: 500px) {
+        .card { padding: 24px; }
+      }
+      @media (min-width: 600px) {
+        .card { padding: 32px; }
       }
 
       #drag-handle {
@@ -76,18 +103,35 @@
         background: linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%);
       }
       
-      /* Section Groups */
-      .section { margin-bottom: 28px; }
+      /* Section Groups - Responsive */
+      .section { 
+        margin-bottom: 20px;
+      }
+      @media (min-height: 600px) {
+        .section { margin-bottom: 24px; }
+      }
+      @media (min-height: 700px) {
+        .section { margin-bottom: 28px; }
+      }
+      
       .section-title {
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: #64748b;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
       
-      .field { margin-bottom: 20px; }
+      .field { 
+        margin-bottom: 16px;
+      }
+      @media (min-height: 600px) {
+        .field { margin-bottom: 18px; }
+      }
+      @media (min-height: 700px) {
+        .field { margin-bottom: 20px; }
+      }
       label { 
         display: block; 
         font-weight: 600; 
@@ -159,12 +203,13 @@
         color: #635bff;
       }
       
-      /* Template Container */
+      /* Template Container - Responsive */
       .tpl-container { 
         border: 1px solid #e2e8f0; 
         border-radius: 8px; 
-        max-height: 350px; 
+        max-height: min(350px, 40vh);
         overflow-y: auto; 
+        overflow-x: hidden;
         padding: 8px;
         background: #f8fafc;
       }
@@ -260,10 +305,10 @@
         box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
       }
       
-      /* Main Button */
+      /* Main Button - Responsive */
       button#goBtn { 
         width: 100%; 
-        padding: 14px 24px; 
+        padding: 12px 20px; 
         background: #635bff; 
         color: white; 
         border: none; 
@@ -272,9 +317,21 @@
         font-weight: 600; 
         margin-top: 8px; 
         transition: all 0.2s ease; 
-        font-size: 15px;
+        font-size: 14px;
         letter-spacing: 0.3px;
         box-shadow: 0 2px 4px rgba(99, 91, 255, 0.2);
+      }
+      @media (min-height: 600px) {
+        button#goBtn { 
+          padding: 13px 22px;
+          font-size: 14.5px;
+        }
+      }
+      @media (min-height: 700px) {
+        button#goBtn { 
+          padding: 14px 24px;
+          font-size: 15px;
+        }
       }
       button#goBtn:hover:not(:disabled) { 
         background: #5a54e6;
@@ -290,13 +347,29 @@
       }
       
       #status { 
-        margin-top: 20px; 
-        font-size: 14px; 
+        margin-top: 16px; 
+        font-size: 13px; 
         text-align: center; 
         font-weight: 500; 
-        min-height: 24px;
-        padding: 12px;
+        min-height: 20px;
+        padding: 10px;
         border-radius: 8px;
+        word-wrap: break-word;
+      }
+      @media (min-height: 600px) {
+        #status { 
+          margin-top: 18px;
+          font-size: 13.5px;
+          padding: 11px;
+        }
+      }
+      @media (min-height: 700px) {
+        #status { 
+          margin-top: 20px;
+          font-size: 14px;
+          padding: 12px;
+          min-height: 24px;
+        }
       }
       .error-text { 
         color: #dc2626; 
@@ -312,12 +385,27 @@
       }
       .preload-banner {
         display: none;
-        margin-bottom: 20px;
-        padding: 12px 14px;
+        margin-bottom: 16px;
+        padding: 10px 12px;
         border-radius: 8px;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
         line-height: 1.4;
+        word-wrap: break-word;
+      }
+      @media (min-height: 600px) {
+        .preload-banner {
+          margin-bottom: 18px;
+          padding: 11px 13px;
+          font-size: 12.5px;
+        }
+      }
+      @media (min-height: 700px) {
+        .preload-banner {
+          margin-bottom: 20px;
+          padding: 12px 14px;
+          font-size: 13px;
+        }
       }
       .preload-banner.info {
         display: block;
