@@ -1,3 +1,45 @@
+// ============================================================
+// MODULE: Migration
+// Descripción: Scripts de migración de datos y estructura
+// Prioridad de Carga: N/A (se ejecuta manualmente, no automáticamente)
+// ============================================================
+//
+// ⚠️ IMPORTANTE - LEA ANTES DE USAR:
+// 
+// Este archivo contiene funciones de migración que se ejecutan MANUALMENTE
+// una sola vez cuando se actualiza la estructura de datos del sistema.
+//
+// 📋 PROPÓSITO:
+// - Migrar datos de estructuras antiguas a nuevas estructuras
+// - Mantener historial de cambios estructurales en el sistema
+// - Proporcionar funciones de verificación pre/post migración
+//
+// 🔒 REGLAS DE USO:
+// 1. NUNCA ejecutar funciones de migración automáticamente en triggers
+// 2. SIEMPRE hacer respaldo completo antes de ejecutar migraciones
+// 3. SIEMPRE ejecutar verificarEstadoMigracion() ANTES de migrar
+// 4. SOLO ejecutar cada migración UNA VEZ por ambiente
+// 5. DOCUMENTAR fecha y usuario que ejecutó la migración
+//
+// 📝 CÓMO AGREGAR NUEVAS MIGRACIONES:
+// 1. Crear función con nombre descriptivo: migrar[Descripción]()
+// 2. Incluir validaciones de pre-condiciones (columnas existen, etc.)
+// 3. Incluir lógica de skip para filas ya migradas
+// 4. Incluir logs detallados del proceso
+// 5. Incluir función de verificación asociada: verificar[Descripción]()
+// 6. Documentar en comentarios: fecha creación, autor, propósito
+//
+// 📊 HISTORIAL DE MIGRACIONES:
+// 
+// [2026-05-13] migrarAdjuntoOrdenANuevasColumnas()
+//   - Propósito: Migrar de columna única AdjuntoOrden a columnas separadas
+//                AdjuntoCOA, AdjuntoOA y EstadoCarga
+//   - Estado: Pendiente de ejecución en producción
+//   - Ejecutado por: [PENDIENTE - Registrar aquí después de ejecutar]
+//   - Resultado: [PENDIENTE - Registrar resultado aquí]
+//
+// ============================================================
+
 /**
  * Migration.gs
  * 

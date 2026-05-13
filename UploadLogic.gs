@@ -19,7 +19,8 @@
  */
 function abrirModalSubidaGeneral() {
   try {
-    var html = HtmlService.createHtmlOutputFromFile('UploadCentralModal')
+    var template = HtmlService.createTemplateFromFile('UploadCentralModal');
+    var html = template.evaluate()
       .setWidth(700)
       .setHeight(600);
     SpreadsheetApp.getUi().showModelessDialog(html, 'Subida Masiva de Documentos');
