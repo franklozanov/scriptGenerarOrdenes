@@ -23,7 +23,7 @@
 function openPrintDialog() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
     .setWidth(550).setHeight(700);
-  SpreadsheetApp.getUi().showModelessDialog(html, ' '); // Título vacío - el drag handle provee el título
+  SpreadsheetApp.getUi().showModelessDialog(html, 'Panel de Impresión');
 }
 
 // --- CONFIGURACIÓN DE IMPRESIÓN ---

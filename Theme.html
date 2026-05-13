@@ -350,41 +350,15 @@
 
   /* === DRAG & RESIZE HANDLES === */
   #modal-drag-handle {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 36px;
-    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    cursor: move;
-    user-select: none;
-    z-index: 10001;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: none;  /* Ocultar drag handle azul - usar solo el título nativo gris de Google Sheets */
   }
 
   #modal-drag-handle-title {
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
+    display: none;
   }
 
   #modal-drag-handle-close {
-    font-size: 24px;
-    cursor: pointer;
-    font-weight: bold;
-    line-height: 1;
-    padding: 0 8px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-  }
-
-  #modal-drag-handle-close:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+    display: none;
   }
 
   #modal-resize-handle {
@@ -404,13 +378,10 @@
   }
 
   /* Ajuste del body y contenedores cuando hay drag handle */
-  body.has-drag-handle {
-    padding-top: 56px;  /* 36px del drag handle + 20px de espacio */
-  }
-
+  /* El drag handle azul está oculto - se usa solo el título nativo gris de Google Sheets */
   body.has-drag-handle .container,
   body.has-drag-handle .card {
-    margin-top: 0;  /* Remover margin-top ya que el body tiene padding-top */
+    margin-top: 0;
   }
 
   /* === RESPONSIVE === */

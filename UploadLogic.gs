@@ -23,7 +23,7 @@ function abrirModalSubidaGeneral() {
     var html = template.evaluate()
       .setWidth(700)
       .setHeight(600);
-    SpreadsheetApp.getUi().showModelessDialog(html, ' '); // Título vacío - el drag handle provee el título
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Subida Masiva de Documentos');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }

@@ -470,9 +470,9 @@
 
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
-      // Inicializar sistema de drag y resize
+      // Inicializar drag y resize (el drag handle azul está oculto en Theme.html)
       initializeModalDragResize({
-        title: 'Subida Masiva de Documentos',
+        title: 'Subida Masiva de Documentos',  // No se mostrará - drag handle oculto
         enableDrag: true,
         enableResize: true,
         minWidth: 600,
