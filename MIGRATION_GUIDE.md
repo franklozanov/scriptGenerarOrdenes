@@ -74,7 +74,26 @@ Después de la migración:
 2. Verifique que la columna `EstadoCarga` muestre los estados correctos
 3. Ejecute nuevamente `verificarEstadoMigracion()` para confirmar
 
-### 6. Eliminar Columna Antigua (Opcional)
+### 6. Aplicar Validaciones de Datos (Recomendado)
+
+Para asegurar la integridad de los datos, aplique validaciones tipo dropdown:
+
+Desde el Editor de Scripts, ejecute:
+```javascript
+aplicarValidacionesEstadoCarga()
+```
+
+Esto aplicará validaciones de datos que:
+- **AdjuntoCOA**: Solo permite "Pendiente" o "✅ Cargado"
+- **AdjuntoOA**: Solo permite "Pendiente" o "✅ Cargado"
+- **EstadoCarga**: Solo permite "Pendiente COA/OA", "Pendiente OA", "Pendiente COA", "✅ Cargados"
+
+**Beneficios:**
+- Previene errores de escritura manual
+- Asegura consistencia en los datos
+- Facilita la selección con dropdown visual
+
+### 7. Eliminar Columna Antigua (Opcional)
 
 Una vez confirmado que todo funciona correctamente, puede eliminar manualmente la columna `AdjuntoOrden` antigua.
 

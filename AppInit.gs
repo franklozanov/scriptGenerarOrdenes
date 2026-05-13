@@ -104,6 +104,13 @@ function initializeCompleteSystem(ui) {
     throw e;
   }
 
+  try {
+    aplicarValidacionesEstadoCarga();
+    summary.push("✓ Validaciones de estado de carga aplicadas");
+  } catch (e) {
+    summary.push("⚠️ Validaciones de estado: " + e.message);
+  }
+
   // Diagnóstico de ConsecutivoImp
   try {
     var diagnosticResult = runConsecutivoImpDiagnostic_();
@@ -352,6 +359,105 @@ function fixHeaders(ui) {
       Logger.log("✓ Encabezados corregidos en hoja: " + sheetName);
     }
   }
+}
+
+// --- VALIDACIONES DE DATOS ---
+
+/**
+ * Aplica validaciones de datos tipo dropdown a las columnas de estado de carga.
+ * Asegura que solo se usen valores predefinidos en AdjuntoCOA, AdjuntoOA y EstadoCarga.
+ * 
+ * IMPORTANTE: Ejecutar después de agregar las columnas o cuando se necesite reforzar las validaciones.
+ */
+function aplicarValidacionesEstadoCarga() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    
+    if (!sheet) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Obtener índices de columnas
+    var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
+    var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+    var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    
+    if (!colAdjuntoCOAIdx || !colAdjuntoOAIdx || !colEstadoCargaIdx) {
+      throw new Error("No se encontraron las columnas AdjuntoCOA, AdjuntoOA o EstadoCarga. Asegúrese de que existan.");
+    }
+    
+    var lastRow = sheet.getMaxRows();
+    
+    // Valores permitidos para AdjuntoCOA y AdjuntoOA
+    var valoresDocumento = ["Pendiente", "✅ Cargado"];
+    var ruleDocumento = SpreadsheetApp.newDataValidation()
+      .requireValueInList(valoresDocumento, true)
+      .setAllowInvalid(false)
+      .setHelpText("Seleccione: Pendiente o ✅ Cargado")
+      .build();
+    
+    // Valores permitidos para EstadoCarga
+    var valoresEstadoCarga = ["Pendiente COA/OA", "Pendiente OA", "Pendiente COA", "✅ Cargados"];
+    var ruleEstadoCarga = SpreadsheetApp.newDataValidation()
+      .requireValueInList(valoresEstadoCarga, true)
+      .setAllowInvalid(false)
+      .setHelpText("Estado calculado automáticamente. Valores: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados")
+      .build();
+    
+    // Aplicar validación a AdjuntoCOA (desde fila 2 hasta el final)
+    var rangeCOA = sheet.getRange(2, colAdjuntoCOAIdx, lastRow - 1, 1);
+    rangeCOA.setDataValidation(ruleDocumento);
+    Logger.log("✓ Validación aplicada a columna AdjuntoCOA");
+    
+    // Aplicar validación a AdjuntoOA
+    var rangeOA = sheet.getRange(2, colAdjuntoOAIdx, lastRow - 1, 1);
+    rangeOA.setDataValidation(ruleDocumento);
+    Logger.log("✓ Validación aplicada a columna AdjuntoOA");
+    
+    // Aplicar validación a EstadoCarga
+    var rangeEstado = sheet.getRange(2, colEstadoCargaIdx, lastRow - 1, 1);
+    rangeEstado.setDataValidation(ruleEstadoCarga);
+    Logger.log("✓ Validación aplicada a columna EstadoCarga");
+    
+    // Mostrar mensaje al usuario
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(
+      '✅ Validaciones Aplicadas',
+      'Se aplicaron validaciones de datos tipo dropdown a las columnas:\n\n' +
+      '• AdjuntoCOA: Pendiente, ✅ Cargado\n' +
+      '• AdjuntoOA: Pendiente, ✅ Cargado\n' +
+      '• EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados\n\n' +
+      'Ahora solo se podrán ingresar valores válidos en estas columnas.',
+      ui.ButtonSet.OK
+    );
+    
+    return {
+      status: 'success',
+      message: 'Validaciones aplicadas correctamente'
+    };
+    
+  } catch (e) {
+    Logger.log("ERROR al aplicar validaciones: " + e.message);
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(
+      'Error',
+      'No se pudieron aplicar las validaciones:\n' + e.message,
+      ui.ButtonSet.OK
+    );
+    throw e;
+  }
+}
+
+/**
+ * Prompt para aplicar validaciones con autenticación admin.
+ */
+function promptAplicarValidacionesEstadoCarga() {
+  withAdminAuth('Aplicar Validaciones de Estado de Carga', function(ui) {
+    aplicarValidacionesEstadoCarga();
+  });
 }
 
 // --- LOGGING ---
