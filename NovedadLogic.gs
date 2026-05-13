@@ -23,7 +23,7 @@ function abrirModalRegistroNovedad() {
     var html = template.evaluate()
       .setWidth(600)
       .setHeight(650);
-    SpreadsheetApp.getUi().showModelessDialog(html, 'Registrar Entrega / Novedad');
+    SpreadsheetApp.getUi().showModelessDialog(html, ' '); // Título vacío - el drag handle provee el título
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }

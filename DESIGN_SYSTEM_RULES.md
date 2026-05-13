@@ -506,6 +506,23 @@ Antes de hacer commit de cambios UI, verificar:
 <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
 ```
 
+### **Abrir modal sin título duplicado:**
+```javascript
+// ✅ CORRECTO - Título vacío, el drag handle provee el título
+function abrirMiModal() {
+  var html = HtmlService.createTemplateFromFile('MiModal');
+  var output = html.evaluate().setWidth(600).setHeight(500);
+  SpreadsheetApp.getUi().showModelessDialog(output, ' '); // Espacio en blanco
+}
+
+// ❌ INCORRECTO - Crea título duplicado
+function abrirMiModal() {
+  var html = HtmlService.createTemplateFromFile('MiModal');
+  var output = html.evaluate().setWidth(600).setHeight(500);
+  SpreadsheetApp.getUi().showModelessDialog(output, 'Mi Modal'); // ❌ Duplicado
+}
+```
+
 ### **Estructura básica de un modal:**
 ```html
 <!DOCTYPE html>
@@ -528,6 +545,17 @@ Antes de hacer commit de cambios UI, verificar:
   </div>
   
   <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+  
+  <script>
+    window.onload = function() {
+      // Inicializar drag handle con título
+      initializeModalDragResize({
+        title: 'Mi Modal',  // Este es el título que se mostrará
+        enableDrag: true,
+        enableResize: true
+      });
+    };
+  </script>
 </body>
 </html>
 ```
