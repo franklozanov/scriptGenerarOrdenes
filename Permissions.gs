@@ -323,8 +323,9 @@ function configureLogsProtection() {
  * Aplica validación de datos y formato condicional con colores a las columnas STATUS.
  * Restringe valores a: Impreso, Reimpreso, RecibidaQA, DevueltaQA, Cerrada.
  * Aplica colores específicos para cada estado.
+ * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicialización)
  */
-function applyStatusDataValidation() {
+function applyStatusDataValidation(silent) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var statusOptions = ['Impreso', 'Reimpreso', 'RecibidaQA', 'DevueltaQA', 'Cerrada'];
@@ -432,27 +433,33 @@ function applyStatusDataValidation() {
       sheetsProcessed.push(sheetName);
     });
     
-    // Mostrar mensaje al usuario
-    var ui = SpreadsheetApp.getUi();
-    if (sheetsProcessed.length > 0) {
-      ui.alert(
-        '✅ Validaciones y Colores Aplicados',
-        'Se aplicaron validaciones de datos y formato condicional a la columna STATUS en:\n\n' +
-        sheetsProcessed.join('\n') + '\n\n' +
-        'Estados disponibles:\n' +
-        '⚫ Impreso (gris)\n' +
-        '🟡 Reimpreso (amarillo)\n' +
-        '🔵 RecibidaQA (azul)\n' +
-        '🔴 DevueltaQA (rojo)\n' +
-        '🟢 Cerrada (verde)',
-        ui.ButtonSet.OK
-      );
-    } else {
-      ui.alert(
-        '⚠️ Advertencia',
-        'No se pudo aplicar validaciones. Verifique que las hojas y columnas existan.',
-        ui.ButtonSet.OK
-      );
+    // Mostrar mensaje al usuario solo si no es modo silencioso
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        if (sheetsProcessed.length > 0) {
+          ui.alert(
+            '✅ Validaciones y Colores Aplicados',
+            'Se aplicaron validaciones de datos y formato condicional a la columna STATUS en:\n\n' +
+            sheetsProcessed.join('\n') + '\n\n' +
+            'Estados disponibles:\n' +
+            '⚫ Impreso (gris)\n' +
+            '🟡 Reimpreso (amarillo)\n' +
+            '🔵 RecibidaQA (azul)\n' +
+            '🔴 DevueltaQA (rojo)\n' +
+            '🟢 Cerrada (verde)',
+            ui.ButtonSet.OK
+          );
+        } else {
+          ui.alert(
+            '⚠️ Advertencia',
+            'No se pudo aplicar validaciones. Verifique que las hojas y columnas existan.',
+            ui.ButtonSet.OK
+          );
+        }
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar mensaje UI (contexto sin UI): " + uiError.message);
+      }
     }
     
     return {
@@ -462,12 +469,20 @@ function applyStatusDataValidation() {
     
   } catch (e) {
     Logger.log("ERROR en applyStatusDataValidation: " + e.message);
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(
-      'Error',
-      'No se pudieron aplicar las validaciones:\n' + e.message,
-      ui.ButtonSet.OK
-    );
+    
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        ui.alert(
+          'Error',
+          'No se pudieron aplicar las validaciones:\n' + e.message,
+          ui.ButtonSet.OK
+        );
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar error UI: " + uiError.message);
+      }
+    }
+    
     throw e;
   }
 }

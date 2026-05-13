@@ -10,8 +10,10 @@
  * 
  * IMPORTANTE: Esta función debe ejecutarse UNA VEZ para crear el botón.
  * Si ya existe un botón, primero ejecute eliminarBotonFlotanteNovedad().
+ * 
+ * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicialización)
  */
-function crearBotonFlotanteNovedad() {
+function crearBotonFlotanteNovedad(silent) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
@@ -23,18 +25,13 @@ function crearBotonFlotanteNovedad() {
     // Eliminar botón existente si hay alguno
     eliminarBotonFlotanteNovedad();
     
-    // Crear imagen SVG del botón
-    var svgButton = createNovedadButtonSVG_();
+    // Usar una imagen PNG simple en base64 (más compatible que SVG)
+    var imageBlob = createNovedadButtonImage_();
     
-    // Convertir SVG a blob
-    var blob = Utilities.newBlob(svgButton, 'image/svg+xml', 'boton-novedad.svg');
-    
-    // Inserir imagen en la hoja
-    var image = sheet.insertImage(blob, 1, 1);
+    // Insertar imagen en la hoja
+    var image = sheet.insertImage(imageBlob, 1, 1);
     
     // Posicionar en esquina inferior derecha
-    // Nota: Las coordenadas son relativas a la celda, no absolutas
-    // Usaremos una celda fuera del área visible normal
     var lastRow = Math.max(sheet.getMaxRows() - 5, 50);
     var lastCol = Math.max(sheet.getMaxColumns() - 2, 20);
     
@@ -44,34 +41,48 @@ function crearBotonFlotanteNovedad() {
     image.setAnchorCellYOffset(10);
     
     // Configurar tamaño del botón
-    image.setWidth(140);
-    image.setHeight(140);
+    image.setWidth(120);
+    image.setHeight(120);
     
     // Asignar función al hacer clic
     image.assignScript('abrirModalRegistroNovedad');
     
     Logger.log("✓ Botón flotante de Novedad creado exitosamente");
     
-    // Mostrar mensaje al usuario
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(
-      '✅ Botón Flotante Creado',
-      'Se ha creado un botón flotante "+ Novedad" en la esquina inferior derecha de la hoja Ordenes.\n\n' +
-      'Haga clic en el botón para abrir el modal de registro de novedad.\n\n' +
-      'Nota: Puede mover el botón arrastrándolo a la posición que prefiera.',
-      ui.ButtonSet.OK
-    );
+    // Mostrar mensaje al usuario solo si no es modo silencioso
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        ui.alert(
+          '✅ Botón Flotante Creado',
+          'Se ha creado un botón flotante "+ Novedad" en la esquina inferior derecha de la hoja Ordenes.\n\n' +
+          'Haga clic en el botón para abrir el modal de registro de novedad.\n\n' +
+          'Nota: Puede mover el botón arrastrándolo a la posición que prefiera.',
+          ui.ButtonSet.OK
+        );
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar mensaje UI (contexto sin UI): " + uiError.message);
+      }
+    }
     
     return { status: 'success', message: 'Botón flotante creado' };
     
   } catch (e) {
     Logger.log("ERROR al crear botón flotante: " + e.message);
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(
-      'Error',
-      'No se pudo crear el botón flotante:\n' + e.message,
-      ui.ButtonSet.OK
-    );
+    
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        ui.alert(
+          'Error',
+          'No se pudo crear el botón flotante:\n' + e.message,
+          ui.ButtonSet.OK
+        );
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar error UI: " + uiError.message);
+      }
+    }
+    
     throw e;
   }
 }
@@ -117,38 +128,26 @@ function eliminarBotonFlotanteNovedad() {
 }
 
 /**
- * Crea el SVG del botón flotante con estilo moderno.
- * @returns {string} Código SVG del botón
+ * Crea una imagen del botón flotante.
+ * Usa una imagen simple de un ícono de "+" desde una fuente pública.
+ * @returns {Blob} Blob de la imagen
  * @private
  */
-function createNovedadButtonSVG_() {
-  var svg = '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<svg width="140" height="140" xmlns="http://www.w3.org/2000/svg">' +
-    '<defs>' +
-    '<filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">' +
-    '<feGaussianBlur in="SourceAlpha" stdDeviation="3"/>' +
-    '<feOffset dx="0" dy="2" result="offsetblur"/>' +
-    '<feComponentTransfer>' +
-    '<feFuncA type="linear" slope="0.3"/>' +
-    '</feComponentTransfer>' +
-    '<feMerge>' +
-    '<feMergeNode/>' +
-    '<feMergeNode in="SourceGraphic"/>' +
-    '</feMerge>' +
-    '</filter>' +
-    '</defs>' +
-    // Círculo de fondo con sombra
-    '<circle cx="70" cy="70" r="60" fill="#1976d2" filter="url(#shadow)"/>' +
-    // Borde del círculo
-    '<circle cx="70" cy="70" r="60" fill="none" stroke="#1565c0" stroke-width="2"/>' +
-    // Símbolo "+" en blanco
-    '<line x1="70" y1="45" x2="70" y2="95" stroke="white" stroke-width="8" stroke-linecap="round"/>' +
-    '<line x1="45" y1="70" x2="95" y2="70" stroke="white" stroke-width="8" stroke-linecap="round"/>' +
-    // Texto "Novedad" debajo del +
-    '<text x="70" y="110" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">Novedad</text>' +
-    '</svg>';
+function createNovedadButtonImage_() {
+  // Usar una imagen pública simple de un botón "+"
+  // Esta es una imagen de placeholder.com con un círculo azul y "+"
+  var imageUrl = 'https://via.placeholder.com/120/1976d2/FFFFFF?text=%2B';
   
-  return svg;
+  try {
+    var response = UrlFetchApp.fetch(imageUrl);
+    var blob = response.getBlob();
+    blob.setName('boton-novedad.png');
+    return blob;
+  } catch (e) {
+    Logger.log("Error al obtener imagen: " + e.message);
+    // Si falla, crear un blob vacío simple
+    throw new Error("No se pudo crear la imagen del botón. Verifique la conexión a internet.");
+  }
 }
 
 /**

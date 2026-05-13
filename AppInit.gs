@@ -105,21 +105,21 @@ function initializeCompleteSystem(ui) {
   }
 
   try {
-    aplicarValidacionesEstadoCarga();
+    aplicarValidacionesEstadoCarga(true); // silent=true para evitar error de UI en inicialización
     summary.push("✓ Validaciones de estado de carga aplicadas");
   } catch (e) {
     summary.push("⚠️ Validaciones de estado: " + e.message);
   }
 
   try {
-    applyStatusDataValidation();
+    applyStatusDataValidation(true); // silent=true para evitar error de UI en inicialización
     summary.push("✓ Validaciones y colores de STATUS aplicados");
   } catch (e) {
     summary.push("⚠️ Validaciones de STATUS: " + e.message);
   }
 
   try {
-    crearBotonFlotanteNovedad();
+    crearBotonFlotanteNovedad(true); // silent=true para evitar error de UI en inicialización
     summary.push("✓ Botón flotante de Novedad creado");
   } catch (e) {
     summary.push("⚠️ Botón flotante: " + e.message);
@@ -382,8 +382,9 @@ function fixHeaders(ui) {
  * Asegura que solo se usen valores predefinidos en AdjuntoCOA, AdjuntoOA y EstadoCarga.
  * 
  * IMPORTANTE: Ejecutar después de agregar las columnas o cuando se necesite reforzar las validaciones.
+ * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicialización)
  */
-function aplicarValidacionesEstadoCarga() {
+function aplicarValidacionesEstadoCarga(silent) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
@@ -436,17 +437,23 @@ function aplicarValidacionesEstadoCarga() {
     rangeEstado.setDataValidation(ruleEstadoCarga);
     Logger.log("✓ Validación aplicada a columna EstadoCarga");
     
-    // Mostrar mensaje al usuario
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(
-      '✅ Validaciones Aplicadas',
-      'Se aplicaron validaciones de datos tipo dropdown a las columnas:\n\n' +
-      '• AdjuntoCOA: Pendiente, ✅ Cargado\n' +
-      '• AdjuntoOA: Pendiente, ✅ Cargado\n' +
-      '• EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados\n\n' +
-      'Ahora solo se podrán ingresar valores válidos en estas columnas.',
-      ui.ButtonSet.OK
-    );
+    // Mostrar mensaje al usuario solo si no es modo silencioso
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        ui.alert(
+          '✅ Validaciones Aplicadas',
+          'Se aplicaron validaciones de datos tipo dropdown a las columnas:\n\n' +
+          '• AdjuntoCOA: Pendiente, ✅ Cargado\n' +
+          '• AdjuntoOA: Pendiente, ✅ Cargado\n' +
+          '• EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados\n\n' +
+          'Ahora solo se podrán ingresar valores válidos en estas columnas.',
+          ui.ButtonSet.OK
+        );
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar mensaje UI (contexto sin UI): " + uiError.message);
+      }
+    }
     
     return {
       status: 'success',
@@ -455,12 +462,20 @@ function aplicarValidacionesEstadoCarga() {
     
   } catch (e) {
     Logger.log("ERROR al aplicar validaciones: " + e.message);
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(
-      'Error',
-      'No se pudieron aplicar las validaciones:\n' + e.message,
-      ui.ButtonSet.OK
-    );
+    
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        ui.alert(
+          'Error',
+          'No se pudieron aplicar las validaciones:\n' + e.message,
+          ui.ButtonSet.OK
+        );
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar error UI: " + uiError.message);
+      }
+    }
+    
     throw e;
   }
 }
