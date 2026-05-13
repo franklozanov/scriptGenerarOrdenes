@@ -1,0 +1,329 @@
+<!-- ============================================================
+     GLOBALSCRIPTS.HTML - JavaScript Compartido
+     Descripción: Funciones JS comunes para todos los modales
+     FASE 6: Design System
+     ============================================================ -->
+
+<script>
+  // === UTILIDADES GENERALES ===
+
+  /**
+   * Muestra un overlay de carga
+   * @param {string} message - Mensaje a mostrar
+   */
+  function showLoading(message = 'Procesando...') {
+    const overlay = document.getElementById('loading-overlay');
+    const text = document.getElementById('loading-text');
+    if (overlay) {
+      if (text) text.textContent = message;
+      overlay.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Oculta el overlay de carga
+   */
+  function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Muestra un mensaje de alerta
+   * @param {string} message - Mensaje a mostrar
+   * @param {string} type - Tipo de alerta: 'success', 'error', 'warning'
+   */
+  function showAlert(message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.textContent = message;
+    
+    const container = document.querySelector('.container') || document.body;
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    setTimeout(() => {
+      alertDiv.remove();
+    }, 5000);
+  }
+
+  /**
+   * Muestra un mensaje de éxito y cierra el modal
+   * @param {string} message - Mensaje de éxito
+   */
+  function showSuccessAndClose(message) {
+    showAlert(message, 'success');
+    setTimeout(() => {
+      google.script.host.close();
+    }, 2000);
+  }
+
+  /**
+   * Muestra un mensaje de error
+   * @param {string} message - Mensaje de error
+   */
+  function showError(message) {
+    hideLoading();
+    showAlert(message, 'error');
+  }
+
+  /**
+   * Valida que un campo no esté vacío
+   * @param {string} value - Valor a validar
+   * @param {string} fieldName - Nombre del campo
+   * @returns {boolean} True si es válido
+   */
+  function validateRequired(value, fieldName) {
+    if (!value || value.toString().trim() === '') {
+      showError(`El campo "${fieldName}" es obligatorio.`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Valida un email
+   * @param {string} email - Email a validar
+   * @returns {boolean} True si es válido
+   */
+  function validateEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+
+  /**
+   * Formatea una fecha a string
+   * @param {Date} date - Fecha a formatear
+   * @returns {string} Fecha formateada YYYY-MM-DD
+   */
+  function formatDate(date) {
+    if (!(date instanceof Date)) date = new Date(date);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Formatea una fecha y hora a string
+   * @param {Date} date - Fecha a formatear
+   * @returns {string} Fecha formateada YYYY-MM-DD HH:mm:ss
+   */
+  function formatDateTime(date) {
+    if (!(date instanceof Date)) date = new Date(date);
+    const dateStr = formatDate(date);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${dateStr} ${hours}:${minutes}:${seconds}`;
+  }
+
+  /**
+   * Escapa HTML para prevenir XSS
+   * @param {string} text - Texto a escapar
+   * @returns {string} Texto escapado
+   */
+  function escapeHtml(text) {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  /**
+   * Debounce para limitar ejecución de funciones
+   * @param {Function} func - Función a ejecutar
+   * @param {number} wait - Tiempo de espera en ms
+   * @returns {Function} Función debounced
+   */
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // === MANEJO DE ARCHIVOS ===
+
+  /**
+   * Convierte un archivo a base64
+   * @param {File} file - Archivo a convertir
+   * @returns {Promise<string>} Base64 del archivo
+   */
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Valida el tipo de archivo
+   * @param {File} file - Archivo a validar
+   * @param {string[]} allowedTypes - Tipos permitidos
+   * @returns {boolean} True si es válido
+   */
+  function validateFileType(file, allowedTypes) {
+    if (!allowedTypes.includes(file.type)) {
+      showError(`Tipo de archivo no permitido. Solo se permiten: ${allowedTypes.join(', ')}`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Valida el tamaño del archivo
+   * @param {File} file - Archivo a validar
+   * @param {number} maxSizeMB - Tamaño máximo en MB
+   * @returns {boolean} True si es válido
+   */
+  function validateFileSize(file, maxSizeMB) {
+    const maxBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      showError(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Formatea bytes a tamaño legible
+   * @param {number} bytes - Bytes a formatear
+   * @returns {string} Tamaño formateado
+   */
+  function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  // === MANEJO DE FORMULARIOS ===
+
+  /**
+   * Obtiene los datos de un formulario
+   * @param {string} formId - ID del formulario
+   * @returns {Object} Datos del formulario
+   */
+  function getFormData(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return {};
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+      data[key] = value;
+    }
+    
+    return data;
+  }
+
+  /**
+   * Resetea un formulario
+   * @param {string} formId - ID del formulario
+   */
+  function resetForm(formId) {
+    const form = document.getElementById(formId);
+    if (form) form.reset();
+  }
+
+  /**
+   * Deshabilita todos los inputs de un formulario
+   * @param {string} formId - ID del formulario
+   * @param {boolean} disabled - True para deshabilitar
+   */
+  function disableForm(formId, disabled = true) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    
+    const inputs = form.querySelectorAll('input, select, textarea, button');
+    inputs.forEach(input => {
+      input.disabled = disabled;
+    });
+  }
+
+  // === MANEJO DE ERRORES ===
+
+  /**
+   * Maneja errores de llamadas a Google Apps Script
+   * @param {Error} error - Error capturado
+   * @param {string} context - Contexto del error
+   */
+  function handleServerError(error, context = '') {
+    console.error(`Error en ${context}:`, error);
+    hideLoading();
+    
+    let message = 'Ocurrió un error al procesar la solicitud.';
+    
+    if (error && error.message) {
+      message = error.message;
+    }
+    
+    if (context) {
+      message = `${context}: ${message}`;
+    }
+    
+    showError(message);
+  }
+
+  // === INICIALIZACIÓN ===
+
+  /**
+   * Ejecuta código cuando el DOM está listo
+   * @param {Function} callback - Función a ejecutar
+   */
+  function onReady(callback) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', callback);
+    } else {
+      callback();
+    }
+  }
+
+  // === UTILIDADES DE UI ===
+
+  /**
+   * Actualiza una barra de progreso
+   * @param {string} barId - ID de la barra de progreso
+   * @param {number} percent - Porcentaje (0-100)
+   */
+  function updateProgress(barId, percent) {
+    const bar = document.getElementById(barId);
+    if (bar) {
+      bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+    }
+  }
+
+  /**
+   * Muestra/oculta un elemento
+   * @param {string} elementId - ID del elemento
+   * @param {boolean} show - True para mostrar
+   */
+  function toggleElement(elementId, show) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      if (show) {
+        element.classList.remove('hidden');
+      } else {
+        element.classList.add('hidden');
+      }
+    }
+  }
+</script>
