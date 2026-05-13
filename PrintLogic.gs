@@ -21,9 +21,10 @@
  * Muestra el panel Index.html con las opciones de impresión.
  */
 function openPrintDialog() {
-  var html = HtmlService.createHtmlOutputFromFile('Index')
+  var template = HtmlService.createTemplateFromFile('Index');
+  var html = template.evaluate()
     .setWidth(550).setHeight(700);
-  SpreadsheetApp.getUi().showModelessDialog(html, 'Panel de Impresión');
+  SpreadsheetApp.getUi().showModelessDialog(html, ' ');
 }
 
 // --- CONFIGURACIÓN DE IMPRESIÓN ---

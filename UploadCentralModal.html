@@ -434,6 +434,8 @@
     var globalUsers = [];
     var rowCounter = 0;
     var globalWebAppUrl = '';
+    var fileCache = {}; // Cache de archivos pre-cargados: { rowId: { file, base64Content, metadata } }
+    var PARALLEL_UPLOAD_LIMIT = 3; // Número de archivos a subir simultáneamente
 
     var mainContent = document.getElementById('mainContent');
     var noOrdersMessage = document.getElementById('noOrdersMessage');
@@ -600,6 +602,7 @@
     function removeRow(rowId) {
       var row = document.getElementById(rowId);
       if (row && rowsContainer.children.length > 1) {
+        delete fileCache[rowId]; // Limpiar cache de esta fila
         row.remove();
         validateForm();
       }
@@ -617,6 +620,7 @@
       statusIndicator.style.display = 'none';
       fileName.textContent = '';
       fileSize.textContent = '';
+      delete fileCache[rowId]; // Limpiar cache anterior
 
       if (!file) {
         validateForm();
@@ -644,12 +648,64 @@
         return;
       }
 
-      // Archivo válido
+      // Archivo válido - mostrar info
       wrapper.classList.add('has-file');
       fileName.textContent = file.name;
       var sizeKB = (file.size / 1024).toFixed(2);
       fileSize.textContent = sizeKB + ' KB';
-      validateForm();
+      
+      // PRE-CARGA: Leer archivo a base64 inmediatamente
+      statusIndicator.textContent = '⏳ Preparando...';
+      statusIndicator.className = 'status-indicator loading';
+      statusIndicator.style.display = 'block';
+      
+      preloadFileToCache(file, rowId, function(success) {
+        if (success) {
+          statusIndicator.textContent = '✓ Listo';
+          statusIndicator.className = 'status-indicator success';
+        } else {
+          statusIndicator.textContent = '❌ Error lectura';
+          statusIndicator.className = 'status-indicator error';
+          wrapper.classList.add('has-error');
+        }
+        validateForm();
+      });
+    }
+
+    /**
+     * Pre-carga un archivo a base64 y lo guarda en cache.
+     * @param {File} file - Archivo a pre-cargar
+     * @param {string} rowId - ID de la fila
+     * @param {Function} callback - Callback(success)
+     */
+    function preloadFileToCache(file, rowId, callback) {
+      var reader = new FileReader();
+      
+      reader.onload = function(e) {
+        var base64Data = e.target.result;
+        var base64Content = base64Data.split(',')[1];
+        
+        // Guardar en cache
+        fileCache[rowId] = {
+          file: file,
+          base64Content: base64Content,
+          metadata: {
+            name: file.name,
+            type: file.type,
+            size: file.size
+          }
+        };
+        
+        console.log('✓ Archivo pre-cargado en cache:', rowId, file.name);
+        callback(true);
+      };
+      
+      reader.onerror = function() {
+        console.error('✗ Error al pre-cargar archivo:', rowId);
+        callback(false);
+      };
+      
+      reader.readAsDataURL(file);
     }
 
     function validateForm() {
@@ -664,10 +720,12 @@
       rows.forEach(function(row) {
         var referenceSelect = row.querySelector('.reference-select');
         var fileInput = row.querySelector('input[type="file"]');
+        var rowId = row.id;
         var hasReference = referenceSelect.value !== '';
         var hasFile = fileInput.files.length > 0;
+        var hasCache = fileCache[rowId] !== undefined;
 
-        if (!hasReference || !hasFile) {
+        if (!hasReference || !hasFile || !hasCache) {
           allValid = false;
         }
       });
@@ -676,6 +734,232 @@
     }
 
     async function uploadAll() {
+      var rows = Array.from(rowsContainer.querySelectorAll('.upload-row'));
+      var totalRows = rows.length;
+      var successCounter = 0;
+      var errorCounter = 0;
+      var completedCounter = 0;
+
+      // Desactivar controles
+      btnAdd.disabled = true;
+      btnUpload.disabled = true;
+      btnCancel.disabled = true;
+      
+      rows.forEach(function(row) {
+        row.classList.add('disabled');
+        var deleteBtn = row.querySelector('.delete-btn');
+        if (deleteBtn) deleteBtn.disabled = true;
+      });
+
+      // Mostrar progreso
+      progressContainer.classList.add('active');
+      summary.classList.remove('active');
+
+      // CARGA PARALELA: Procesar archivos en lotes
+      console.log('🚀 Iniciando carga paralela de', totalRows, 'archivos (límite:', PARALLEL_UPLOAD_LIMIT, 'simultáneos)');
+      
+      for (var i = 0; i < rows.length; i += PARALLEL_UPLOAD_LIMIT) {
+        var batch = rows.slice(i, i + PARALLEL_UPLOAD_LIMIT);
+        var batchPromises = batch.map(function(row, batchIndex) {
+          return uploadSingleRow(row, i + batchIndex, totalRows, function(success) {
+            completedCounter++;
+            if (success) {
+              successCounter++;
+            } else {
+              errorCounter++;
+            }
+            
+            // Actualizar progreso global
+            var progress = (completedCounter / totalRows) * 100;
+            progressFill.style.width = progress + '%';
+            progressText.textContent = 'Procesados ' + completedCounter + ' de ' + totalRows + ' archivos...';
+          });
+        });
+        
+        // Esperar a que termine el lote actual antes de continuar con el siguiente
+        await Promise.all(batchPromises);
+      }
+
+      // Progreso completo
+      progressFill.style.width = '100%';
+      progressText.textContent = 'Proceso finalizado';
+
+      // Mostrar resumen
+      successCount.textContent = successCounter;
+      errorCount.textContent = errorCounter;
+      
+      if (errorCounter === 0) {
+        summaryMessage.textContent = 'Todos los archivos han sido subidos exitosamente.';
+      } else if (successCounter === 0) {
+        summaryMessage.textContent = 'Ningún archivo pudo ser subido. Revise los errores indicados.';
+      } else {
+        summaryMessage.textContent = successCounter + ' archivo(s) subido(s) exitosamente, ' + errorCounter + ' con error(es).';
+      }
+      
+      summary.classList.add('active');
+      progressContainer.classList.remove('active');
+    }
+
+    /**
+     * Sube un solo archivo (fila) usando el cache pre-cargado.
+     * @param {HTMLElement} row - Elemento de la fila
+     * @param {number} index - Índice de la fila
+     * @param {number} total - Total de filas
+     * @param {Function} callback - Callback(success)
+     * @returns {Promise}
+     */
+    async function uploadSingleRow(row, index, total, callback) {
+      var rowId = row.id;
+      var docTypeSelect = row.querySelector('.doc-type-select-input');
+      var referenceSelect = row.querySelector('.reference-select');
+      var statusIndicator = document.getElementById(rowId + '-status');
+      var errorContainer = document.getElementById(rowId + '-error');
+      
+      var docType = docTypeSelect.value;
+      var referenceNo = referenceSelect.value;
+      var selectedUser = getSelectedUploadUser();
+      
+      // Validar usuario
+      if (!selectedUser) {
+        statusIndicator.textContent = '❌ Usuario';
+        statusIndicator.className = 'status-indicator error';
+        if (errorContainer) {
+          errorContainer.textContent = 'Seleccione un usuario válido desde el listado.';
+          errorContainer.classList.add('active');
+        }
+        callback(false);
+        return;
+      }
+      
+      // Validar que exista en cache
+      if (!fileCache[rowId]) {
+        statusIndicator.textContent = '❌ No cargado';
+        statusIndicator.className = 'status-indicator error';
+        if (errorContainer) {
+          errorContainer.textContent = 'El archivo no fue pre-cargado correctamente. Intente seleccionarlo de nuevo.';
+          errorContainer.classList.add('active');
+        }
+        callback(false);
+        return;
+      }
+      
+      // Limpiar contenedor de error
+      if (errorContainer) {
+        errorContainer.textContent = '';
+        errorContainer.classList.remove('active');
+      }
+      
+      // Mostrar estado de carga
+      statusIndicator.textContent = '⏳ Subiendo...';
+      statusIndicator.className = 'status-indicator loading';
+      
+      try {
+        var cached = fileCache[rowId];
+        var result = await uploadFileFromCache(cached, referenceNo, docType, false, selectedUser.userId);
+        
+        console.log('Fila', index + 1, '/', total, '- Status:', result.status, '- Ref:', referenceNo);
+        
+        if (result.status === 'exists') {
+          // Archivo existe, pedir confirmación al usuario
+          var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
+          
+          if (confirmOverwrite) {
+            // Usuario aceptó, reintentar con overwriteConfirmed = true
+            result = await uploadFileFromCache(cached, referenceNo, docType, true, selectedUser.userId);
+            
+            if (result.status === 'success') {
+              statusIndicator.textContent = '✅ Completado';
+              statusIndicator.className = 'status-indicator success';
+              callback(true);
+            } else {
+              statusIndicator.textContent = '❌ Error';
+              statusIndicator.className = 'status-indicator error';
+              if (errorContainer) {
+                errorContainer.textContent = result.message || 'Error desconocido';
+                errorContainer.classList.add('active');
+              }
+              callback(false);
+            }
+          } else {
+            // Usuario canceló - marcar como subido
+            statusIndicator.textContent = '✅ Subido';
+            statusIndicator.className = 'status-indicator success';
+            statusIndicator.title = 'Archivo ya existe, considerado como subido';
+            callback(true);
+          }
+        } else if (result.status === 'success') {
+          statusIndicator.textContent = '✅ Completado';
+          statusIndicator.className = 'status-indicator success';
+          callback(true);
+        } else {
+          statusIndicator.textContent = '❌ Error';
+          statusIndicator.className = 'status-indicator error';
+          if (errorContainer) {
+            errorContainer.textContent = result.message || 'Error desconocido';
+            errorContainer.classList.add('active');
+          }
+          callback(false);
+        }
+      } catch (error) {
+        console.error('Error en fila', index + 1, ':', error);
+        statusIndicator.textContent = '❌ Error';
+        statusIndicator.className = 'status-indicator error';
+        if (errorContainer) {
+          errorContainer.textContent = error.message || 'Error desconocido';
+          errorContainer.classList.add('active');
+        }
+        callback(false);
+      }
+    }
+
+    /**
+     * Sube un archivo usando datos del cache (sin leer de nuevo).
+     * @param {Object} cached - Datos del cache { file, base64Content, metadata }
+     * @param {string} referenceNo - Número de referencia
+     * @param {string} docType - Tipo de documento
+     * @param {boolean} overwriteConfirmed - Si se confirmó sobrescritura
+     * @param {string} userId - ID del usuario
+     * @returns {Promise<Object>}
+     */
+    function uploadFileFromCache(cached, referenceNo, docType, overwriteConfirmed, userId) {
+      return new Promise(function(resolve, reject) {
+        if (!globalWebAppUrl) {
+          reject(new Error('URL de Web App no configurada. Ejecute setWebAppUrl con la URL del despliegue.'));
+          return;
+        }
+        if (!userId) {
+          reject(new Error('No se pudo identificar el UserID del usuario seleccionado.'));
+          return;
+        }
+        
+        fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            operation: 'uploadDocument',
+            base64Data: cached.base64Content,
+            mimeType: cached.metadata.type,
+            fileName: cached.metadata.name,
+            referenceNo: referenceNo,
+            docType: docType,
+            overwriteConfirmed: overwriteConfirmed,
+            userId: userId
+          })
+        })
+        .then(function(response) {
+          return response.json();
+        })
+        .then(function(result) {
+          resolve(result);
+        })
+        .catch(function(error) {
+          reject(new Error('Error al comunicarse con la Web App: ' + error.message));
+        });
+      });
+    }
+
+    // FUNCIÓN LEGACY - Mantener por compatibilidad pero ya no se usa
+    async function uploadAll_OLD_SEQUENTIAL() {
       var rows = rowsContainer.querySelectorAll('.upload-row');
       var totalRows = rows.length;
       var successCounter = 0;
@@ -696,7 +980,7 @@
       progressContainer.classList.add('active');
       summary.classList.remove('active');
 
-      // Procesar cada fila secuencialmente
+      // Procesar cada fila secuencialmente (VIEJO)
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         var rowId = row.id;
@@ -794,8 +1078,7 @@
           errorCounter++;
         }
 
-        // Pequeña pausa entre archivos
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // SIN PAUSA - carga paralela optimizada
       }
 
       // Progreso completo
@@ -871,6 +1154,7 @@
     function resetForm() {
       rowsContainer.innerHTML = '';
       rowCounter = 0;
+      fileCache = {}; // Limpiar cache de archivos
       summary.classList.remove('active');
       addRow();
       
