@@ -85,7 +85,7 @@ function getPendingOrdersList() {
       
       // Agregar a lista de COA pendientes si AdjuntoCOA != "✅ Cargado" Y tiene NoAnalisis
       if (estadoCOAStr !== "✅ Cargado" && noAnalisisStr) {
-        ordenesPendientesCOA.push(noOrdenStr);
+        ordenesPendientesCOA.push(noAnalisisStr); // Usar NoAnalisis para COA
       }
     }
     
