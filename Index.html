@@ -3,53 +3,14 @@
   <head>
     <base target="_top">
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    
+    <!-- FASE 6: Design System Centralizado -->
+    <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+    
     <style>
-      * { box-sizing: border-box; }
+      /* Estilos específicos de Index.html - Panel de Impresión */
       html, body { 
-        font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; 
-        padding: 0; 
         background: #f6f9fc;
-        margin: 0; 
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-      }
-      .card { 
-        background: white; 
-        padding: 20px; 
-        border-radius: 12px; 
-        box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        overflow-y: auto;
-        overflow-x: hidden;
-      }
-      
-      /* Custom scrollbar for main container */
-      .card::-webkit-scrollbar {
-        width: 8px;
-      }
-      .card::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 4px;
-      }
-      .card::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
-      }
-      .card::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
-      
-      /* Responsive padding */
-      @media (min-width: 500px) {
-        .card { padding: 24px; }
-      }
-      @media (min-width: 600px) {
-        .card { padding: 32px; }
       }
 
       #resize-handle {
@@ -68,56 +29,15 @@
         background: linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%);
       }
       
-      /* Section Groups - Responsive */
-      .section { 
-        margin-bottom: 20px;
-      }
-      @media (min-height: 600px) {
-        .section { margin-bottom: 24px; }
-      }
-      @media (min-height: 700px) {
-        .section { margin-bottom: 28px; }
-      }
-      
-      .section-title {
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #64748b;
-        margin-bottom: 10px;
-      }
-      
-      .field { 
-        margin-bottom: 16px;
-      }
-      @media (min-height: 600px) {
-        .field { margin-bottom: 18px; }
-      }
-      @media (min-height: 700px) {
-        .field { margin-bottom: 20px; }
-      }
-      label { 
-        display: block; 
-        font-weight: 600; 
-        font-size: 13px; 
-        color: #334155; 
-        margin-bottom: 8px; 
-      }
-      
-      /* Modern Inputs */
+      /* Inputs específicos con estilo custom */
       input[type="text"] { 
-        width: 100%; 
         padding: 12px 16px; 
         border: 1px solid #e2e8f0; 
         border-radius: 8px; 
         font-size: 14px;
         color: #1e293b;
-        transition: all 0.2s ease;
-        background: white;
       }
       input[type="text"]:focus {
-        outline: none;
         border-color: #635bff;
         box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
       }
@@ -412,16 +332,12 @@
         border-radius: 12px;
         backdrop-filter: blur(4px);
       }
-      .spinner { 
+      #loader .spinner { 
         border: 3px solid #e2e8f0; 
         border-top: 3px solid #635bff; 
-        border-radius: 50%; 
         width: 36px; 
         height: 36px; 
-        animation: spin 1s linear infinite; 
-        margin-bottom: 16px;
       }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
@@ -478,19 +394,15 @@
       <div id="status"></div>
     </div>
 
+    <!-- FASE 6: JavaScript Compartido -->
+    <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+
     <script>
       let globalTemplates = [];
       let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
-      let debounceTimer = null; // Timer for debounce function
 
-      // Debounce function to avoid multiple backend calls while typing
-      function debounce(func, delay) {
-        return function(...args) {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => func.apply(this, args), delay);
-        };
-      }
+      // Función debounce() ahora viene de GlobalScripts.html
 
       function setPreloadBanner(type, message) {
         const banner = document.getElementById('preloadBanner');
