@@ -88,8 +88,9 @@ function syncVerifCantDisponible() {
       if (verifCantValue !== '-' && verifCantValue !== '' && !isNaN(verifCantValue)) {
         var numVerifCant = Number(verifCantValue);
         if (numVerifCant >= 0) {
-          // Verificar si necesita actualización
-          if (numVerifCant !== Number(cantDispValue)) {
+          // CORRECCIÓN: Solo copiar si 'CantDispAFecha' está vacío, para no sobreescribir datos existentes.
+          // Esto asegura que la lógica solo se aplique a filas nuevas o no inicializadas.
+          if (cantDispValue === '' || cantDispValue === null || cantDispValue === undefined) {
             updates.push({
               row: i + 2, // +2 porque i empieza en 0 y hay header
               value: numVerifCant
