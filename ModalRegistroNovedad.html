@@ -5,204 +5,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Registrar Entrega / Novedad</title>
+  
+  <!-- FASE 6: Design System Centralizado -->
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
-    }
-
+    /* Estilos específicos de este modal */
     body {
-      background-color: #f5f5f5;
       padding: 20px;
       overflow-x: hidden;
       min-height: 100vh;
-    }
-
-    .container {
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      width: 100%;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-      color: #1976d2;
-      font-size: 20px;
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-
-    .subtitle {
-      color: #666;
-      font-size: 13px;
-      margin-bottom: 16px;
-    }
-
-    .info {
-      background-color: #e3f2fd;
-      border-left: 4px solid #1976d2;
-      padding: 10px 12px;
-      margin-bottom: 16px;
-      font-size: 12px;
-      color: #333;
-      border-radius: 0 4px 4px 0;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 12px;
-      color: #333;
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 13px;
-      background: white;
-    }
-
-    .form-group textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
-
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
-      outline: none;
-      border-color: #1976d2;
-      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
-    }
-
-    .form-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .form-row .form-group {
-      flex: 1;
-      margin-bottom: 0;
     }
 
     .button-group {
       display: flex;
       gap: 10px;
       margin-top: 20px;
-    }
-
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 4px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    .btn-primary {
-      background-color: #1976d2;
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background-color: #1565c0;
-    }
-
-    .btn-primary:disabled {
-      background-color: #b0bec5;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      background-color: #f5f5f5;
-      color: #333;
-    }
-
-    .btn-secondary:hover {
-      background-color: #e0e0e0;
-    }
-
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.95);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-
-    .loading-overlay.hidden {
-      display: none;
-    }
-
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #1976d2;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .loading-text {
-      color: #1976d2;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .message {
-      padding: 12px;
-      border-radius: 4px;
-      margin-top: 16px;
-      font-size: 13px;
-      display: none;
-    }
-
-    .message.success {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-      border: 1px solid #c8e6c9;
-      display: block;
-    }
-
-    .message.error {
-      background-color: #ffebee;
-      color: #c62828;
-      border: 1px solid #ffcdd2;
-      display: block;
-    }
-
-    .message.warning {
-      background-color: #fff3e0;
-      color: #e65100;
-      border: 1px solid #ffe0b2;
-      display: block;
     }
   </style>
 </head>
@@ -277,14 +95,15 @@
         <button type="button" class="btn btn-secondary" id="btnCancel">Cancelar</button>
       </div>
     </form>
-
-    <div class="message" id="message"></div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay hidden" id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text" id="loadingText">Procesando...</div>
+    <div class="loading-text" id="loading-text">Procesando...</div>
   </div>
+
+  <!-- FASE 6: JavaScript Compartido -->
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
 
   <script>
     var globalWebAppUrl = '';
@@ -304,8 +123,8 @@
           loadOrdenes();
         })
         .withFailureHandler(function(error) {
-          showMessage('Error al cargar datos iniciales: ' + error.message, 'error');
-          showLoading(false);
+          showError('Error al cargar datos iniciales: ' + error.message);
+          hideLoading();
           document.getElementById('mainContainer').style.display = 'block';
         })
         .getInitialData();
@@ -336,13 +155,13 @@
           ordenes = data || [];
           populateOrdenesSelect();
           // Finaliza la carga completa
-          showLoading(false);
+          hideLoading();
           document.getElementById('mainContainer').style.display = 'block';
         })
         .withFailureHandler(function(error) {
-          showMessage('Error al cargar órdenes: ' + error.message, 'error');
+          showError('Error al cargar órdenes: ' + error.message);
           document.getElementById('noOrden').innerHTML = '<option value="">Error al cargar</option>';
-          showLoading(false);
+          hideLoading();
           document.getElementById('mainContainer').style.display = 'block';
         })
         .getOrdenesParaNovedad();
@@ -433,22 +252,22 @@
       var comentario = document.getElementById('comentario').value;
 
       if (!usuarioUserId) {
-        showMessage('Seleccione un usuario válido de la lista.', 'error');
+        showError('Seleccione un usuario válido de la lista.');
         return;
       }
 
       if (!noOrden || !codigo) {
-        showMessage('Seleccione una orden válida.', 'error');
+        showError('Seleccione una orden válida.');
         return;
       }
 
       if (!nuevoStatus) {
-        showMessage('Seleccione el nuevo estado.', 'error');
+        showError('Seleccione el nuevo estado.');
         return;
       }
 
       if (!tipoNovedad) {
-        showMessage('Seleccione el tipo de novedad.', 'error');
+        showError('Seleccione el tipo de novedad.');
         return;
       }
 
@@ -456,7 +275,7 @@
       var numDevueltas = noPagDevueltas === "" ? -1 : Number(noPagDevueltas);
       
       if (numDevueltas >= 0 && numTotal !== numDevueltas && !comentario.trim()) {
-        showMessage('Las páginas devueltas no coinciden con las entregadas. Debe registrar el motivo en los comentarios.', 'warning');
+        showAlert('Las páginas devueltas no coinciden con las entregadas. Debe registrar el motivo en los comentarios.', 'warning');
         document.getElementById('comentario').focus();
         return;
       }
@@ -474,7 +293,7 @@
         realizadoPor: usuarioUserId
       };
 
-      showLoading(true, 'Registrando novedad...');
+      showLoading('Registrando novedad...');
 
       fetch(globalWebAppUrl, {
         method: 'POST',
@@ -487,17 +306,17 @@
         return response.json();
       })
       .then(function(result) {
-        showLoading(false);
+        hideLoading();
         if (result.status === 'success') {
-          showMessage('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
+          showAlert('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
           resetearCamposNovedad();
         } else {
-          showMessage('Error al registrar novedad: ' + (result.message || 'Error desconocido'), 'error');
+          showError('Error al registrar novedad: ' + (result.message || 'Error desconocido'));
         }
       })
       .catch(function(error) {
-        showLoading(false);
-        showMessage('Error al registrar novedad: ' + error.message, 'error');
+        hideLoading();
+        showError('Error al registrar novedad: ' + error.message);
       });
     }
 
@@ -514,30 +333,9 @@
       
       validarPaginas();
       loadOrdenes();
-      
-      setTimeout(function() {
-        var messageEl = document.getElementById('message');
-        messageEl.style.display = 'none';
-      }, 4000);
     }
 
-    function showLoading(show, text) {
-      var overlay = document.getElementById('loadingOverlay');
-      var loadingText = document.getElementById('loadingText');
-      
-      if (show) {
-        loadingText.textContent = text || 'Procesando...';
-        overlay.classList.remove('hidden');
-      } else {
-        overlay.classList.add('hidden');
-      }
-    }
-
-    function showMessage(text, type) {
-      var messageEl = document.getElementById('message');
-      messageEl.textContent = text;
-      messageEl.className = 'message ' + type;
-    }
+    // Funciones showLoading y showMessage ahora vienen de GlobalScripts.html
 
     // Inicializar al cargar
     window.addEventListener('load', initialize);
