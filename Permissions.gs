@@ -320,38 +320,156 @@ function configureLogsProtection() {
 // --- VALIDACIÓN DE DATOS ---
 
 /**
- * Aplica validación de datos a las columnas STATUS.
+ * Aplica validación de datos y formato condicional con colores a las columnas STATUS.
  * Restringe valores a: Impreso, Reimpreso, RecibidaQA, DevueltaQA, Cerrada.
+ * Aplica colores específicos para cada estado.
  */
 function applyStatusDataValidation() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var statusOptions = ['Impreso', 'Reimpreso', 'RecibidaQA', 'DevueltaQA', 'Cerrada'];
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(statusOptions, true)
-    .setAllowInvalid(false)
-    .build();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var statusOptions = ['Impreso', 'Reimpreso', 'RecibidaQA', 'DevueltaQA', 'Cerrada'];
     
-  var sheetsToUpdate = ['Ordenes', 'RegistroNovedad'];
-  
-  sheetsToUpdate.forEach(function(sheetName) {
-    var sheet = ss.getSheetByName(sheetName);
-    if (sheet) {
+    // Crear regla de validación
+    var rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(statusOptions, true)
+      .setAllowInvalid(false)
+      .setHelpText("Seleccione un estado: Impreso, Reimpreso, RecibidaQA, DevueltaQA, Cerrada")
+      .build();
+    
+    var sheetsToUpdate = ['Ordenes', 'RegistroNovedad'];
+    var sheetsProcessed = [];
+    
+    sheetsToUpdate.forEach(function(sheetName) {
+      var sheet = ss.getSheetByName(sheetName);
+      if (!sheet) {
+        Logger.log("⚠️ Hoja no encontrada: " + sheetName);
+        return;
+      }
+      
       var lastCol = sheet.getLastColumn();
-      if (lastCol > 0) {
-        var headers = sheet.getRange(1, 1, 1, lastCol).getValues();
-        var statusColIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
-        
-        if (statusColIdx) {
-          var maxRows = sheet.getMaxRows();
-          if (maxRows > 1) {
-            var range = sheet.getRange(2, statusColIdx, maxRows - 1, 1);
-            range.setDataValidation(rule);
-            Logger.log("✓ Validación de datos aplicada a columna STATUS en hoja: " + sheetName);
+      if (lastCol === 0) {
+        Logger.log("⚠️ Hoja sin columnas: " + sheetName);
+        return;
+      }
+      
+      var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      var statusColIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+      
+      if (!statusColIdx) {
+        Logger.log("⚠️ Columna STATUS no encontrada en: " + sheetName);
+        return;
+      }
+      
+      var maxRows = sheet.getMaxRows();
+      if (maxRows <= 1) {
+        Logger.log("⚠️ Hoja sin filas de datos: " + sheetName);
+        return;
+      }
+      
+      var range = sheet.getRange(2, statusColIdx, maxRows - 1, 1);
+      
+      // Aplicar validación de datos
+      range.setDataValidation(rule);
+      
+      // Limpiar reglas de formato condicional existentes en esta columna
+      var existingRules = sheet.getConditionalFormatRules();
+      var filteredRules = existingRules.filter(function(rule) {
+        var ruleRanges = rule.getRanges();
+        for (var i = 0; i < ruleRanges.length; i++) {
+          if (ruleRanges[i].getColumn() === statusColIdx) {
+            return false; // Excluir esta regla
           }
         }
-      }
+        return true; // Mantener esta regla
+      });
+      
+      // Definir colores para cada estado
+      var colorRules = [
+        {
+          status: 'Impreso',
+          bgColor: '#d9d9d9',    // Gris claro
+          textColor: '#434343'   // Gris oscuro
+        },
+        {
+          status: 'Reimpreso',
+          bgColor: '#fff2cc',    // Amarillo claro
+          textColor: '#7f6000'   // Amarillo oscuro
+        },
+        {
+          status: 'RecibidaQA',
+          bgColor: '#cfe2f3',    // Azul claro
+          textColor: '#073763'   // Azul oscuro
+        },
+        {
+          status: 'DevueltaQA',
+          bgColor: '#f4cccc',    // Rojo claro
+          textColor: '#990000'   // Rojo oscuro
+        },
+        {
+          status: 'Cerrada',
+          bgColor: '#d9ead3',    // Verde claro
+          textColor: '#274e13'   // Verde oscuro
+        }
+      ];
+      
+      // Crear reglas de formato condicional para cada estado
+      colorRules.forEach(function(colorRule) {
+        var conditionalFormatRule = SpreadsheetApp.newConditionalFormatRule()
+          .whenTextEqualTo(colorRule.status)
+          .setBackground(colorRule.bgColor)
+          .setFontColor(colorRule.textColor)
+          .setBold(true)
+          .setRanges([range])
+          .build();
+        
+        filteredRules.push(conditionalFormatRule);
+      });
+      
+      // Aplicar todas las reglas
+      sheet.setConditionalFormatRules(filteredRules);
+      
+      Logger.log("✓ Validación y formato condicional aplicados a STATUS en: " + sheetName);
+      sheetsProcessed.push(sheetName);
+    });
+    
+    // Mostrar mensaje al usuario
+    var ui = SpreadsheetApp.getUi();
+    if (sheetsProcessed.length > 0) {
+      ui.alert(
+        '✅ Validaciones y Colores Aplicados',
+        'Se aplicaron validaciones de datos y formato condicional a la columna STATUS en:\n\n' +
+        sheetsProcessed.join('\n') + '\n\n' +
+        'Estados disponibles:\n' +
+        '⚫ Impreso (gris)\n' +
+        '🟡 Reimpreso (amarillo)\n' +
+        '🔵 RecibidaQA (azul)\n' +
+        '🔴 DevueltaQA (rojo)\n' +
+        '🟢 Cerrada (verde)',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert(
+        '⚠️ Advertencia',
+        'No se pudo aplicar validaciones. Verifique que las hojas y columnas existan.',
+        ui.ButtonSet.OK
+      );
     }
-  });
+    
+    return {
+      status: 'success',
+      sheetsProcessed: sheetsProcessed
+    };
+    
+  } catch (e) {
+    Logger.log("ERROR en applyStatusDataValidation: " + e.message);
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(
+      'Error',
+      'No se pudieron aplicar las validaciones:\n' + e.message,
+      ui.ButtonSet.OK
+    );
+    throw e;
+  }
 }
 
 // --- PROMPTS CON AUTENTICACIÓN ADMIN ---
@@ -373,5 +491,14 @@ function promptSetupAuditTrail() {
   withAdminAuth('Activar Auditoría (Admin)', function(ui) {
     setupAuditTrailTrigger();
     ui.alert('✅ Sistema de auditoría activado. Los cambios se registrarán en la hoja Logs.');
+  });
+}
+
+/**
+ * Prompt para aplicar validaciones y colores a columna STATUS (requiere contraseña de admin).
+ */
+function promptApplyStatusValidation() {
+  withAdminAuth('Aplicar Validaciones de STATUS', function(ui) {
+    applyStatusDataValidation();
   });
 }

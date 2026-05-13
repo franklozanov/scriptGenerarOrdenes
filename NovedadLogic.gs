@@ -19,7 +19,8 @@
  */
 function abrirModalRegistroNovedad() {
   try {
-    var html = HtmlService.createHtmlOutputFromFile('ModalRegistroNovedad')
+    var template = HtmlService.createTemplateFromFile('ModalRegistroNovedad');
+    var html = template.evaluate()
       .setWidth(600)
       .setHeight(650);
     SpreadsheetApp.getUi().showModelessDialog(html, 'Registrar Entrega / Novedad');

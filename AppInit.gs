@@ -111,6 +111,20 @@ function initializeCompleteSystem(ui) {
     summary.push("⚠️ Validaciones de estado: " + e.message);
   }
 
+  try {
+    applyStatusDataValidation();
+    summary.push("✓ Validaciones y colores de STATUS aplicados");
+  } catch (e) {
+    summary.push("⚠️ Validaciones de STATUS: " + e.message);
+  }
+
+  try {
+    crearBotonFlotanteNovedad();
+    summary.push("✓ Botón flotante de Novedad creado");
+  } catch (e) {
+    summary.push("⚠️ Botón flotante: " + e.message);
+  }
+
   // Diagnóstico de ConsecutivoImp
   try {
     var diagnosticResult = runConsecutivoImpDiagnostic_();
