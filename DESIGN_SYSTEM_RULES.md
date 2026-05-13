@@ -4,6 +4,8 @@
 **Última actualización:** Mayo 2026  
 **Propósito:** Guía obligatoria para mantener consistencia en el diseño UI de todos los modales y componentes HTML.
 
+> ⚠️ **IMPORTANTE:** Este documento está vinculado a la memoria del sistema de IA. Cualquier cambio de UI debe consultar primero este documento. La memoria del sistema recordará automáticamente estas reglas en futuras sesiones.
+
 ---
 
 ## 🎯 Principio Fundamental
@@ -553,5 +555,42 @@ Antes de hacer commit de cambios UI, verificar:
 
 ---
 
+## 🧠 Integración con Memoria del Sistema
+
+Este documento está vinculado a la **memoria permanente del sistema de IA** (Cascade/Windsurf).
+
+### **Cómo Funciona:**
+
+1. **Memoria Automática:** El sistema de IA tiene una memoria que recuerda estas reglas en todas las sesiones futuras
+2. **Consulta Obligatoria:** Antes de cualquier cambio UI, el sistema consultará automáticamente este documento
+3. **Validación:** El sistema verificará que los cambios cumplan con las reglas establecidas
+4. **Recordatorio:** Si se intenta crear estilos duplicados, el sistema recordará usar Theme.html
+
+### **Beneficios:**
+
+- ✅ Consistencia garantizada en todas las sesiones
+- ✅ No se olvidan las reglas entre sesiones
+- ✅ Validación automática de cambios UI
+- ✅ Recordatorios proactivos al desarrollar
+
+### **Actualización de la Memoria:**
+
+Si se actualiza este documento, la memoria del sistema debe actualizarse también:
+
+```
+1. Modificar DESIGN_SYSTEM_RULES.md
+2. Actualizar la memoria del sistema con los cambios
+3. Verificar que ambos estén sincronizados
+```
+
+### **Ubicación de la Memoria:**
+
+- **ID de Memoria:** `26aeee41-546e-4b7c-9f71-a73ba9eb44fc`
+- **Tags:** `design_system`, `ui_rules`, `mandatory`, `theme`, `css`, `standards`, `documentation`
+- **Tipo:** Memoria permanente del sistema
+
+---
+
 **Última actualización:** Mayo 2026  
-**Mantenido por:** Equipo de Desarrollo QMS
+**Mantenido por:** Equipo de Desarrollo QMS  
+**Memoria del Sistema:** Activa y sincronizada ✅
