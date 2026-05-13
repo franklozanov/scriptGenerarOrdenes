@@ -196,9 +196,10 @@ function migrarAdjuntoOrdenANuevasColumnas() {
 
 /**
  * Función auxiliar para verificar el estado de la migración.
- * Muestra cuántas filas tienen datos en las columnas antiguas vs nuevas.
+ * Muestra cuántas filas tienen datos en la columna antigua vs las nuevas.
+ * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicialización)
  */
-function verificarEstadoMigracion() {
+function verificarEstadoMigracion(silent) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
@@ -246,15 +247,29 @@ function verificarEstadoMigracion() {
     Logger.log("Filas con datos en nuevas columnas (COA/OA): " + conNuevasColumnas);
     Logger.log("Filas sin datos en ninguna: " + sinDatos);
     
-    var ui = SpreadsheetApp.getUi();
-    ui.alert(
-      'Estado de Migración',
-      'Total de filas: ' + data.length + '\n' +
-      'Filas con datos en AdjuntoOrden (antigua): ' + conAdjuntoOrden + '\n' +
-      'Filas con datos en nuevas columnas (COA/OA): ' + conNuevasColumnas + '\n' +
-      'Filas sin datos: ' + sinDatos,
-      ui.ButtonSet.OK
-    );
+    // Mostrar mensaje al usuario solo si no es modo silencioso
+    if (!silent) {
+      try {
+        var ui = SpreadsheetApp.getUi();
+        ui.alert(
+          'Estado de Migración',
+          'Total de filas: ' + data.length + '\n' +
+          'Filas con datos en AdjuntoOrden (antigua): ' + conAdjuntoOrden + '\n' +
+          'Filas con datos en nuevas columnas (COA/OA): ' + conNuevasColumnas + '\n' +
+          'Filas sin datos: ' + sinDatos,
+          ui.ButtonSet.OK
+        );
+      } catch (uiError) {
+        Logger.log("No se pudo mostrar mensaje UI (contexto sin UI): " + uiError.message);
+      }
+    }
+    
+    return {
+      totalFilas: data.length,
+      conAdjuntoOrden: conAdjuntoOrden,
+      conNuevasColumnas: conNuevasColumnas,
+      sinDatos: sinDatos
+    };
     
   } catch (e) {
     Logger.log("ERROR en verificación: " + e.message);
