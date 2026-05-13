@@ -150,7 +150,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       folderKey = "DOC_ORDENES";
       targetAdjuntoCol = colAdjuntoOAIdx;
     } else if (docType === "Certificado de Analisis") {
-      targetColName = "NoOrden";
+      targetColName = "NoAnalisis";
       folderKey = "DOC_ANALISIS";
       targetAdjuntoCol = colAdjuntoCOAIdx;
     }
