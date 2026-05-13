@@ -403,11 +403,14 @@
     background: linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%);
   }
 
-  /* Ajuste del contenedor principal cuando hay drag handle */
+  /* Ajuste del body y contenedores cuando hay drag handle */
+  body.has-drag-handle {
+    padding-top: 56px;  /* 36px del drag handle + 20px de espacio */
+  }
+
   body.has-drag-handle .container,
   body.has-drag-handle .card {
-    margin-top: 36px;
-    height: calc(100% - 36px);
+    margin-top: 0;  /* Remover margin-top ya que el body tiene padding-top */
   }
 
   /* === RESPONSIVE === */

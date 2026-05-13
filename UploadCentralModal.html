@@ -38,13 +38,15 @@
     .upload-row {
       display: flex;
       gap: 10px;
-      align-items: center;
+      align-items: stretch;  /* Cambiar a stretch para altura uniforme */
       width: 100%;
       margin-bottom: 10px;
       padding: 12px;
       background: #fafafa;
       border: 1px solid #e0e0e0;
       border-radius: 6px;
+      flex-wrap: nowrap;  /* No permitir wrap */
+      overflow: visible;  /* Permitir que los dropdowns se muestren */
     }
 
     .upload-row:hover {
@@ -58,17 +60,20 @@
     }
 
     .upload-row .doc-type-select {
-      flex: 0 0 160px;
-      min-width: 160px;
+      flex: 0 0 180px;  /* Aumentar ancho para evitar corte de texto */
+      min-width: 180px;
+      max-width: 180px;
     }
 
     .upload-row .order-select {
-      flex: 0 0 140px;
-      min-width: 140px;
+      flex: 0 0 150px;  /* Aumentar ancho para evitar corte de texto */
+      min-width: 150px;
+      max-width: 150px;
     }
 
     .upload-row .file-input-wrapper {
-      flex: 2;
+      flex: 1 1 auto;  /* Tomar espacio restante */
+      min-width: 200px;  /* Ancho mínimo */
       position: relative;
       border: 2px dashed #ccc;
       border-radius: 4px;
@@ -127,13 +132,17 @@
     }
 
     .upload-row .status-indicator {
-      flex: 0 0 100px;
-      min-width: 100px;
+      flex: 0 0 110px;  /* Aumentar ligeramente */
+      min-width: 110px;
+      max-width: 110px;
       font-size: 11px;
-      padding: 6px 8px;
+      padding: 6px 10px;
       border-radius: 4px;
       text-align: center;
       display: none;
+      white-space: nowrap;  /* Evitar salto de línea */
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .upload-row .status-indicator.loading {
