@@ -326,4 +326,224 @@
       }
     }
   }
+
+  // === DRAG & RESIZE MODAL SYSTEM ===
+
+  /**
+   * Inicializa el sistema de drag y resize para modales
+   * @param {Object} options - Opciones de configuración
+   * @param {string} options.title - Título del modal
+   * @param {boolean} options.enableDrag - Habilitar arrastre (default: true)
+   * @param {boolean} options.enableResize - Habilitar redimensionamiento (default: true)
+   * @param {number} options.minWidth - Ancho mínimo en px (default: 400)
+   * @param {number} options.minHeight - Alto mínimo en px (default: 500)
+   * @param {number} options.maxWidth - Ancho máximo en px (default: 1200)
+   * @param {number} options.maxHeight - Alto máximo en px (default: 1000)
+   */
+  function initializeModalDragResize(options) {
+    options = options || {};
+    const title = options.title || 'Modal';
+    const enableDrag = options.enableDrag !== false;
+    const enableResize = options.enableResize !== false;
+    const minWidth = options.minWidth || 400;
+    const minHeight = options.minHeight || 500;
+    const maxWidth = options.maxWidth || 1200;
+    const maxHeight = options.maxHeight || 1000;
+
+    // Crear drag handle si está habilitado
+    if (enableDrag) {
+      const dragHandle = document.createElement('div');
+      dragHandle.id = 'modal-drag-handle';
+      dragHandle.innerHTML = `
+        <div id="modal-drag-handle-title">${title}</div>
+        <div id="modal-drag-handle-close">×</div>
+      `;
+      document.body.insertBefore(dragHandle, document.body.firstChild);
+      document.body.classList.add('has-drag-handle');
+
+      // Event listener para cerrar
+      document.getElementById('modal-drag-handle-close').addEventListener('click', function() {
+        google.script.host.close();
+      });
+
+      // Inicializar lógica de drag
+      initializeDrag(dragHandle);
+    }
+
+    // Crear resize handle si está habilitado
+    if (enableResize) {
+      const resizeHandle = document.createElement('div');
+      resizeHandle.id = 'modal-resize-handle';
+      document.body.appendChild(resizeHandle);
+
+      // Inicializar lógica de resize
+      initializeResize(resizeHandle, minWidth, minHeight, maxWidth, maxHeight);
+    }
+  }
+
+  /**
+   * Inicializa la lógica de arrastre del modal
+   * @param {HTMLElement} dragHandle - Elemento del drag handle
+   */
+  function initializeDrag(dragHandle) {
+    let offsetX = 0;
+    let offsetY = 0;
+    let isDragging = false;
+
+    function startDrag(e) {
+      // Ignorar si se hace clic en el botón de cerrar
+      if (e.target.id === 'modal-drag-handle-close') return;
+      
+      isDragging = true;
+      offsetX = e.clientX;
+      offsetY = e.clientY;
+      
+      document.addEventListener('mousemove', onDragMove);
+      document.addEventListener('mouseup', stopDrag, { once: true });
+      
+      e.preventDefault();
+    }
+
+    function onDragMove(e) {
+      if (!isDragging) return;
+      
+      const dx = e.clientX - offsetX;
+      const dy = e.clientY - offsetY;
+      
+      try {
+        google.script.host.moveBy(dx, dy);
+      } catch (err) {
+        console.error('Error al mover modal:', err);
+      }
+      
+      // Actualizar offset para el siguiente movimiento
+      offsetX = e.clientX;
+      offsetY = e.clientY;
+      
+      e.preventDefault();
+    }
+
+    function stopDrag() {
+      isDragging = false;
+      document.removeEventListener('mousemove', onDragMove);
+    }
+
+    dragHandle.addEventListener('mousedown', startDrag);
+  }
+
+  /**
+   * Inicializa la lógica de redimensionamiento del modal
+   * @param {HTMLElement} resizeHandle - Elemento del resize handle
+   * @param {number} minWidth - Ancho mínimo
+   * @param {number} minHeight - Alto mínimo
+   * @param {number} maxWidth - Ancho máximo
+   * @param {number} maxHeight - Alto máximo
+   */
+  function initializeResize(resizeHandle, minWidth, minHeight, maxWidth, maxHeight) {
+    let isResizing = false;
+    let startWidth = 0;
+    let startHeight = 0;
+    let startX = 0;
+    let startY = 0;
+    let rafId = null;
+
+    function startResize(e) {
+      // Solo activar con clic izquierdo
+      if (e.button !== 0) return;
+      
+      // Prevenir múltiples activaciones
+      if (isResizing) return;
+      
+      isResizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      // Obtener dimensiones actuales del diálogo
+      startWidth = window.innerWidth;
+      startHeight = window.innerHeight;
+      
+      // Añadir feedback visual
+      document.body.style.cursor = 'nwse-resize';
+      document.body.style.userSelect = 'none';
+      resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%)';
+      
+      // Añadir listeners
+      document.addEventListener('mousemove', handleResize, { passive: false });
+      document.addEventListener('mouseup', stopResize, { once: true });
+      
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    function handleResize(e) {
+      if (!isResizing) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Cancelar frame anterior si existe
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      
+      // Usar requestAnimationFrame para suavizar
+      rafId = requestAnimationFrame(function() {
+        if (!isResizing) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + deltaX));
+        const newHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + deltaY));
+        
+        try {
+          google.script.host.setWidth(newWidth);
+          google.script.host.setHeight(newHeight);
+        } catch (err) {
+          console.error('Error al redimensionar:', err);
+        }
+        
+        rafId = null;
+      });
+    }
+
+    function stopResize(e) {
+      // Forzar detención inmediata
+      isResizing = false;
+      
+      // Cancelar cualquier frame pendiente
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
+      // Restaurar estilos normales
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      resizeHandle.style.background = 'linear-gradient(135deg, transparent 0%, transparent 50%, #94a3b8 50%, #94a3b8 100%)';
+      
+      // Remover listener de mousemove
+      document.removeEventListener('mousemove', handleResize);
+      
+      // Resetear variables
+      startX = 0;
+      startY = 0;
+      startWidth = 0;
+      startHeight = 0;
+      
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+
+    resizeHandle.addEventListener('mousedown', startResize);
+    
+    // Seguridad adicional: detener en mouseleave del documento
+    document.addEventListener('mouseleave', function() {
+      if (isResizing) {
+        stopResize();
+      }
+    });
+  }
 </script>

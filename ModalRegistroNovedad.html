@@ -338,7 +338,20 @@
     // Funciones showLoading y showMessage ahora vienen de GlobalScripts.html
 
     // Inicializar al cargar
-    window.addEventListener('load', initialize);
+    window.addEventListener('load', function() {
+      initialize();
+      
+      // Inicializar sistema de drag y resize
+      initializeModalDragResize({
+        title: 'Registrar Entrega / Novedad',
+        enableDrag: true,
+        enableResize: true,
+        minWidth: 500,
+        minHeight: 600,
+        maxWidth: 900,
+        maxHeight: 900
+      });
+    });
   </script>
 </body>
 </html>

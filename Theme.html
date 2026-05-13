@@ -344,6 +344,68 @@
   .p-2 { padding: 16px; }
   .p-3 { padding: 24px; }
 
+  /* === DRAG & RESIZE HANDLES === */
+  #modal-drag-handle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    cursor: move;
+    user-select: none;
+    z-index: 10001;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  #modal-drag-handle-title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  #modal-drag-handle-close {
+    font-size: 24px;
+    cursor: pointer;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  #modal-drag-handle-close:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  #modal-resize-handle {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+    z-index: 10000;
+    background: linear-gradient(135deg, transparent 0%, transparent 50%, #94a3b8 50%, #94a3b8 100%);
+    border-bottom-right-radius: 12px;
+  }
+
+  #modal-resize-handle:hover {
+    background: linear-gradient(135deg, transparent 0%, transparent 50%, #64748b 50%, #64748b 100%);
+  }
+
+  /* Ajuste del contenedor principal cuando hay drag handle */
+  body.has-drag-handle .container,
+  body.has-drag-handle .card {
+    margin-top: 36px;
+    height: calc(100% - 36px);
+  }
+
   /* === RESPONSIVE === */
   @media (min-width: 500px) {
     .card { padding: 24px; }

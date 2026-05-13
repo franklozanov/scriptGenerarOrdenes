@@ -400,6 +400,17 @@
 
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
+      // Inicializar sistema de drag y resize
+      initializeModalDragResize({
+        title: 'Subida Masiva de Documentos',
+        enableDrag: true,
+        enableResize: true,
+        minWidth: 600,
+        minHeight: 550,
+        maxWidth: 1000,
+        maxHeight: 900
+      });
+      
       google.script.run
         .withSuccessHandler(function(data) {
           globalWebAppUrl = data.webAppUrl;

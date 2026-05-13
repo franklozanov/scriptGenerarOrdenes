@@ -21,9 +21,8 @@ function abrirModalRegistroNovedad() {
   try {
     var html = HtmlService.createHtmlOutputFromFile('ModalRegistroNovedad')
       .setWidth(600)
-      .setHeight(650)
-      .setTitle('Registrar Entrega / Novedad');
-    SpreadsheetApp.getUi().showModalDialog(html, 'Registro de Novedad');
+      .setHeight(650);
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Registrar Entrega / Novedad');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }

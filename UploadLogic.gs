@@ -21,9 +21,8 @@ function abrirModalSubidaGeneral() {
   try {
     var html = HtmlService.createHtmlOutputFromFile('UploadCentralModal')
       .setWidth(700)
-      .setHeight(600)
-      .setTitle('Subida Masiva de Documentos');
-    SpreadsheetApp.getUi().showModalDialog(html, 'Subida Masiva de Órdenes');
+      .setHeight(600);
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Subida Masiva de Documentos');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }
