@@ -269,7 +269,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     // Actualizar UI en la hoja según tipo de documento
     var fileUrl = newFile.getUrl();
     var targetCell = sheetOrdenes.getRange(targetRowIndex, targetAdjuntoCol);
-    targetCell.setValue("✅ Cargado");
+    targetCell.setValue(VALORES_DOCUMENTO.CARGADO);
     targetCell.setNote("Archivo cargado: " + fileUrl);
     
     // Actualizar estado consolidado

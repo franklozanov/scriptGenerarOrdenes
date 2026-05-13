@@ -64,7 +64,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   }
 
   if (printType === "Reimpresion") {
-    sheet.getRange(rowIndex, cols.STATUS).setValue("Reimpreso");
+    sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.REIMPRESO);
     
     var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
     sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
@@ -72,7 +72,7 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
     var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
     sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
   } else {
-    sheet.getRange(rowIndex, cols.STATUS).setValue("Impreso");
+    sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.IMPRESO);
     
     var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
     sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
@@ -233,7 +233,7 @@ function onEditInstalled(e) {
           var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
           
           if (colAdjuntoOACol) {
-            sheet.getRange(rowIdx, colAdjuntoOACol).setValue("Pendiente");
+            sheet.getRange(rowIdx, colAdjuntoOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
             sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
           }
           
@@ -246,7 +246,7 @@ function onEditInstalled(e) {
         
         // Si NoOrden se asigna por primera vez y AdjuntoOA está vacío, inicializar
         if (estadoOAStr === "" && e.value !== undefined && e.value !== "") {
-          if (colAdjuntoOACol) sheet.getRange(rowIdx, colAdjuntoOACol).setValue("Pendiente");
+          if (colAdjuntoOACol) sheet.getRange(rowIdx, colAdjuntoOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
           actualizarEstadoCarga(sheet, rowIdx, headers);
           logChange('ASIGNACION_PENDIENTE_OA', 'NoOrden asignado. Estado de AdjuntoOA establecido a Pendiente.', userIdentity);
           return;
@@ -265,7 +265,7 @@ function onEditInstalled(e) {
           var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
           
           if (colAdjuntoCOACol) {
-            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue("Pendiente");
+            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
             sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
           }
           
@@ -278,7 +278,7 @@ function onEditInstalled(e) {
         
         // Si NoAnalisis se asigna por primera vez y AdjuntoCOA está vacío, inicializar
         if (estadoCOAStr === "" && e.value !== undefined && e.value !== "") {
-          if (colAdjuntoCOACol) sheet.getRange(rowIdx, colAdjuntoCOACol).setValue("Pendiente");
+          if (colAdjuntoCOACol) sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
           actualizarEstadoCarga(sheet, rowIdx, headers);
           logChange('ASIGNACION_PENDIENTE_COA', 'NoAnalisis asignado. Estado de AdjuntoCOA establecido a Pendiente.', userIdentity);
           return;

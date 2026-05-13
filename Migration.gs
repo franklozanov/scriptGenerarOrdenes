@@ -123,19 +123,17 @@ function migrarAdjuntoOrdenANuevasColumnas() {
       
       // Lógica de migración:
       // Si AdjuntoOrden = "✅ Cargado" -> ambas columnas a "✅ Cargado"
-      // Si AdjuntoOrden = "Pendiente" o vacío -> ambas a "Pendiente"
+      // Determinar nuevos estados basados en el valor de AdjuntoOrden
+      var nuevoEstadoCOA = VALORES_DOCUMENTO.PENDIENTE;
+      var nuevoEstadoOA = VALORES_DOCUMENTO.PENDIENTE;
       
-      var nuevoEstadoCOA = "Pendiente";
-      var nuevoEstadoOA = "Pendiente";
-      
-      if (adjuntoOrdenStr === "✅ Cargado") {
-        // Si estaba cargado, marcar ambos como cargados
-        nuevoEstadoCOA = "✅ Cargado";
-        nuevoEstadoOA = "✅ Cargado";
+      if (adjuntoOrdenStr === VALORES_DOCUMENTO.CARGADO) {
+        nuevoEstadoCOA = VALORES_DOCUMENTO.CARGADO;
+        nuevoEstadoOA = VALORES_DOCUMENTO.CARGADO;
       } else {
         // Si estaba pendiente o vacío, dejar ambos como pendiente
-        nuevoEstadoCOA = "Pendiente";
-        nuevoEstadoOA = "Pendiente";
+        nuevoEstadoCOA = VALORES_DOCUMENTO.PENDIENTE;
+        nuevoEstadoOA = VALORES_DOCUMENTO.PENDIENTE;
       }
       
       // Si no tiene NoAnalisis, el COA no aplica (dejar vacío o N/A)

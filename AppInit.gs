@@ -406,20 +406,25 @@ function aplicarValidacionesEstadoCarga(silent) {
     
     var lastRow = sheet.getMaxRows();
     
-    // Valores permitidos para AdjuntoCOA y AdjuntoOA
-    var valoresDocumento = ["Pendiente", "✅ Cargado"];
+    // Valores permitidos para AdjuntoCOA y AdjuntoOA (usar constantes de Config.gs)
+    var valoresDocumento = [VALORES_DOCUMENTO.PENDIENTE, VALORES_DOCUMENTO.CARGADO];
     var ruleDocumento = SpreadsheetApp.newDataValidation()
       .requireValueInList(valoresDocumento, true)
       .setAllowInvalid(false)
-      .setHelpText("Seleccione: Pendiente o ✅ Cargado")
+      .setHelpText("Seleccione: " + valoresDocumento.join(" o "))
       .build();
     
-    // Valores permitidos para EstadoCarga
-    var valoresEstadoCarga = ["Pendiente COA/OA", "Pendiente OA", "Pendiente COA", "✅ Cargados"];
+    // Valores permitidos para EstadoCarga (usar constantes de Config.gs)
+    var valoresEstadoCarga = [
+      VALORES_ESTADO_CARGA.PENDIENTE_AMBOS,
+      VALORES_ESTADO_CARGA.PENDIENTE_OA,
+      VALORES_ESTADO_CARGA.PENDIENTE_COA,
+      VALORES_ESTADO_CARGA.CARGADOS
+    ];
     var ruleEstadoCarga = SpreadsheetApp.newDataValidation()
       .requireValueInList(valoresEstadoCarga, true)
       .setAllowInvalid(false)
-      .setHelpText("Estado calculado automáticamente. Valores: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados")
+      .setHelpText("Estado calculado automáticamente. Valores: " + valoresEstadoCarga.join(", "))
       .build();
     
     // Aplicar validación a AdjuntoCOA (desde fila 2 hasta el final)

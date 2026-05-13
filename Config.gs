@@ -4,6 +4,29 @@
 // Prioridad de Carga: 1° (define globales usados por todo)
 // ============================================================
 
+// --- CONSTANTES DE VALORES DE DROPDOWN ---
+// Estos valores deben coincidir EXACTAMENTE con los configurados en las validaciones de datos
+
+var VALORES_DOCUMENTO = {
+  PENDIENTE: "Pendiente",
+  CARGADO: "✅ Cargado"
+};
+
+var VALORES_ESTADO_CARGA = {
+  PENDIENTE_AMBOS: "Pendiente COA/OA",
+  PENDIENTE_OA: "Pendiente OA",
+  PENDIENTE_COA: "Pendiente COA",
+  CARGADOS: "✅ Cargados"
+};
+
+var VALORES_STATUS = {
+  IMPRESO: "Impreso",
+  REIMPRESO: "Reimpreso",
+  RECIBIDA_QA: "RecibidaQA",
+  DEVUELTA_QA: "DevueltaQA",
+  CERRADA: "Cerrada"
+};
+
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 

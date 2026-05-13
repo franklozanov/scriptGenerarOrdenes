@@ -328,13 +328,21 @@ function configureLogsProtection() {
 function applyStatusDataValidation(silent) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var statusOptions = ['Impreso', 'Reimpreso', 'RecibidaQA', 'DevueltaQA', 'Cerrada'];
+    
+    // Usar constantes de Config.gs para asegurar consistencia
+    var statusOptions = [
+      VALORES_STATUS.IMPRESO,
+      VALORES_STATUS.REIMPRESO,
+      VALORES_STATUS.RECIBIDA_QA,
+      VALORES_STATUS.DEVUELTA_QA,
+      VALORES_STATUS.CERRADA
+    ];
     
     // Crear regla de validación
     var rule = SpreadsheetApp.newDataValidation()
       .requireValueInList(statusOptions, true)
       .setAllowInvalid(false)
-      .setHelpText("Seleccione un estado: Impreso, Reimpreso, RecibidaQA, DevueltaQA, Cerrada")
+      .setHelpText("Seleccione un estado: " + statusOptions.join(", "))
       .build();
     
     var sheetsToUpdate = ['Ordenes', 'RegistroNovedad'];

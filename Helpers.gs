@@ -84,23 +84,21 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
  * @returns {string} Estado consolidado
  */
 function calcularEstadoCarga(estadoCOA, estadoOA) {
-  var coaStr = estadoCOA ? estadoCOA.toString().trim() : "Pendiente";
-  var oaStr = estadoOA ? estadoOA.toString().trim() : "Pendiente";
+  var coa = estadoCOA ? estadoCOA.toString().trim() : "";
+  var oa = estadoOA ? estadoOA.toString().trim() : "";
   
-  var coaCargado = coaStr === "✅ Cargado";
-  var oaCargado = oaStr === "✅ Cargado";
+  var coaCargado = (coa === VALORES_DOCUMENTO.CARGADO);
+  var oaCargado = (oa === VALORES_DOCUMENTO.CARGADO);
   
   if (coaCargado && oaCargado) {
-    return "✅ Cargados";
-  } else if (!coaCargado && !oaCargado) {
-    return "Pendiente COA/OA";
-  } else if (!coaCargado && oaCargado) {
-    return "Pendiente COA";
+    return VALORES_ESTADO_CARGA.CARGADOS;
   } else if (coaCargado && !oaCargado) {
-    return "Pendiente OA";
+    return VALORES_ESTADO_CARGA.PENDIENTE_OA;
+  } else if (!coaCargado && oaCargado) {
+    return VALORES_ESTADO_CARGA.PENDIENTE_COA;
+  } else {
+    return VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
   }
-  
-  return "Pendiente COA/OA";
 }
 
 /**
