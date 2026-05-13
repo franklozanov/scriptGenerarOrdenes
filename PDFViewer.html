@@ -5,16 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Visor de PDF</title>
+  
+  <!-- FASE 6: Design System Centralizado -->
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    /* Estilos específicos de PDFViewer.html */
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f5f5f5;
       height: 100vh;
       overflow: hidden;
     }
@@ -64,12 +61,8 @@
     .print-btn {
       background: white;
       color: #1976d2;
-      border: none;
       padding: 12px 24px;
       font-size: 16px;
-      font-weight: 600;
-      border-radius: 6px;
-      cursor: pointer;
       display: flex;
       align-items: center;
       gap: 8px;
