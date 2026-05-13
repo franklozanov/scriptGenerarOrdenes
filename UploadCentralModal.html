@@ -65,7 +65,7 @@
       background: #fafafa;
       border: 1px solid #e0e0e0;
       border-radius: 6px;
-      flex-wrap: nowrap;  /* No permitir wrap */
+      flex-wrap: wrap;  /* Permitir wrap para mensaje de error */
       overflow: visible;  /* Permitir que los dropdowns se muestren */
     }
 
@@ -196,6 +196,23 @@
       background-color: #ffebee;
       color: #c62828;
       border: 1px solid #ef9a9a;
+    }
+
+    .upload-row .error-message {
+      flex: 1 1 100%;
+      margin-top: 8px;
+      padding: 8px 12px;
+      background-color: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+      word-wrap: break-word;
+    }
+
+    .upload-row .error-message.active {
+      display: block;
     }
 
     .upload-row .delete-btn {
@@ -525,6 +542,7 @@
           </div>
           <div class="status-indicator" id="${rowId}-status"></div>
           <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>🗑️</button>
+          <div class="error-message" id="${rowId}-error"></div>
         </div>
       `;
 
@@ -699,6 +717,7 @@
           statusIndicator.className = 'status-indicator error';
           if (errorContainer) {
             errorContainer.textContent = 'Seleccione un usuario válido desde el listado.';
+            errorContainer.classList.add('active');
           }
           errorCounter++;
           continue;
@@ -707,6 +726,7 @@
         // Limpiar contenedor de error al inicio de cada intento
         if (errorContainer) {
           errorContainer.textContent = '';
+          errorContainer.classList.remove('active');
         }
 
         // Actualizar progreso
@@ -740,6 +760,7 @@
                 statusIndicator.className = 'status-indicator error';
                 if (errorContainer) {
                   errorContainer.textContent = result.message || 'Error desconocido';
+                  errorContainer.classList.add('active');
                 }
                 errorCounter++;
               }
@@ -759,6 +780,7 @@
             statusIndicator.className = 'status-indicator error';
             if (errorContainer) {
               errorContainer.textContent = result.message || 'Error desconocido';
+              errorContainer.classList.add('active');
             }
             errorCounter++;
           }
@@ -768,6 +790,7 @@
           statusIndicator.className = 'status-indicator error';
           if (errorContainer) {
             errorContainer.textContent = error.message || 'Error desconocido';
+            errorContainer.classList.add('active');
           }
           errorCounter++;
         }
