@@ -129,24 +129,29 @@ function eliminarBotonFlotanteNovedad() {
 
 /**
  * Crea una imagen del botón flotante.
- * Usa una imagen simple de un ícono de "+" desde una fuente pública.
- * @returns {Blob} Blob de la imagen
+ * Genera un SVG embebido en base64 sin necesidad de conexión a internet.
+ * @returns {Blob} Blob de la imagen SVG
  * @private
  */
 function createNovedadButtonImage_() {
-  // Usar una imagen pública simple de un botón "+"
-  // Esta es una imagen de placeholder.com con un círculo azul y "+"
-  var imageUrl = 'https://via.placeholder.com/120/1976d2/FFFFFF?text=%2B';
+  // Crear SVG con círculo azul y símbolo "+"
+  var svg = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">' +
+    '<circle cx="60" cy="60" r="55" fill="#1976d2" stroke="#1565c0" stroke-width="3"/>' +
+    '<text x="60" y="85" font-family="Arial, sans-serif" font-size="70" font-weight="bold" ' +
+    'fill="#FFFFFF" text-anchor="middle">+</text>' +
+    '<text x="60" y="105" font-family="Arial, sans-serif" font-size="12" font-weight="normal" ' +
+    'fill="#FFFFFF" text-anchor="middle">Novedad</text>' +
+    '</svg>';
   
   try {
-    var response = UrlFetchApp.fetch(imageUrl);
-    var blob = response.getBlob();
-    blob.setName('boton-novedad.png');
+    // Convertir SVG a blob
+    var blob = Utilities.newBlob(svg, 'image/svg+xml', 'boton-novedad.svg');
+    Logger.log("✓ Imagen del botón creada exitosamente (SVG embebido)");
     return blob;
   } catch (e) {
-    Logger.log("Error al obtener imagen: " + e.message);
-    // Si falla, crear un blob vacío simple
-    throw new Error("No se pudo crear la imagen del botón. Verifique la conexión a internet.");
+    Logger.log("Error al crear imagen SVG: " + e.message);
+    throw new Error("No se pudo crear la imagen del botón: " + e.message);
   }
 }
 
