@@ -207,29 +207,43 @@ function onEditInstalled(e) {
         }
       }
 
-      var colAdjuntoCol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOrden', false);
+      var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
+      var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
       var colOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
 
       if (colOrdenCol && editedRange.getColumn() === colOrdenCol) {
         var rowIdx = editedRange.getRow();
-        var adjuntoValue = sheet.getRange(rowIdx, colAdjuntoCol).getValue();
-        var adjuntoStr = adjuntoValue ? adjuntoValue.toString().trim() : "";
         
-        if (adjuntoStr === "✅ Cargado") {
+        var estadoCOA = colAdjuntoCOACol ? sheet.getRange(rowIdx, colAdjuntoCOACol).getValue() : "";
+        var estadoOA = colAdjuntoOACol ? sheet.getRange(rowIdx, colAdjuntoOACol).getValue() : "";
+        var estadoCOAStr = estadoCOA ? estadoCOA.toString().trim() : "";
+        var estadoOAStr = estadoOA ? estadoOA.toString().trim() : "";
+        
+        if (estadoCOAStr === "✅ Cargado" || estadoOAStr === "✅ Cargado") {
           var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
           var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
           
-          sheet.getRange(rowIdx, colAdjuntoCol).setValue("Pendiente");
-          sheet.getRange(rowIdx, colAdjuntoCol).clearNote();
+          if (colAdjuntoCOACol) {
+            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue("Pendiente");
+            sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
+          }
+          if (colAdjuntoOACol) {
+            sheet.getRange(rowIdx, colAdjuntoOACol).setValue("Pendiente");
+            sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
+          }
           
-          logChange('RESET_CARGA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado devuelto a Pendiente.', userIdentity);
-          SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. El estado del adjunto ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
+          actualizarEstadoCarga(sheet, rowIdx, headers);
+          
+          logChange('RESET_CARGA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estados de documentos devueltos a Pendiente.', userIdentity);
+          SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. Los estados de los documentos han vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
           return;
         }
         
-        if (adjuntoStr === "" && e.value !== undefined && e.value !== "") {
-          sheet.getRange(rowIdx, colAdjuntoCol).setValue("Pendiente");
-          logChange('ASIGNACION_PENDIENTE', 'NoOrden asignado. Estado de AdjuntoOrden establecido a Pendiente.', userIdentity);
+        if (estadoCOAStr === "" && estadoOAStr === "" && e.value !== undefined && e.value !== "") {
+          if (colAdjuntoCOACol) sheet.getRange(rowIdx, colAdjuntoCOACol).setValue("Pendiente");
+          if (colAdjuntoOACol) sheet.getRange(rowIdx, colAdjuntoOACol).setValue("Pendiente");
+          actualizarEstadoCarga(sheet, rowIdx, headers);
+          logChange('ASIGNACION_PENDIENTE', 'NoOrden asignado. Estados de documentos establecidos a Pendiente.', userIdentity);
           return;
         }
       }

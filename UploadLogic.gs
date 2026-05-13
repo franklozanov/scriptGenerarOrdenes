@@ -32,11 +32,11 @@ function abrirModalSubidaGeneral() {
 
 /**
  * Obtiene las listas de órdenes y análisis pendientes de carga.
- * Retorna un array con los NoOrden de todas las filas donde AdjuntoOrden sea "Pendiente".
+ * Retorna arrays con los NoOrden según el estado de carga de COA y OA.
  * 
- * @returns {Object} Objeto con arrays de órdenes y análisis pendientes
- * @property {Array<string>} ordenes - Números de orden pendientes
- * @property {Array<string>} analisis - Números de análisis pendientes
+ * @returns {Object} Objeto con arrays de órdenes pendientes por tipo de documento
+ * @property {Array<string>} ordenesPendientesOA - Números de orden con OA pendiente
+ * @property {Array<string>} ordenesPendientesCOA - Números de orden con COA pendiente
  */
 function getPendingOrdersList() {
   try {
@@ -49,45 +49,48 @@ function getPendingOrdersList() {
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-    var colAdjuntoCol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOrden', true);
+    var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
+    var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
     var colNoAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
     
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return { ordenes: [], analisis: [] }; // No hay datos
+      return { ordenesPendientesOA: [], ordenesPendientesCOA: [] };
     }
     
-    // Obtener todas las filas de datos
     var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     var data = dataRange.getValues();
     
-    var ordenes = [];
-    var analisis = [];
+    var ordenesPendientesOA = [];
+    var ordenesPendientesCOA = [];
     
     for (var i = 0; i < data.length; i++) {
       var noOrden = data[i][colNoOrdenCol - 1];
-      var adjuntoEstado = data[i][colAdjuntoCol - 1];
+      var estadoCOA = colAdjuntoCOACol ? data[i][colAdjuntoCOACol - 1] : "Pendiente";
+      var estadoOA = colAdjuntoOACol ? data[i][colAdjuntoOACol - 1] : "Pendiente";
       var noAnalisis = colNoAnalisisCol ? data[i][colNoAnalisisCol - 1] : null;
       
-      // Manejo seguro de valores nulos o indefinidos
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
-      var adjuntoStr = adjuntoEstado ? adjuntoEstado.toString().trim() : "";
+      var estadoCOAStr = estadoCOA ? estadoCOA.toString().trim() : "Pendiente";
+      var estadoOAStr = estadoOA ? estadoOA.toString().trim() : "Pendiente";
       var noAnalisisStr = noAnalisis ? noAnalisis.toString().trim() : "";
       
-      // Obtener órdenes pendientes (AdjuntoOrden == "Pendiente")
-      if (noOrdenStr && adjuntoStr === "Pendiente") {
-        ordenes.push(noOrdenStr);
+      if (!noOrdenStr) continue;
+      
+      // Agregar a lista de OA pendientes si AdjuntoOA != "✅ Cargado"
+      if (estadoOAStr !== "✅ Cargado") {
+        ordenesPendientesOA.push(noOrdenStr);
       }
       
-      // Obtener NoAnalisis solo para filas con AdjuntoOrden == "Pendiente"
-      if (noAnalisisStr && adjuntoStr === "Pendiente") {
-        analisis.push(noAnalisisStr);
+      // Agregar a lista de COA pendientes si AdjuntoCOA != "✅ Cargado" Y tiene NoAnalisis
+      if (estadoCOAStr !== "✅ Cargado" && noAnalisisStr) {
+        ordenesPendientesCOA.push(noOrdenStr);
       }
     }
     
-    Logger.log("✓ Órdenes pendientes encontradas: " + ordenes.length);
-    Logger.log("✓ NoAnalisis encontrados: " + analisis.length);
-    return { ordenes: ordenes, analisis: analisis };
+    Logger.log("✓ Órdenes con OA pendiente: " + ordenesPendientesOA.length);
+    Logger.log("✓ Órdenes con COA pendiente: " + ordenesPendientesCOA.length);
+    return { ordenesPendientesOA: ordenesPendientesOA, ordenesPendientesCOA: ordenesPendientesCOA };
     
   } catch (e) {
     Logger.log("Error en getPendingOrdersList: " + e.message);
@@ -130,24 +133,30 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var headers = data[0]; // La primera fila son los encabezados
     
     // Mapeo de columnas por nombre de encabezado (base-1 para getRange)
-    var colAdjuntoIdx = getColumnIndexByName(headers, 'AdjuntoOrden', true);
+    var colAdjuntoCOAIdx = getColumnIndexByName(headers, 'AdjuntoCOA', false);
+    var colAdjuntoOAIdx = getColumnIndexByName(headers, 'AdjuntoOA', false);
+    var colEstadoCargaIdx = getColumnIndexByName(headers, 'EstadoCarga', false);
     var colNoOrdenIdx = getColumnIndexByName(headers, 'NoOrden', true);
-    var colNoAnalisisIdx = getColumnIndexByName(headers, 'NoAnalisis', true);
+    var colNoAnalisisIdx = getColumnIndexByName(headers, 'NoAnalisis', false);
     
     // Determinar la columna objetivo según docType (para búsqueda en array data)
     var targetColName = "";
     var folderKey = "";
+    var targetAdjuntoCol = null;
+    
     if (docType === "Orden de Acondicionamiento") {
       targetColName = "NoOrden";
       folderKey = "DOC_ORDENES";
-    } else if (docType === "Registro de Inspeccion Base") {
-      targetColName = "NoAnalisis";
+      targetAdjuntoCol = colAdjuntoOAIdx;
+    } else if (docType === "Certificado de Analisis") {
+      targetColName = "NoOrden";
       folderKey = "DOC_ANALISIS";
+      targetAdjuntoCol = colAdjuntoCOAIdx;
     }
     
-    // Validación de seguridad para folderKey
-    if (folderKey === "") {
-      return { status: 'error', message: "Tipo de documento no reconocido para asignar carpeta: " + docType };
+    // Validación de seguridad para folderKey y targetAdjuntoCol
+    if (folderKey === "" || !targetAdjuntoCol) {
+      return { status: 'error', message: "Tipo de documento no reconocido o columnas no configuradas: " + docType };
     }
     
     // Obtener índice de columna objetivo para búsqueda en array (base-0)
@@ -177,12 +186,12 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja. Puede haber sido eliminada mientras el modal estaba abierto.' };
     }
 
-    // Validación específica para Orden de Acondicionamiento: verificar que AdjuntoOrden sea "Pendiente"
-    if (docType === "Orden de Acondicionamiento") {
-      var currentAdjunto = data[targetRowIndex - 1][colAdjuntoIdx - 1]; // colAdjuntoIdx es base-1, data es base-0
-      if (currentAdjunto && currentAdjunto.toString().trim() !== "Pendiente") {
-        return { status: 'error', message: 'La orden "' + referenceNo + '" ya no está en estado "Pendiente". Puede haber sido cargada por otro usuario. Actualice el modal.' };
-      }
+    // Validación: verificar que el documento específico esté pendiente
+    var currentEstadoDoc = data[targetRowIndex - 1][targetAdjuntoCol - 1];
+    var currentEstadoDocStr = currentEstadoDoc ? currentEstadoDoc.toString().trim() : "Pendiente";
+    
+    if (currentEstadoDocStr === "✅ Cargado") {
+      return { status: 'error', message: 'El documento "' + docType + '" para "' + referenceNo + '" ya está cargado. Actualice el modal.' };
     }
 
     // Obtener carpeta desde templates
@@ -257,17 +266,14 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var newFile = folder.createFile(blob);
 
     // Actualizar UI en la hoja según tipo de documento
-    if (docType === "Orden de Acondicionamiento") {
-      // Poner "✅ Cargado" en AdjuntoOrden y agregar Nota
-      var targetCell = sheetOrdenes.getRange(targetRowIndex, colAdjuntoIdx); // colAdjuntoIdx es base-1
-      targetCell.setValue("✅ Cargado");
-      var fileUrl = newFile.getUrl();
-      targetCell.setNote("Archivo cargado: " + fileUrl);
-    } else if (docType === "Registro de Inspeccion Base") {
-      // NO tocar AdjuntoOrden - solo agregar Nota en NoAnalisis
-      var targetCell = sheetOrdenes.getRange(targetRowIndex, colNoAnalisisIdx); // colNoAnalisisIdx es base-1
-      var fileUrl = newFile.getUrl();
-      targetCell.setNote("Registro base cargado: " + fileUrl);
+    var fileUrl = newFile.getUrl();
+    var targetCell = sheetOrdenes.getRange(targetRowIndex, targetAdjuntoCol);
+    targetCell.setValue("✅ Cargado");
+    targetCell.setNote("Archivo cargado: " + fileUrl);
+    
+    // Actualizar estado consolidado
+    if (colEstadoCargaIdx) {
+      actualizarEstadoCarga(sheetOrdenes, targetRowIndex, headers);
     }
 
     // Auditoría obligatoria

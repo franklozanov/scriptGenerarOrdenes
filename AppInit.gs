@@ -27,7 +27,7 @@ function initializeApp(ui) {
   var report = validateStructure();
   
   if (report.missingSheets.length === 0 && report.incorrectHeaders.length === 0) {
-    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos. Use "🔄 Actualizar Botones de Subida" para configurar la columna AdjuntoOrden.');
+    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos.');
     return;
   }
   
@@ -48,7 +48,7 @@ function initializeApp(ui) {
   if (response === ui.Button.YES) {
     createMissingSheets(ui);
     fixHeaders(ui);
-    ui.alert('✅ Inicialización completada. Estructura corregida. Use "🔄 Actualizar Botones de Subida" para configurar la columna AdjuntoOrden.');
+    ui.alert('✅ Inicialización completada. Estructura corregida.\n\nIMPORTANTE: Si está actualizando desde una versión anterior, ejecute la función "migrarAdjuntoOrdenANuevasColumnas" desde el menú Script Editor.');
 
     // Registrar inicialización en Logs si existe
     logInitialization();

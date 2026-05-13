@@ -76,3 +76,52 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
   var colIndex = getColumnIndexByName(headers, columnName, true);
   sheet.getRange(rowIndex, colIndex).setValue(value);
 }
+
+/**
+ * Calcula el estado consolidado de carga basado en los estados de COA y OA.
+ * @param {string} estadoCOA - Estado del Certificado de Análisis ("Pendiente" o "✅ Cargado")
+ * @param {string} estadoOA - Estado de la Orden de Acondicionamiento ("Pendiente" o "✅ Cargado")
+ * @returns {string} Estado consolidado
+ */
+function calcularEstadoCarga(estadoCOA, estadoOA) {
+  var coaStr = estadoCOA ? estadoCOA.toString().trim() : "Pendiente";
+  var oaStr = estadoOA ? estadoOA.toString().trim() : "Pendiente";
+  
+  var coaCargado = coaStr === "✅ Cargado";
+  var oaCargado = oaStr === "✅ Cargado";
+  
+  if (coaCargado && oaCargado) {
+    return "✅ Cargados";
+  } else if (!coaCargado && !oaCargado) {
+    return "Pendiente COA/OA";
+  } else if (!coaCargado && oaCargado) {
+    return "Pendiente COA";
+  } else if (coaCargado && !oaCargado) {
+    return "Pendiente OA";
+  }
+  
+  return "Pendiente COA/OA";
+}
+
+/**
+ * Actualiza el estado consolidado de carga en una fila específica.
+ * @param {Sheet} sheet - Hoja de cálculo 'Ordenes'
+ * @param {number} rowIndex - Número de fila (base-1)
+ * @param {Array} headers - Array de encabezados de la hoja
+ */
+function actualizarEstadoCarga(sheet, rowIndex, headers) {
+  var colCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
+  var colOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+  
+  if (!colCOAIdx || !colOAIdx || !colEstadoIdx) {
+    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoCarga");
+    return;
+  }
+  
+  var estadoCOA = sheet.getRange(rowIndex, colCOAIdx).getValue();
+  var estadoOA = sheet.getRange(rowIndex, colOAIdx).getValue();
+  
+  var estadoConsolidado = calcularEstadoCarga(estadoCOA, estadoOA);
+  sheet.getRange(rowIndex, colEstadoIdx).setValue(estadoConsolidado);
+}

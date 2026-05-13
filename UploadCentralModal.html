@@ -381,10 +381,10 @@
           globalPendingOrders = data;
           hideLoading();
           
-          var hasOrdenes = data.ordenes && data.ordenes.length > 0;
-          var hasAnalisis = data.analisis && data.analisis.length > 0;
+          var hasOA = data.ordenesPendientesOA && data.ordenesPendientesOA.length > 0;
+          var hasCOA = data.ordenesPendientesCOA && data.ordenesPendientesCOA.length > 0;
           
-          if (!hasOrdenes && !hasAnalisis) {
+          if (!hasOA && !hasCOA) {
             noOrdersMessage.style.display = 'block';
           } else {
             mainContent.style.display = 'block';
@@ -441,7 +441,7 @@
           <div class="doc-type-select">
             <select class="doc-type-select-input" onchange="handleDocTypeChange(this, '${rowId}')">
               <option value="Orden de Acondicionamiento">Orden Acond.</option>
-              <option value="Registro de Inspeccion Base">Inspección</option>
+              <option value="Certificado de Analisis">Certificado Análisis</option>
             </select>
           </div>
           <div class="order-select">
@@ -481,11 +481,11 @@
       var emptyMessage = '';
       
       if (docType === 'Orden de Acondicionamiento') {
-        list = globalPendingOrders.ordenes || [];
-        emptyMessage = 'No hay órdenes pendientes';
-      } else if (docType === 'Registro de Inspeccion Base') {
-        list = globalPendingOrders.analisis || [];
-        emptyMessage = 'No hay análisis disponibles';
+        list = globalPendingOrders.ordenesPendientesOA || [];
+        emptyMessage = 'No hay órdenes con OA pendiente';
+      } else if (docType === 'Certificado de Analisis') {
+        list = globalPendingOrders.ordenesPendientesCOA || [];
+        emptyMessage = 'No hay órdenes con COA pendiente';
       }
       
       if (list.length === 0) {
