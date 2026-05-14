@@ -11,116 +11,176 @@
     
     body {
       font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: white;
       height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    /* Header con botón minimizar */
+    .header {
+      background: #1976d2;
+      color: white;
+      padding: 12px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    
+    .minimize-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+    
+    .minimize-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    /* Contenido principal */
+    .sidebar-content {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 20px;
-    }
-    
-    .sidebar-content {
       text-align: center;
-      width: 100%;
     }
     
-    .title {
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
+    .icon-container {
+      width: 80px;
+      height: 80px;
+      background: #1976d2;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin-bottom: 20px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+    }
+    
+    .icon-container .icon {
+      font-size: 40px;
+      color: white;
     }
     
     /* Botón de acción */
     #action-button {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      background: white;
+      width: 100%;
+      max-width: 160px;
+      padding: 14px 20px;
+      border-radius: 8px;
+      background: #1976d2;
       border: none;
       cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #667eea;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
       transition: all 0.2s ease;
       outline: none;
-      margin: 0 auto;
     }
     
     #action-button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-      background: #f8f9fa;
+      background: #1565c0;
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+      transform: translateY(-1px);
     }
     
     #action-button:active {
-      transform: scale(0.98);
-    }
-    
-    .button-icon {
-      font-size: 32px;
-      font-weight: bold;
-      margin-bottom: 6px;
-      line-height: 1;
-    }
-    
-    .button-text {
-      font-size: 11px;
-      font-weight: 600;
-      text-align: center;
-      line-height: 1.2;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(25, 118, 210, 0.3);
     }
     
     .description {
-      color: rgba(255, 255, 255, 0.9);
+      color: #666;
       font-size: 12px;
-      margin-top: 20px;
+      margin-top: 16px;
       line-height: 1.5;
     }
     
-    /* Animación de pulso */
-    @keyframes pulse {
-      0%, 100% {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      }
-      50% {
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 8px rgba(255, 255, 255, 0.2);
-      }
+    /* Footer */
+    .footer {
+      padding: 12px 15px;
+      background: #f5f5f5;
+      border-top: 1px solid #e0e0e0;
+      text-align: center;
     }
     
-    #action-button.pulse {
-      animation: pulse 2s infinite;
+    .footer-text {
+      font-size: 11px;
+      color: #999;
+    }
+    
+    /* Estado minimizado */
+    body.minimized .sidebar-content,
+    body.minimized .footer {
+      display: none;
+    }
+    
+    body.minimized {
+      height: auto;
+    }
+    
+    body.minimized .header {
+      cursor: pointer;
+    }
+    
+    body.minimized .minimize-btn {
+      transform: rotate(180deg);
     }
   </style>
 </head>
 <body>
+  <!-- Header con botón minimizar -->
+  <div class="header" id="header">
+    <div class="header-title">📝 Novedades</div>
+    <button class="minimize-btn" id="minimize-btn" title="Minimizar">−</button>
+  </div>
+  
+  <!-- Contenido principal -->
   <div class="sidebar-content">
-    <div class="title">📝 Novedades</div>
+    <div class="icon-container">
+      <span class="icon">➕</span>
+    </div>
     
-    <button id="action-button" class="pulse">
-      <span class="button-icon">➕</span>
-      <span class="button-text">Registrar<br>Novedad</span>
+    <button id="action-button">
+      Registrar Novedad
     </button>
     
     <div class="description">
-      Haz clic para registrar<br>entregas o novedades
+      Registra entregas o<br>novedades de órdenes
     </div>
+  </div>
+  
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-text">Sistema QMS</div>
   </div>
 
   <script>
-    // Manejar clic en el botón
+    // Manejar clic en el botón de acción
     document.getElementById('action-button').addEventListener('click', function() {
-      // Remover animación de pulso después del primer clic
-      this.classList.remove('pulse');
-      
       // Llamar a la función de Apps Script para abrir el modal
       google.script.run
         .withSuccessHandler(function() {
@@ -131,6 +191,30 @@
           alert('Error al abrir el modal de novedad. Por favor, intente nuevamente.');
         })
         .abrirModalRegistroNovedad();
+    });
+    
+    // Manejar minimizar/maximizar
+    var isMinimized = false;
+    var minimizeBtn = document.getElementById('minimize-btn');
+    var header = document.getElementById('header');
+    
+    function toggleMinimize() {
+      isMinimized = !isMinimized;
+      document.body.classList.toggle('minimized', isMinimized);
+      minimizeBtn.textContent = isMinimized ? '+' : '−';
+      minimizeBtn.title = isMinimized ? 'Maximizar' : 'Minimizar';
+    }
+    
+    minimizeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleMinimize();
+    });
+    
+    // Hacer clic en el header cuando está minimizado para expandir
+    header.addEventListener('click', function() {
+      if (isMinimized) {
+        toggleMinimize();
+      }
     });
   </script>
 </body>
