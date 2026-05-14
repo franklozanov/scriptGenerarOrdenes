@@ -119,10 +119,10 @@ function initializeCompleteSystem(ui) {
   }
 
   try {
-    crearBotonFlotanteNovedad(true); // silent=true para evitar error de UI en inicialización
-    summary.push("✓ Botón flotante de Novedad creado");
+    mostrarSidebarFlotante(true); // silent=true para evitar error de UI en inicialización
+    summary.push("✓ Sidebar flotante de Novedad mostrado");
   } catch (e) {
-    summary.push("⚠️ Botón flotante: " + e.message);
+    summary.push("⚠️ Sidebar flotante: " + e.message);
   }
 
   // Diagnóstico de ConsecutivoImp

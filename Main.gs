@@ -41,11 +41,11 @@ function onOpen() {
     Logger.log("Error en warmup de caché: " + e.message);
   }
   
-  // Verificar y crear botón flotante de Novedad si no existe
+  // Mostrar sidebar flotante de Novedad
   try {
-    verificarYCrearBotonFlotante_();
+    mostrarSidebarFlotante(true);
   } catch (e) {
-    Logger.log("Error al verificar botón flotante: " + e.message);
+    Logger.log("Error al mostrar sidebar flotante: " + e.message);
   }
 }
 
@@ -126,44 +126,3 @@ function syncVerifCantDisponible() {
   }
 }
 
-// --- GESTIÓN DEL BOTÓN FLOTANTE ---
-
-/**
- * Verifica si existe el botón flotante de Novedad y lo crea si no existe.
- * Se ejecuta silenciosamente en onOpen para mantener el botón siempre visible.
- * @private
- */
-function verificarYCrearBotonFlotante_() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('Ordenes');
-    
-    if (!sheet) {
-      Logger.log("verificarYCrearBotonFlotante_: Hoja 'Ordenes' no encontrada.");
-      return;
-    }
-    
-    // Verificar si ya existe el botón
-    var images = sheet.getImages();
-    var botonExiste = false;
-    
-    for (var i = 0; i < images.length; i++) {
-      var script = images[i].getScript();
-      if (script === 'abrirModalRegistroNovedad') {
-        botonExiste = true;
-        Logger.log("✓ Botón flotante de Novedad ya existe");
-        break;
-      }
-    }
-    
-    // Si no existe, crearlo silenciosamente
-    if (!botonExiste) {
-      Logger.log("Creando botón flotante de Novedad...");
-      crearBotonFlotanteNovedad(true); // silent=true
-      Logger.log("✓ Botón flotante de Novedad creado automáticamente");
-    }
-    
-  } catch (e) {
-    Logger.log("ERROR en verificarYCrearBotonFlotante_: " + e.message);
-  }
-}
