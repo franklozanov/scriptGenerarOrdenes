@@ -14,29 +14,36 @@
  */
 function createNovedadButtonImage_() {
   try {
-    var cache = CacheService.getScriptCache();
-    var cacheKey = 'NOVEDAD_BUTTON_IMAGE_BASE64';
+    var properties = PropertiesService.getScriptProperties();
+    var propertyKey = 'NOVEDAD_BUTTON_IMAGE_BASE64';
     
-    // Intentar obtener desde caché
-    var cachedBase64 = cache.get(cacheKey);
+    // Intentar obtener desde propiedades almacenadas
+    var storedBase64 = properties.getProperty(propertyKey);
     
-    if (cachedBase64) {
-      Logger.log("✓ Imagen del botón obtenida desde caché");
-      var binaryData = Utilities.base64Decode(cachedBase64);
+    if (storedBase64) {
+      Logger.log("✓ Imagen del botón obtenida desde almacenamiento");
+      var binaryData = Utilities.base64Decode(storedBase64);
       return Utilities.newBlob(binaryData, 'image/png', 'novedad-button.png');
     }
     
-    // Si no está en caché, cargar desde Drive
+    // Si no está almacenada, cargar desde Drive
     Logger.log("Cargando imagen del botón desde Drive...");
     var imageFileId = '1fmVlKe3jI6CymA9_iW4vNO_7PncuFGu1';
     var imageFile = DriveApp.getFileById(imageFileId);
     var imageBlob = imageFile.getBlob();
     
-    // Convertir a base64 y guardar en caché (6 horas)
+    // Convertir a base64 y guardar en propiedades
     var base64Data = Utilities.base64Encode(imageBlob.getBytes());
-    cache.put(cacheKey, base64Data, 21600); // 6 horas
     
-    Logger.log("✓ Imagen cargada desde Drive y guardada en caché");
+    // Verificar tamaño (límite de PropertiesService es ~500KB)
+    if (base64Data.length > 500000) {
+      Logger.log("⚠ Imagen demasiado grande para almacenar. Usando desde Drive directamente.");
+      imageBlob.setContentType('image/png');
+      return imageBlob;
+    }
+    
+    properties.setProperty(propertyKey, base64Data);
+    Logger.log("✓ Imagen cargada desde Drive y almacenada (tamaño: " + Math.round(base64Data.length/1024) + "KB)");
     
     imageBlob.setContentType('image/png');
     return imageBlob;
@@ -65,4 +72,20 @@ function createFallbackButtonImage_() {
   Logger.log("⚠ Usando imagen de respaldo (1x1 transparente)");
   
   return blob;
+}
+
+/**
+ * Limpia la imagen almacenada del botón flotante.
+ * Útil para forzar la recarga desde Drive si se actualiza la imagen.
+ */
+function limpiarImagenBotonAlmacenada() {
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    properties.deleteProperty('NOVEDAD_BUTTON_IMAGE_BASE64');
+    Logger.log("✓ Imagen del botón eliminada del almacenamiento");
+    return { status: 'success', message: 'Imagen eliminada. Se recargará desde Drive la próxima vez.' };
+  } catch (e) {
+    Logger.log("ERROR al limpiar imagen almacenada: " + e.message);
+    throw e;
+  }
 }
