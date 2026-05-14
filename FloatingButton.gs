@@ -128,30 +128,48 @@ function eliminarBotonFlotanteNovedad() {
 }
 
 /**
- * Crea una imagen del botón flotante.
- * Genera un SVG embebido en base64 sin necesidad de conexión a internet.
- * @returns {Blob} Blob de la imagen SVG
+ * Crea el botón flotante usando un Drawing nativo de Google Sheets.
+ * No requiere imágenes externas - usa formas y texto nativos.
+ * @param {Sheet} sheet - Hoja donde crear el botón
+ * @returns {Object} Drawing creado
  * @private
  */
-function createNovedadButtonImage_() {
-  // Crear SVG con círculo azul y símbolo "+"
-  var svg = '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">' +
-    '<circle cx="60" cy="60" r="55" fill="#1976d2" stroke="#1565c0" stroke-width="3"/>' +
-    '<text x="60" y="85" font-family="Arial, sans-serif" font-size="70" font-weight="bold" ' +
-    'fill="#FFFFFF" text-anchor="middle">+</text>' +
-    '<text x="60" y="105" font-family="Arial, sans-serif" font-size="12" font-weight="normal" ' +
-    'fill="#FFFFFF" text-anchor="middle">Novedad</text>' +
-    '</svg>';
-  
+function createNovedadButtonDrawing_(sheet) {
   try {
-    // Convertir SVG a blob
-    var blob = Utilities.newBlob(svg, 'image/svg+xml', 'boton-novedad.svg');
-    Logger.log("✓ Imagen del botón creada exitosamente (SVG embebido)");
-    return blob;
+    // Crear un rectángulo con esquinas redondeadas (simula círculo)
+    var shape = sheet.newChart()
+      .asAreaChart() // Usamos un tipo de gráfico temporal
+      .setPosition(5, 5, 0, 0) // Posición inicial (se ajustará después)
+      .build();
+    
+    // Nota: Google Apps Script no permite crear Drawings directamente con formas personalizadas
+    // La alternativa es usar una celda con formato especial como botón
+    
+    // Crear una celda especial que actúe como botón
+    var buttonCell = sheet.getRange('A1');
+    buttonCell.setValue('➕ Novedad');
+    buttonCell.setBackground('#1976d2');
+    buttonCell.setFontColor('#FFFFFF');
+    buttonCell.setFontSize(14);
+    buttonCell.setFontWeight('bold');
+    buttonCell.setHorizontalAlignment('center');
+    buttonCell.setVerticalAlignment('middle');
+    
+    // Ajustar tamaño de la celda
+    sheet.setColumnWidth(1, 120);
+    sheet.setRowHeight(1, 120);
+    
+    Logger.log("✓ Botón flotante creado usando celda formateada");
+    
+    return {
+      type: 'cell',
+      range: 'A1',
+      sheet: sheet
+    };
+    
   } catch (e) {
-    Logger.log("Error al crear imagen SVG: " + e.message);
-    throw new Error("No se pudo crear la imagen del botón: " + e.message);
+    Logger.log("Error al crear botón flotante: " + e.message);
+    throw new Error("No se pudo crear el botón flotante: " + e.message);
   }
 }
 

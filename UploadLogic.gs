@@ -242,32 +242,44 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var targetFileName = referenceNo + ".pdf";
     var existingFiles = folder.getFilesByName(targetFileName);
     var archivoReemplazado = false;
+    var skipUpload = false;
+    var fileUrl = "";
     
     // Verificar si el archivo ya existe
     if (existingFiles.hasNext()) {
       Logger.log("Archivo ya existe: " + targetFileName);
-      if (!overwriteConfirmed) {
+      
+      if (overwriteConfirmed === 'skipUpload') {
+        // Usuario canceló reemplazo - solo actualizar estado sin tocar archivo
+        Logger.log("Usuario canceló reemplazo. Actualizando estado sin modificar archivo.");
+        var existingFile = existingFiles.next();
+        fileUrl = existingFile.getUrl();
+        skipUpload = true;
+      } else if (!overwriteConfirmed) {
         // Retornar status 'exists' para que el frontend pida confirmación
         Logger.log("Retornando status 'exists' para pedir confirmación al usuario");
         return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndex };
-      }
-      
-      // Si overwriteConfirmed es true, proceder con el reemplazo
-      while (existingFiles.hasNext()) {
-        var oldFile = existingFiles.next();
-        Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
-        oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
-        archivoReemplazado = true;
+      } else {
+        // Si overwriteConfirmed es true, proceder con el reemplazo
+        while (existingFiles.hasNext()) {
+          var oldFile = existingFiles.next();
+          Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
+          oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
+          archivoReemplazado = true;
+        }
       }
     }
 
-    // Decodificar base64 y crear el archivo
-    var decodedData = Utilities.base64Decode(base64Data);
-    var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
-    var newFile = folder.createFile(blob);
+    // Subir archivo solo si no se saltó la subida
+    if (!skipUpload) {
+      // Decodificar base64 y crear el archivo
+      var decodedData = Utilities.base64Decode(base64Data);
+      var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
+      var newFile = folder.createFile(blob);
+      fileUrl = newFile.getUrl();
+    }
 
     // Actualizar UI en la hoja según tipo de documento
-    var fileUrl = newFile.getUrl();
     var targetCell = sheetOrdenes.getRange(targetRowIndex, targetAdjuntoCol);
     targetCell.setValue(VALORES_DOCUMENTO.CARGADO);
     targetCell.setNote("Archivo cargado: " + fileUrl);
@@ -279,12 +291,19 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
 
     // Auditoría obligatoria
     var userIdentity = getUserIdentityStringByUserId_(actingUserId);
-    var logMessage = archivoReemplazado 
-      ? "Se REEMPLAZÓ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado"
-      : "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
+    var logMessage = "";
+    
+    if (skipUpload) {
+      logMessage = "Se actualizó el estado a 'Cargado' para '" + docType + "' (ref: " + referenceNo + ") sin modificar el archivo existente";
+    } else if (archivoReemplazado) {
+      logMessage = "Se REEMPLAZÓ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
+    } else {
+      logMessage = "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
+    }
+    
     logChange('CARGA_DOCUMENTO', logMessage, userIdentity);
     
-    return { status: 'success', message: 'Documento subido exitosamente para ' + docType + ' ' + referenceNo + '.' };
+    return { status: 'success', message: 'Documento procesado exitosamente para ' + docType + ' ' + referenceNo + '.' };
     
   } catch (e) {
     Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);

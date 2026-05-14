@@ -864,12 +864,13 @@
           var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
           
           if (confirmOverwrite) {
-            // Usuario aceptó, reintentar con overwriteConfirmed = true
+            // Usuario aceptó REEMPLAZAR - reintentar con overwriteConfirmed = true
             result = await uploadFileFromCache(cached, referenceNo, docType, true, selectedUser.userId);
             
             if (result.status === 'success') {
-              statusIndicator.textContent = '✅ Completado';
+              statusIndicator.textContent = '✅ Reemplazado';
               statusIndicator.className = 'status-indicator success';
+              statusIndicator.title = 'Archivo reemplazado exitosamente';
               callback(true);
             } else {
               statusIndicator.textContent = '❌ Error';
@@ -881,11 +882,24 @@
               callback(false);
             }
           } else {
-            // Usuario canceló - marcar como subido
-            statusIndicator.textContent = '✅ Subido';
-            statusIndicator.className = 'status-indicator success';
-            statusIndicator.title = 'Archivo ya existe, considerado como subido';
-            callback(true);
+            // Usuario canceló REEMPLAZO - actualizar estado sin reemplazar archivo
+            // Llamar al backend para que actualice la celda a "✅ Cargado" sin tocar el archivo
+            result = await uploadFileFromCache(cached, referenceNo, docType, 'skipUpload', selectedUser.userId);
+            
+            if (result.status === 'success' || result.status === 'skipped') {
+              statusIndicator.textContent = '✅ Ya existe';
+              statusIndicator.className = 'status-indicator success';
+              statusIndicator.title = 'Archivo ya existe, estado actualizado sin reemplazar';
+              callback(true);
+            } else {
+              statusIndicator.textContent = '❌ Error';
+              statusIndicator.className = 'status-indicator error';
+              if (errorContainer) {
+                errorContainer.textContent = result.message || 'Error al actualizar estado';
+                errorContainer.classList.add('active');
+              }
+              callback(false);
+            }
           }
         } else if (result.status === 'success') {
           statusIndicator.textContent = '✅ Completado';
