@@ -14,8 +14,8 @@
 function mostrarSidebarFlotante(silent) {
   try {
     var html = HtmlService.createHtmlOutputFromFile('FloatingButtonSidebar')
-      .setWidth(40)
-      .setTitle('');
+      .setWidth(200)
+      .setTitle('Novedades');
     
     SpreadsheetApp.getUi().showSidebar(html);
     

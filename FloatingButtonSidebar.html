@@ -11,148 +11,88 @@
     
     body {
       font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-      overflow: hidden;
-      background: transparent;
-      height: 100vh;
-    }
-    
-    #sidebar-container {
-      position: fixed;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 45px;
-      height: 200px;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-    }
-    
-    #sidebar-container:hover {
-      width: 160px;
-    }
-    
-    /* Pestaña colapsada */
-    #tab {
-      position: absolute;
-      right: 0;
-      top: 0;
-      width: 45px;
-      height: 200px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 12px 0 0 12px;
-      box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.15);
+      height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
+      padding: 20px;
     }
     
-    #tab:hover {
-      box-shadow: -4px 4px 16px rgba(102, 126, 234, 0.3);
+    .sidebar-content {
+      text-align: center;
+      width: 100%;
     }
     
-    #tab-text {
+    .title {
       color: white;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 600;
-      letter-spacing: 1.5px;
+      margin-bottom: 20px;
       text-transform: uppercase;
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      user-select: none;
-    }
-    
-    #tab-arrow {
-      position: absolute;
-      left: 12px;
-      color: white;
-      font-size: 20px;
-      opacity: 0.8;
-      transition: transform 0.3s ease;
-    }
-    
-    #sidebar-container:hover #tab-arrow {
-      transform: translateX(-3px);
-    }
-    
-    /* Contenido expandido */
-    #content {
-      position: absolute;
-      right: 45px;
-      top: 0;
-      width: 115px;
-      height: 200px;
-      background: white;
-      border-radius: 12px 0 0 12px;
-      box-shadow: -2px 2px 12px rgba(0, 0, 0, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-      padding: 10px;
-    }
-    
-    #sidebar-container:hover #content {
-      opacity: 1;
-      pointer-events: auto;
+      letter-spacing: 1px;
     }
     
     /* Botón de acción */
     #action-button {
-      width: 90px;
-      height: 90px;
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: white;
       border: none;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: white;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      color: #667eea;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       transition: all 0.2s ease;
       outline: none;
+      margin: 0 auto;
     }
     
     #action-button:hover {
-      transform: scale(1.08);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      background: #f8f9fa;
     }
     
     #action-button:active {
-      transform: scale(0.95);
+      transform: scale(0.98);
     }
     
     .button-icon {
-      font-size: 28px;
+      font-size: 32px;
       font-weight: bold;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
       line-height: 1;
     }
     
     .button-text {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       text-align: center;
       line-height: 1.2;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.5px;
     }
     
-    /* Animación de pulso sutil */
+    .description {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 12px;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+    
+    /* Animación de pulso */
     @keyframes pulse {
       0%, 100% {
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       }
       50% {
-        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.5);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 8px rgba(255, 255, 255, 0.2);
       }
     }
     
@@ -162,19 +102,16 @@
   </style>
 </head>
 <body>
-  <div id="sidebar-container">
-    <!-- Pestaña colapsada -->
-    <div id="tab">
-      <span id="tab-arrow">◄</span>
-      <span id="tab-text">Novedad</span>
-    </div>
+  <div class="sidebar-content">
+    <div class="title">📝 Novedades</div>
     
-    <!-- Contenido expandido -->
-    <div id="content">
-      <button id="action-button" class="pulse">
-        <span class="button-icon">➕</span>
-        <span class="button-text">Registrar<br>Novedad</span>
-      </button>
+    <button id="action-button" class="pulse">
+      <span class="button-icon">➕</span>
+      <span class="button-text">Registrar<br>Novedad</span>
+    </button>
+    
+    <div class="description">
+      Haz clic para registrar<br>entregas o novedades
     </div>
   </div>
 
@@ -195,13 +132,6 @@
         })
         .abrirModalRegistroNovedad();
     });
-    
-    // Opcional: Remover pulso al pasar el mouse por primera vez
-    document.getElementById('sidebar-container').addEventListener('mouseenter', function() {
-      setTimeout(function() {
-        document.getElementById('action-button').classList.remove('pulse');
-      }, 1000);
-    }, { once: true });
   </script>
 </body>
 </html>
