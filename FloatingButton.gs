@@ -61,3 +61,39 @@ function ocultarSidebarFlotante() {
     throw e;
   }
 }
+
+/**
+ * FUNCIÓN DE PRUEBA MANUAL
+ * Ejecuta esta función desde el editor de Apps Script para probar el sidebar.
+ * Menú: Extensiones → Apps Script → Seleccionar "testSidebarManual" → Ejecutar
+ */
+function testSidebarManual() {
+  try {
+    Logger.log("=== PRUEBA MANUAL DE SIDEBAR ===");
+    
+    // Mostrar el sidebar
+    mostrarSidebarFlotante(false);
+    
+    // Mostrar confirmación
+    SpreadsheetApp.getUi().alert(
+      '✅ Sidebar Ejecutado',
+      'El sidebar debería estar visible ahora en el borde derecho.\n\n' +
+      'Si no lo ves:\n' +
+      '1. Verifica que estés en la hoja correcta\n' +
+      '2. Mira en el borde derecho de la pantalla\n' +
+      '3. Revisa los logs (Ver → Registros)',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+  } catch (e) {
+    Logger.log("ERROR: " + e.message);
+    Logger.log("Stack: " + e.stack);
+    
+    SpreadsheetApp.getUi().alert(
+      '❌ Error',
+      'Error al mostrar sidebar:\n\n' + e.message + '\n\n' +
+      'Detalles en logs (Ver → Registros)',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
+}
