@@ -13,7 +13,8 @@
  */
 function mostrarSidebarFlotante(silent) {
   try {
-    var html = HtmlService.createHtmlOutputFromFile('FloatingButtonSidebar')
+    var template = HtmlService.createTemplateFromFile('FloatingButtonSidebar');
+    var html = template.evaluate()
       .setWidth(200)
       .setTitle('Novedades');
     
