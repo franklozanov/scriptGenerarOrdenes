@@ -29,6 +29,8 @@ function onOpen() {
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad')
     .addSeparator()
+    .addItem('📌 Mostrar Panel Lateral de Novedades', 'mostrarSidebarFlotanteFromMenu')
+    .addSeparator()
     .addSubMenu(configMenu)
     .addToUi();
   
@@ -36,17 +38,13 @@ function onOpen() {
   try {
     getInitialData();
     syncVerifCantDisponible();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Plantillas estáticas listas.', 'Sistema QMS', 5);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Use "Gestionar OA → 📌 Mostrar Panel Lateral" para acceso rápido a novedades.', 'Sistema QMS', 7);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
   }
   
-  // Mostrar sidebar flotante de Novedad
-  try {
-    mostrarSidebarFlotante(true);
-  } catch (e) {
-    Logger.log("Error al mostrar sidebar flotante: " + e.message);
-  }
+  // NOTA: No se puede mostrar sidebar automáticamente en onOpen() por restricciones de seguridad de Google Sheets
+  // El usuario debe usar el menú "Gestionar OA → Mostrar Panel Lateral de Novedades"
 }
 
 // --- SINCRONIZACIÓN DE DATOS ---

@@ -45,6 +45,14 @@ function mostrarSidebarFlotante(silent) {
 }
 
 /**
+ * Muestra el sidebar flotante desde el menú (sin modo silent).
+ * Esta función es llamada cuando el usuario hace clic en el menú.
+ */
+function mostrarSidebarFlotanteFromMenu() {
+  mostrarSidebarFlotante(false);
+}
+
+/**
  * Oculta el sidebar flotante.
  * Nota: El sidebar se puede cerrar manualmente por el usuario usando el botón X.
  * Esta función es opcional y puede usarse programáticamente si es necesario.
