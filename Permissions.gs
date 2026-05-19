@@ -264,6 +264,8 @@ function configureOrdenesProtection() {
     "VerifLote", "VerifCant. Disponible", "VerifExp",
     "Fabricante", "Decision"
   ];
+  // 2. Proteger la hoja completa para cumplir con 21 CFR Part 11 (Cero acceso manual)
+  protectSheetFully(sheetOrdenes, 'Proteccion_Ordenes');
   
   var filaEncabezados = 1;
   var headers = sheetOrdenes.getRange(filaEncabezados, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
@@ -293,6 +295,7 @@ function configureOrdenesProtection() {
   }
   
   Logger.log("✓ Protección por columna configurada para Ordenes");
+  Logger.log("✓ Protección total configurada para la hoja Ordenes");
 }
 
 /**

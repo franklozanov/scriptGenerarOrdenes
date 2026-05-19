@@ -361,10 +361,13 @@ function fixHeaders(ui) {
       }
     }
     
-    if (!headersMatch) {
-      // Corregir encabezados
-      sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
-      Logger.log("✓ Encabezados corregidos en hoja: " + sheetName);
+    if (!headersMatch && missingHeaders.length > 0) {
+      // Agregar los encabezados faltantes al final de las columnas existentes sin sobreescribir
+      var lastCol = sheet.getLastColumn();
+      var startCol = lastCol === 0 ? 1 : lastCol + 1; // Manejo por si la hoja está totalmente en blanco
+      
+      sheet.getRange(1, startCol, 1, missingHeaders.length).setValues([missingHeaders]);
+      Logger.log("✓ Encabezados faltantes agregados al final en la hoja " + sheetName + ": " + missingHeaders.join(", "));
     }
   }
 }

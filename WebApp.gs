@@ -114,7 +114,8 @@ function jsonResponse_(payload) {
  * @private
  */
 function handlePrivilegedOperation_(params) {
-  var callingUserId = requireAuthorizedUser_(params);
+  // La validación ahora debe ser independiente de lo que envíe el cliente.
+  var callingUserId = requireAuthorizedUserStrict_(params);
   var operation = params.operation || '';
   Logger.log("WebApp - Operación solicitada: " + operation);
   Logger.log("WebApp - UserID validado: " + callingUserId);
@@ -166,6 +167,41 @@ function handlePrivilegedOperation_(params) {
     diagnostic: 'UNKNOWN_OPERATION',
     supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad']
   };
+}
+
+// --- SEGURIDAD 21 CFR Part 11 ---
+
+/**
+ * Valida rigurosamente la identidad del usuario y su PIN.
+ * No confía en parámetros front-end, obtiene el correo directamente de la sesión de Google.
+ * @param {Object} params - Parámetros recibidos en el POST (debe contener pinFirma)
+ * @returns {string} UserID del usuario validado
+ * @throws {Error} Si el usuario no existe, no está activo o el PIN es incorrecto.
+ */
+function requireAuthorizedUserStrict_(params) {
+  // 1. Obtener la identidad REAL de la sesión de Google (Insuplantable si la WebApp requiere login)
+  var activeEmail = Session.getActiveUser().getEmail();
+  if (!activeEmail) {
+    throw new Error("No se pudo verificar la identidad de Google. Inicie sesión nuevamente.");
+  }
+
+  // 2. Buscar usuario en base de datos (Hoja Usuarios)
+  var validUser = getUserRecordByEmail_(activeEmail);
+  if (!validUser) {
+    throw new Error("ACCESO DENEGADO: El correo " + activeEmail + " no está registrado en el sistema.");
+  }
+
+  if (validUser.estado !== "Activo") {
+    throw new Error("ACCESO DENEGADO: Su usuario se encuentra inactivo.");
+  }
+
+  // 3. Validar Firma Electrónica (PIN) para solventar el "Timeout"
+  var pinRecibido = params.pinFirma || params.pin;
+  if (!pinRecibido || pinRecibido.toString() !== validUser.pin.toString()) {
+    throw new Error("FIRMA INVÁLIDA: El PIN ingresado es incorrecto.");
+  }
+
+  return validUser.userId;
 }
 
 // --- GESTIÓN DE URL DE WEB APP ---

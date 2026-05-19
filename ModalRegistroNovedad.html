@@ -27,11 +27,6 @@
     <form id="novedadForm">
       <div class="form-row">
         <div class="form-group">
-          <label for="usuarioResponsable">Usuario Responsable</label>
-          <input type="text" id="usuarioResponsable" list="usuariosList" placeholder="Seleccione usuario" required>
-          <datalist id="usuariosList"></datalist>
-        </div>
-        <div class="form-group">
           <label for="noOrden">Número de Orden</label>
           <select id="noOrden" required>
             <option value="">Cargando órdenes...</option>
@@ -79,6 +74,14 @@
       <div class="form-group">
         <label for="comentario">Comentario <span id="reqAsterisk" style="color: red; display: none;">*</span></label>
         <textarea id="comentario" placeholder="Ingrese comentarios adicionales (opcional)"></textarea>
+      </div>
+
+      <!-- 21 CFR Part 11: PIN de confirmación (Firma Electrónica) -->
+      <div class="form-row" style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+        <div class="form-group" style="width: 50%;">
+          <label for="userPin">PIN de Autorización (Firma Electrónica) <span style="color: red;">*</span></label>
+          <input type="password" id="userPin" required maxlength="6" placeholder="Ingrese su PIN" style="letter-spacing: 3px; font-weight: bold; text-align: center;">
+        </div>
       </div>
 
       <div class="button-group">
@@ -223,17 +226,6 @@
     function handleSubmit(e) {
       e.preventDefault();
       
-      var inputUsuario = document.getElementById('usuarioResponsable').value.trim();
-      var usuarioUserId = "";
-      
-      // Búsqueda directa en memoria para evadir bugs del Datalist HTML
-      for (var i = 0; i < users.length; i++) {
-        if (users[i].nombreCompleto === inputUsuario) {
-          usuarioUserId = users[i].userId;
-          break;
-        }
-      }
-
       var noOrden = document.getElementById('noOrden').value;
       var codigo = document.getElementById('ordenCodigo').value;
       var totalPags = document.getElementById('ordenTotalPags').value;
@@ -241,11 +233,7 @@
       var tipoNovedad = document.getElementById('tipoNovedad').value;
       var noPagDevueltas = document.getElementById('noPagDevueltas').value;
       var comentario = document.getElementById('comentario').value;
-
-      if (!usuarioUserId) {
-        showError('Seleccione un usuario válido de la lista.');
-        return;
-      }
+      var pin = document.getElementById('userPin').value;
 
       if (!noOrden || !codigo) {
         showError('Seleccione una orden válida.');
@@ -262,6 +250,11 @@
         return;
       }
 
+      if (!pin) {
+        showError('El PIN de autorización es obligatorio.');
+        return;
+      }
+
       var numTotal = Number(totalPags) || 0;
       var numDevueltas = noPagDevueltas === "" ? -1 : Number(noPagDevueltas);
       
@@ -273,7 +266,6 @@
 
       var params = {
         operation: 'registrarNovedad',
-        userId: usuarioUserId,
         noOrden: noOrden,
         codigo: codigo,
         tipoNovedad: tipoNovedad,
@@ -281,7 +273,8 @@
         comentario: comentario,
         totalPags: Number(totalPags) || 0,
         noPagDevueltas: Number(noPagDevueltas) || 0,
-        realizadoPor: usuarioUserId
+        pinFirma: pin
+        // userId y realizadoPor se inyectarán de forma segura en el backend
       };
 
       showLoading('Registrando novedad...');
@@ -317,6 +310,7 @@
       document.getElementById('tipoNovedad').value = '';
       document.getElementById('noPagDevueltas').value = '';
       document.getElementById('comentario').value = '';
+      document.getElementById('userPin').value = '';
       
       document.getElementById('ordenCodigo').value = '';
       document.getElementById('ordenTotalPags').value = '0';

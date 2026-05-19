@@ -12,16 +12,33 @@
  * Crea los menús de la aplicación y precarga datos en caché.
  */
 function onOpen() {
+  var activeEmail = Session.getActiveUser().getEmail();
+  var validUser = getUserRecordByEmail_(activeEmail); // Función a implementar que busque en 'Usuarios'
+  
+  if (!validUser) {
+    SpreadsheetApp.getUi().alert(
+      '⛔ ACCESO DENEGADO', 
+      'El usuario ' + (activeEmail || 'desconocido') + ' no está autorizado para visualizar o interactuar con este documento.\n\nPor favor contacte al Administrador de QA.', 
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return; // Detiene la creación de menús
+  }
+
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
-  var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
-    .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
+  var adminMenu;
+  if (validUser.rol === 'Administrador' || validUser.rol === 'QA') {
+    adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
+      .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
+  }
 
   // 2. Menú de Configuración General
   var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
     .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
-    .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp')
-    .addSeparator()
-    .addSubMenu(adminMenu);
+    .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp');
+    
+  if (adminMenu) {
+    configMenu.addSeparator().addSubMenu(adminMenu);
+  }
 
   // 3. Menú Principal (Gestionar OA)
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
