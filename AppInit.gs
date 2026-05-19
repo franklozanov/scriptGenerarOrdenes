@@ -118,12 +118,6 @@ function initializeCompleteSystem(ui) {
     summary.push("⚠️ Validaciones de STATUS: " + e.message);
   }
 
-  try {
-    mostrarSidebarFlotante(true); // silent=true para evitar error de UI en inicialización
-    summary.push("✓ Sidebar flotante de Novedad mostrado");
-  } catch (e) {
-    summary.push("⚠️ Sidebar flotante: " + e.message);
-  }
 
   // Diagnóstico de ConsecutivoImp
   try {
