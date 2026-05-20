@@ -26,7 +26,9 @@ function onOpen() {
 
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu;
-  if (hasPermission(validUser.userId, PERMISOS.MENU_ADMIN)) {
+  // Fallback de seguridad: El Administrador siempre ve el menú de inicialización
+  var isAdminFallback = validUser.rol === 'Administrador';
+  if (hasPermission(validUser.userId, PERMISOS.MENU_ADMIN) || isAdminFallback) {
     adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
       .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
   }
