@@ -318,6 +318,22 @@ function clearInitialDataCache() {
   cache.remove('initialData_v1');
   cache.remove('initialData_v2');
   cache.remove('printConfig_v1');
+  
+  // Limpiar caché de permisos de roles
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetPermisos = ss.getSheetByName('PermisosRoles');
+    if (sheetPermisos) {
+      var data = sheetPermisos.getDataRange().getValues();
+      for (var r = 1; r < data.length; r++) {
+        var rol = data[r][0] ? data[r][0].toString().trim() : '';
+        if (rol) cache.remove('Permisos_' + rol);
+      }
+    }
+  } catch (e) {
+    Logger.log("Error limpiando caché de permisos: " + e.message);
+  }
+  
   for (var i = 0; i < STATIC_TEMPLATE_KEYS_.length; i++) {
     var prefix = getStaticTemplateCachePrefix_(STATIC_TEMPLATE_KEYS_[i]);
     var meta = cache.get(prefix + 'meta');
