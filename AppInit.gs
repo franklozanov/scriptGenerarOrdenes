@@ -23,6 +23,7 @@ function promptInitializeApp() {
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  */
 function initializeApp(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var report = validateStructure();
   
@@ -62,6 +63,7 @@ function initializeApp(ui) {
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  */
 function initializeCompleteSystem(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   var summary = [];
   
   // Limpiar caché al inicio para forzar recarga de plantillas actualizadas
@@ -144,6 +146,7 @@ function initializeCompleteSystem(ui) {
  * @private
  */
 function initializeWorkbookStructure_(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   var report = validateStructure();
   if (report.missingSheets.length > 0) {
     createMissingSheets(ui);
@@ -160,6 +163,7 @@ function initializeWorkbookStructure_(ui) {
  * @private
  */
 function ensureWebAppUrlConfigured_(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   var savedUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL');
   
   // Si ya existe URL configurada, preguntar si desea mantenerla o modificarla
@@ -286,6 +290,7 @@ function validateStructure() {
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  */
 function createMissingSheets(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
   for (var sheetName in REQUIRED_SHEETS) {
@@ -311,6 +316,7 @@ function createMissingSheets(ui) {
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  */
 function fixHeaders(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
   for (var sheetName in REQUIRED_SHEETS) {
