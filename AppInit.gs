@@ -303,8 +303,9 @@ function createMissingSheets(ui) {
       
       // Si se creó PermisosRoles, insertar filas de ejemplo
       if (sheetName === 'PermisosRoles') {
-        sheet.getRange(2, 1, 1, 10).setValues([['Administrador', true, true, true, true, true, true, true, true, true]]);
-        sheet.getRange(3, 1, 1, 10).setValues([['Operario', false, false, false, true, true, true, true, false, false]]);
+        sheet.getRange(2, 1, 1, 10).setValues([['ADMIN', true, true, true, true, true, true, true, true, true]]);
+        sheet.getRange(3, 1, 1, 10).setValues([['QA', true, false, true, true, true, true, true, true, true]]);
+        sheet.getRange(4, 1, 1, 10).setValues([['STANDARD', false, false, false, true, true, true, true, false, false]]);
         Logger.log("✓ Filas de ejemplo insertadas en PermisosRoles");
       }
     }
