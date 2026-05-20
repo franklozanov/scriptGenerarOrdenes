@@ -8,48 +8,56 @@
 // --- TRIGGER PRINCIPAL: onOpen() ---
 
 /**
- * Trigger simple (fallback) - NO captura correo en contextos inter-dominio.
- * Delegará al trigger instalable onOpenMain() si está configurado.
- * Si el correo no está disponible, solicitará al usuario que lo ingrese.
+ * Trigger simple - Captura correo automáticamente.
+ * Si el correo no está disponible (usuarios inter-dominio),
+ * crea menú de autorización nativa OAuth.
  */
 function onOpen() {
   var activeEmail = Session.getActiveUser().getEmail();
   
-  // Fallback: Si el trigger simple no captura el correo (string vacío),
-  // solicitar al usuario que ingrese su correo manualmente
   if (!activeEmail || activeEmail === "") {
-    Logger.log("onOpen: Correo no disponible en trigger simple, solicitando input manual");
-    var inputEmail = Browser.inputBox(
-      'Identificación Requerida',
-      'Su correo no pudo ser detectado automáticamente.\n\nPor favor, ingrese su correo corporativo:',
-      Browser.Buttons.OK_CANCEL
+    Logger.log("onOpen: Correo no detectado. Creando menú de autorización nativa.");
+    SpreadsheetApp.getUi().createMenu('🔐 Iniciar Sesión')
+      .addItem('Autorizar Acceso', 'autorizarUsuarioExterno')
+      .addToUi();
+      
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Por favor, haz clic en "🔐 Iniciar Sesión" en el menú superior para cargar la aplicación.', 
+      'Autorización Requerida', 
+      10
     );
-    
-    if (inputEmail === 'cancel') {
-      SpreadsheetApp.getUi().alert('Cancelado: No se puede continuar sin identificación.');
-      return;
-    }
-    
-    if (!inputEmail || inputEmail.trim() === "") {
-      SpreadsheetApp.getUi().alert('Error: Correo inválido. No se puede continuar.');
-      return;
-    }
-    
-    activeEmail = inputEmail.trim();
+    return;
   }
   
-  // Delegar al trigger instalable
   onOpenMain(activeEmail);
 }
 
 /**
- * Trigger instalable (RECOMENDADO) - Captura correo completo en contextos inter-dominio.
- * Configurar este trigger desde: Triggers → Añadir Trigger → Al Abrir → onOpenMain
- * @param {string} email - Correo del usuario (opcional, si no se pasa se detectará)
+ * Función ejecutada manualmente por usuarios externos desde el menú.
+ * Fuerza a Google a validar los permisos OAuth y captura el correo real.
+ */
+function autorizarUsuarioExterno() {
+  var activeEmail = Session.getActiveUser().getEmail();
+  
+  if (!activeEmail || activeEmail === "") {
+    SpreadsheetApp.getUi().alert(
+      '❌ Error de Autorización', 
+      'No se pudo obtener la autorización de Google. El sistema no puede identificar su cuenta de correo de forma segura.', 
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+  
+  SpreadsheetApp.getActiveSpreadsheet().toast('Identidad verificada: ' + activeEmail + '. Cargando sistema...', 'Éxito', 3);
+  onOpenMain(activeEmail);
+}
+
+/**
+ * Función centralizadora para construir menús y cargar la aplicación.
+ * @param {string} email - Correo del usuario ya detectado y validado.
  */
 function onOpenMain(email) {
-  // Si 'email' es un objeto de evento del trigger, ignorarlo y usar Session
-  var activeEmail = (typeof email === 'string' && email.trim() !== '') ? email.trim() : Session.getActiveUser().getEmail();
+  var activeEmail = email;
   var validUser = getUserRecordByEmail_(activeEmail);
   
   if (!validUser) {
@@ -147,14 +155,6 @@ function onOpenMain(email) {
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
   }
-}
-
-/**
- * Wrapper para compatibilidad - permite llamar onOpenMain sin parámetros
- * (útil si se configura trigger instalable sin pasar email explícitamente)
- */
-function onOpenMainWrapper() {
-  onOpenMain();
 }
 
 // --- SINCRONIZACIÓN DE DATOS ---
