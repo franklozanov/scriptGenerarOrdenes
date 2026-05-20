@@ -196,11 +196,34 @@ function handlePrivilegedOperation_(params) {
     return procesarAutorizacionQA(params, callingUserId);
   }
 
+  if (operation === 'solicitarImpresion') {
+    if (!hasPermission(callingUserId, PERMISOS.SOLICITAR_REIMPRESION)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.noOrden || !params.tipoSolicitud || !params.motivo || !params.plantillas) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para solicitar impresión extraordinaria.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return registrarSolicitudImpresion(params, callingUserId);
+  }
+
+  if (operation === 'procesarAprobacionImpresionQA') {
+    if (!hasPermission(callingUserId, PERMISOS.APROBAR_REIMPRESION)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.targetIds || !Array.isArray(params.targetIds) || params.targetIds.length === 0) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para procesar aprobación.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    if (!params.accion || (params.accion !== 'Aprobada' && params.accion !== 'Rechazada')) {
+      return { status: 'error', message: 'Acción inválida. Debe ser "Aprobada" o "Rechazada".', diagnostic: 'INVALID_ACTION' };
+    }
+    return procesarAprobacionImpresionQA(params, callingUserId);
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA', 'solicitarImpresion', 'procesarAprobacionImpresionQA']
   };
 }
 

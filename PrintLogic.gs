@@ -309,19 +309,52 @@ function fetchOrderData(orderNo) {
     Logger.log("fetchOrderData: Orden " + orderNo + " con STATUS 'Autorizada' - Permitiendo impresión (GAMP 5 Compliance)");
   }
   // --- FIN VALIDACIÓN DE STATUS ---
-  
+
+  // --- BUSCAR SOLICITUD APROBADA PARA ESTA ORDEN ---
+  var approvedRequest = null;
+  try {
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    if (solicitudesSheet) {
+      var solHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+      var solData = solicitudesSheet.getDataRange().getValues();
+
+      var colSolIdSolicitud = getColumnIndexByNameCaseInsensitive(solHeaders, 'ID_Solicitud', false);
+      var colSolNoOrden = getColumnIndexByNameCaseInsensitive(solHeaders, 'NoOrden', false);
+      var colSolEstado = getColumnIndexByNameCaseInsensitive(solHeaders, 'Estado', false);
+      var colSolPlantillas = getColumnIndexByNameCaseInsensitive(solHeaders, 'Plantillas', false);
+
+      if (colSolNoOrden && colSolEstado && colSolPlantillas) {
+        for (var i = 1; i < solData.length; i++) {
+          var solNoOrden = solData[i][colSolNoOrden - 1] ? solData[i][colSolNoOrden - 1].toString().trim() : "";
+          var solEstado = solData[i][colSolEstado - 1] ? solData[i][colSolEstado - 1].toString().trim() : "";
+
+          if (solNoOrden === orderNo && solEstado === 'Aprobada') {
+            var idSolicitud = colSolIdSolicitud ? (solData[i][colSolIdSolicitud - 1] || '').toString() : '';
+            var plantillas = solData[i][colSolPlantillas - 1] ? solData[i][colSolPlantillas - 1].toString() : '';
+            approvedRequest = { id: idSolicitud, plantillas: plantillas };
+            Logger.log("Solicitud aprobada encontrada para orden " + orderNo + ": " + idSolicitud);
+            break;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("Error buscando solicitud aprobada: " + e.message);
+  }
+  // --- FIN BÚSQUEDA SOLICITUD APROBADA ---
+
   var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
   var formData = {};
   var noAnalisisStr = "";
-  
+
   fieldNames.forEach(function(name) {
     var hCol = getColumnIndexByNameCaseInsensitive(headers, name, false);
     if (hCol) {
       var val = targetRowData[hCol - 1];
       if (name === "NoAnalisis" && val != null) noAnalisisStr = val.toString().trim();
-      
+
       if (val instanceof Date) {
-        formData[name] = (name === "Exp") ? Utilities.formatDate(val, Session.getScriptTimeZone(), "MM/yyyy") 
+        formData[name] = (name === "Exp") ? Utilities.formatDate(val, Session.getScriptTimeZone(), "MM/yyyy")
                                           : Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd");
       } else {
         formData[name] = (val != null) ? val.toString() : "";
@@ -359,7 +392,9 @@ function fetchOrderData(orderNo) {
     formData: formData,
     coords: dynamicCoords,
     pdfs: dynamicPdfs,
-    errors: errors
+    errors: errors,
+    orderStatus: statusValue,
+    approvedRequest: approvedRequest
   };
 }
 
@@ -727,7 +762,7 @@ function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
 /**
  * Wrapper con autenticación para updateTraceability.
  * Llamado desde Index.html vía google.script.run.
- * 
+ *
  * @param {string} orderNo - Número de orden
  * @param {string} userId - UserID del usuario que ejecuta la acción
  * @param {number} pagesPrinted - Número de páginas impresas
@@ -738,4 +773,330 @@ function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
 function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
   if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
   return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
+}
+
+/**
+ * Obtiene las solicitudes de impresión pendientes de aprobación QA.
+ * Recorre la hoja 'SolicitudesImpresion' y retorna filas con Estado = 'Pendiente QA'.
+ *
+ * @returns {Array} Array de objetos con las solicitudes pendientes
+ */
+function getSolicitudesPendientesQA() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    if (!solicitudesSheet) {
+      Logger.log("La hoja 'SolicitudesImpresion' no existe.");
+      return [];
+    }
+
+    var headers = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+    var data = solicitudesSheet.getDataRange().getValues();
+
+    var colEstado = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
+    var colIdSolicitud = getColumnIndexByNameCaseInsensitive(headers, 'ID_Solicitud', false);
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
+    var colTipoSolicitud = getColumnIndexByNameCaseInsensitive(headers, 'TipoSolicitud', false);
+    var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false);
+    var colMotivo = getColumnIndexByNameCaseInsensitive(headers, 'Motivo', false);
+    var colPlantillas = getColumnIndexByNameCaseInsensitive(headers, 'Plantillas', false);
+    var colFecha = getColumnIndexByNameCaseInsensitive(headers, 'Fecha', false);
+
+    var solicitudesPendientes = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var estado = colEstado ? (data[i][colEstado - 1] || '').toString().trim() : '';
+      if (estado === 'Pendiente QA') {
+        var row = data[i];
+        var solicitud = {
+          idSolicitud: colIdSolicitud ? (row[colIdSolicitud - 1] || '').toString() : '',
+          noOrden: colNoOrden ? (row[colNoOrden - 1] || '').toString() : '',
+          tipoSolicitud: colTipoSolicitud ? (row[colTipoSolicitud - 1] || '').toString() : '',
+          solicitadoPor: colSolicitadoPor ? (row[colSolicitadoPor - 1] || '').toString() : '',
+          motivo: colMotivo ? (row[colMotivo - 1] || '').toString() : '',
+          plantillas: colPlantillas ? (row[colPlantillas - 1] || '').toString() : '',
+          fecha: colFecha ? (row[colFecha - 1] || '') : ''
+        };
+        solicitudesPendientes.push(solicitud);
+      }
+    }
+
+    Logger.log("Solicitudes pendientes QA encontradas: " + solicitudesPendientes.length);
+    return solicitudesPendientes;
+
+  } catch (e) {
+    Logger.log("Error en getSolicitudesPendientesQA: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * Abre el modal de aprobación de solicitudes de impresión extraordinaria.
+ * Muestra el panel ModalAprobarImpresion.html con las solicitudes pendientes.
+ */
+function abrirModalAprobarImpresion() {
+  var template = HtmlService.createTemplateFromFile('ModalAprobarImpresion');
+  var html = template.evaluate()
+    .setWidth(950).setHeight(700);
+  SpreadsheetApp.getUi().showModelessDialog(html, 'Aprobar Impresiones');
+}
+
+/**
+ * Obtiene las órdenes válidas para impresión (datalist).
+ * Retorna órdenes con STATUS Autorizada, Impreso o Reimpreso,
+ * cruzando con SolicitudesImpresion para identificar aprobaciones pendientes.
+ *
+ * @returns {Array} Array de objetos { noOrden, label }
+ */
+function getOrdenesValidasParaImpresion() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ordenesSheet = ss.getSheetByName('Ordenes');
+    if (!ordenesSheet) return [];
+
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    var solicitudesAprobadas = {};
+
+    // Cargar solicitudes aprobadas en mapa para cruce rápido
+    if (solicitudesSheet) {
+      var solHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+      var solData = solicitudesSheet.getDataRange().getValues();
+
+      var colSolNoOrden = getColumnIndexByNameCaseInsensitive(solHeaders, 'NoOrden', false);
+      var colSolEstado = getColumnIndexByNameCaseInsensitive(solHeaders, 'Estado', false);
+
+      if (colSolNoOrden && colSolEstado) {
+        for (var i = 1; i < solData.length; i++) {
+          var solNoOrden = solData[i][colSolNoOrden - 1] ? solData[i][colSolNoOrden - 1].toString().trim() : "";
+          var solEstado = solData[i][colSolEstado - 1] ? solData[i][colSolEstado - 1].toString().trim() : "";
+
+          if (solEstado === 'Aprobada') {
+            solicitudesAprobadas[solNoOrden] = true;
+          }
+        }
+      }
+    }
+
+    // Obtener órdenes con STATUS válido
+    var headers = ordenesSheet.getRange(1, 1, 1, ordenesSheet.getLastColumn()).getValues()[0];
+    var data = ordenesSheet.getDataRange().getValues();
+
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+
+    var ordenesValidas = [];
+    var statusValidos = ['Autorizada', 'Impreso', 'Reimpreso'];
+
+    for (var i = 1; i < data.length; i++) {
+      var noOrden = colNoOrden ? (data[i][colNoOrden - 1] || '').toString().trim() : '';
+      var status = colStatus ? (data[i][colStatus - 1] || '').toString().trim() : '';
+
+      if (!noOrden) continue;
+
+      if (statusValidos.indexOf(status) !== -1) {
+        var label = '';
+
+        if (status === 'Autorizada') {
+          label = noOrden + ' - Autorizada';
+        } else if (status === 'Impreso' || status === 'Reimpreso') {
+          if (solicitudesAprobadas[noOrden]) {
+            label = noOrden + ' - Solicitud Extra Aprobada';
+          } else {
+            label = noOrden + ' - Impresa (Requiere solicitar permiso)';
+          }
+        }
+
+        ordenesValidas.push({ noOrden: noOrden, label: label });
+      }
+    }
+
+    Logger.log("Órdenes válidas para impresión encontradas: " + ordenesValidas.length);
+    return ordenesValidas;
+
+  } catch (e) {
+    Logger.log("Error en getOrdenesValidasParaImpresion: " + e.message);
+    return [];
+  }
+}
+
+// --- GESTIÓN DE SOLICITUDES DE IMPRESIÓN EXTRAORDINARIA ---
+
+/**
+ * Registra una solicitud de impresión extraordinaria (Reimpresión o Adicional).
+ * Valida que la orden tenga un STATUS que permita solicitudes y crea el registro.
+ *
+ * @param {Object} params - Parámetros de la solicitud
+ * @param {string} params.noOrden - Número de orden
+ * @param {string} params.tipoSolicitud - Tipo de solicitud ('Reimpresión' o 'Adicional')
+ * @param {string} params.motivo - Motivo de la solicitud
+ * @param {string} params.plantillas - Plantillas y copias solicitadas (JSON o texto)
+ * @param {string} userId - UserID del solicitante
+ * @returns {Object} Resultado de la operación
+ * @throws {Error} Si la orden no existe o su STATUS no permite solicitudes
+ */
+function registrarSolicitudImpresion(params, userId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ordenesSheet = ss.getSheetByName('Ordenes');
+    if (!ordenesSheet) throw new Error("La hoja 'Ordenes' no existe.");
+
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    if (!solicitudesSheet) throw new Error("La hoja 'SolicitudesImpresion' no existe. Ejecute el módulo Migration para crearla.");
+
+    // Validar parámetros requeridos
+    if (!params.noOrden || !params.tipoSolicitud || !params.motivo || !params.plantillas) {
+      throw new Error("Faltan parámetros requeridos: noOrden, tipoSolicitud, motivo, plantillas.");
+    }
+
+    // Buscar la orden
+    var headers = ordenesSheet.getRange(1, 1, 1, ordenesSheet.getLastColumn()).getValues()[0];
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+
+    var orderValues = ordenesSheet.getRange(1, colNoOrden, ordenesSheet.getLastRow(), 1).getValues();
+    var targetRowIndex = -1;
+    var normalizedOrderNo = params.noOrden.toString().trim().toLowerCase();
+
+    for (var idx = 1; idx < orderValues.length; idx++) {
+      var rowOrderNo = orderValues[idx][0] ? orderValues[idx][0].toString().trim().toLowerCase() : "";
+      if (rowOrderNo === normalizedOrderNo) {
+        targetRowIndex = idx + 1;
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      throw new Error("La orden '" + params.noOrden + "' no existe en la hoja Ordenes.");
+    }
+
+    // Validar STATUS de la orden
+    var statusValue = "";
+    if (colStatus) {
+      statusValue = ordenesSheet.getRange(targetRowIndex, colStatus).getValue();
+      statusValue = statusValue ? statusValue.toString().trim() : "";
+    }
+
+    var allowedStatuses = ['Impreso', 'Reimpreso', 'Autorizada'];
+    if (allowedStatuses.indexOf(statusValue) === -1) {
+      throw new Error("La orden '" + params.noOrden + "' tiene STATUS '" + statusValue + "'. Solo se permiten solicitudes para órdenes con STATUS: Impreso, Reimpreso o Autorizada.");
+    }
+
+    // Generar ID_Solicitud único
+    var timestamp = new Date().getTime();
+    var idSolicitud = 'REQ-' + timestamp;
+
+    // Obtener identidad del solicitante
+    var userIdentity = getUserIdentityStringByUserId_(userId);
+
+    // Insertar fila en SolicitudesImpresion
+    var solicitudesHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+    var newRow = [];
+    var colMapping = {
+      'ID_Solicitud': idSolicitud,
+      'Fecha': new Date(),
+      'NoOrden': params.noOrden,
+      'SolicitadoPor': userIdentity,
+      'TipoSolicitud': params.tipoSolicitud,
+      'Motivo': params.motivo,
+      'Plantillas': params.plantillas,
+      'Estado': 'Pendiente QA',
+      'FirmaQA': ''
+    };
+
+    for (var i = 0; i < solicitudesHeaders.length; i++) {
+      var headerName = solicitudesHeaders[i] ? solicitudesHeaders[i].toString().trim() : "";
+      newRow.push(colMapping[headerName] || '');
+    }
+
+    solicitudesSheet.appendRow(newRow);
+
+    // Registrar en Logs
+    logChange('SOLICITUD_IMPRESION', 'Solicitud ' + idSolicitud + ' creada para orden ' + params.noOrden + ' (Tipo: ' + params.tipoSolicitud + ')', userIdentity);
+
+    Logger.log("Solicitud de impresión registrada: " + idSolicitud + " para orden " + params.noOrden);
+
+    return { status: 'success', message: 'Solicitud enviada a QA exitosamente.', idSolicitud: idSolicitud };
+
+  } catch (e) {
+    Logger.log("Error en registrarSolicitudImpresion: " + e.message);
+    throw new Error("Error al registrar solicitud de impresión: " + e.message);
+  }
+}
+
+/**
+ * Procesa la aprobación o rechazo de solicitudes de impresión extraordinaria.
+ * Actualiza el estado de las solicitudes seleccionadas y registra la firma QA.
+ *
+ * @param {Object} params - Parámetros de la aprobación
+ * @param {Array} params.targetIds - Array de ID_Solicitud a procesar
+ * @param {string} params.accion - Acción a ejecutar ('Aprobada' o 'Rechazada')
+ * @param {string} userId - UserID del usuario QA que aprueba/rechaza
+ * @returns {Object} Resultado de la operación
+ * @throws {Error} Si hay errores en el procesamiento
+ */
+function procesarAprobacionImpresionQA(params, userId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    if (!solicitudesSheet) throw new Error("La hoja 'SolicitudesImpresion' no existe.");
+
+    var headers = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+    var data = solicitudesSheet.getDataRange().getValues();
+
+    var colIdSolicitud = getColumnIndexByNameCaseInsensitive(headers, 'ID_Solicitud', false);
+    var colEstado = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
+    var colFirmaQA = getColumnIndexByNameCaseInsensitive(headers, 'FirmaQA', false);
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
+
+    if (!colIdSolicitud || !colEstado || !colFirmaQA) {
+      throw new Error("La hoja 'SolicitudesImpresion' no tiene las columnas requeridas.");
+    }
+
+    var targetIds = params.targetIds || [];
+    var accion = params.accion || '';
+    var userIdentity = getUserIdentityStringByUserId_(userId);
+    var timestamp = new Date().toLocaleString('es-ES');
+    var firmaQA = "QA: " + userIdentity + " - " + timestamp;
+
+    var procesadas = 0;
+    var noEncontradas = 0;
+    var yaProcesadas = 0;
+
+    for (var i = 1; i < data.length; i++) {
+      var idSolicitud = colIdSolicitud ? (data[i][colIdSolicitud - 1] || '').toString() : '';
+      var estadoActual = colEstado ? (data[i][colEstado - 1] || '').toString().trim() : '';
+
+      if (targetIds.indexOf(idSolicitud) !== -1) {
+        if (estadoActual !== 'Pendiente QA') {
+          yaProcesadas++;
+          continue;
+        }
+
+        // Actualizar estado y firma
+        solicitudesSheet.getRange(i + 1, colEstado).setValue(accion);
+        solicitudesSheet.getRange(i + 1, colFirmaQA).setValue(firmaQA);
+        procesadas++;
+
+        // Registrar en Logs
+        var noOrden = colNoOrden ? (data[i][colNoOrden - 1] || '').toString() : '';
+        logChange('APROBACION_IMPRESION_QA', 'Solicitud ' + idSolicitud + ' para orden ' + noOrden + ' fue ' + accion.toLowerCase(), userIdentity);
+      }
+    }
+
+    var mensaje = 'Procesadas ' + procesadas + ' solicitud(es) exitosamente.';
+    if (yaProcesadas > 0) {
+      mensaje += ' ' + yaProcesadas + ' solicitud(es) ya habían sido procesadas y fueron omitidas.';
+    }
+    if (noEncontradas > 0) {
+      mensaje += ' ' + noEncontradas + ' solicitud(es) no fueron encontradas.';
+    }
+
+    Logger.log("ProcesarAprobacionImpresionQA: " + mensaje);
+
+    return { status: 'success', message: mensaje, procesadas: procesadas };
+
+  } catch (e) {
+    Logger.log("Error en procesarAprobacionImpresionQA: " + e.message);
+    throw new Error("Error al procesar aprobación: " + e.message);
+  }
 }

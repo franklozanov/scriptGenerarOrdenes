@@ -85,6 +85,37 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
   sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
 
+  // --- CERRAR SOLICITUD APROBADA SI EXISTE ---
+  try {
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    if (solicitudesSheet) {
+      var solHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+      var solData = solicitudesSheet.getDataRange().getValues();
+
+      var colSolIdSolicitud = getColumnIndexByNameCaseInsensitive(solHeaders, 'ID_Solicitud', false);
+      var colSolNoOrden = getColumnIndexByNameCaseInsensitive(solHeaders, 'NoOrden', false);
+      var colSolEstado = getColumnIndexByNameCaseInsensitive(solHeaders, 'Estado', false);
+
+      if (colSolNoOrden && colSolEstado && colSolIdSolicitud) {
+        for (var i = 1; i < solData.length; i++) {
+          var solNoOrden = solData[i][colSolNoOrden - 1] ? solData[i][colSolNoOrden - 1].toString().trim() : "";
+          var solEstado = solData[i][colSolEstado - 1] ? solData[i][colSolEstado - 1].toString().trim() : "";
+
+          if (solNoOrden === orderNo && solEstado === 'Aprobada') {
+            var idSolicitud = colSolIdSolicitud ? (solData[i][colSolIdSolicitud - 1] || '').toString() : '';
+            solicitudesSheet.getRange(i + 1, colSolEstado).setValue('Completada');
+            logChange('SOLICITUD_COMPLETADA', 'La solicitud ' + idSolicitud + ' fue consumida al imprimir orden ' + orderNo, nombreCorto);
+            Logger.log("Solicitud " + idSolicitud + " marcada como Completada tras impresión de orden " + orderNo);
+            break;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("Error cerrando solicitud aprobada: " + e.message);
+  }
+  // --- FIN CIERRE SOLICITUD APROBADA ---
+
   return "Record updated successfully.";
 }
 

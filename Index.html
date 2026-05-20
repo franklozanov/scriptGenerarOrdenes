@@ -357,7 +357,8 @@
         <div class="section-title">Datos de la Orden</div>
         <div class="field">
           <label>No. de Orden</label>
-          <input type="text" id="orderNo" autocomplete="off" autofocus placeholder="Ej: 8602">
+          <input type="text" id="orderNo" list="ordenesList" autocomplete="off" autofocus placeholder="Ej: 8602">
+          <datalist id="ordenesList"></datalist>
         </div>
 
         <div class="field">
@@ -391,6 +392,27 @@
           <div class="hint">Ajuste el número de copias para cada plantilla</div>
           <div id="tplList" class="tpl-container"></div>
         </div>
+      </div>
+
+      <!-- Panel de Solicitud Extraordinaria (oculto por defecto) -->
+      <div id="panelSolicitudExtra" style="display: none;" data-requires-permission="SOLICITAR_REIMPRESION">
+        <div class="field">
+          <div id="solicitudAviso" class="info-text" style="padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;">
+            ⚠️ Esta orden ya fue impresa. Para generar copias adicionales o reimpresiones, debe enviar una solicitud a QA detallando las plantillas requeridas arriba.
+          </div>
+        </div>
+        <div class="field">
+          <label>Tipo de Solicitud</label>
+          <select id="solicitudTipo" style="width: 100%; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white;">
+            <option value="Reimpresión">Reimpresión (Daño)</option>
+            <option value="Adicional">Adicional (Proceso)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Motivo <span style="color: #dc2626;">*</span></label>
+          <textarea id="solicitudMotivo" rows="3" style="width: 100%; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit;" placeholder="Describa el motivo de la solicitud..."></textarea>
+        </div>
+        <button id="btnSolicitarExtra" onclick="enviarSolicitudExtraordinaria()" style="width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; margin-top: 12px; font-size: 15px; letter-spacing: 0.3px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">📨 Enviar Solicitud a QA</button>
       </div>
 
       <button id="goBtn" onclick="run()" disabled>Generar PDF Combinado</button>
@@ -538,15 +560,78 @@
               console.log(`⚠️ Descartando respuesta obsoleta para orden ${currentOrderNo} (actual: ${currentInput})`);
               return;
             }
-            
+
             preloadState.status = response.ready ? 'ready' : 'error';
             preloadState.data = response;
             preloadState.pdfsByKey = buildPdfsByKey(response.pdfs);
             preloadState.errors = response.errors || [];
-            
-            console.log(`✓ Datos precargados para orden ${currentOrderNo}`);
+
+            console.log(`✓ Datos precargados para orden ${currentOrderNo}, STATUS: ${response.orderStatus}`);
             renderPreloadResult(response);
-            
+
+            // --- LÓGICA DE BLOQUEO DE IMPRESIÓN SEGÚN STATUS ---
+            const goBtn = document.getElementById('goBtn');
+            const panelSolicitudExtra = document.getElementById('panelSolicitudExtra');
+
+            // --- VERIFICAR SI HAY SOLICITUD APROBADA (DESBLOQUEO CONDICIONAL) ---
+            if (response.approvedRequest && response.approvedRequest.id) {
+              // Solicitud aprobada: ignorar bloqueo de orden "Impresa", permitir impresión autorizada
+              goBtn.style.display = 'block';
+              goBtn.disabled = false;
+              panelSolicitudExtra.style.display = 'none';
+              setPreloadBanner('success', '✅ Solicitud ' + response.approvedRequest.id + ' Aprobada. Proceda con la impresión autorizada.');
+
+              // Parsear JSON de plantillas aprobadas
+              let plantillasAprobadas = [];
+              try {
+                plantillasAprobadas = JSON.parse(response.approvedRequest.plantillas);
+              } catch (e) {
+                console.error('Error parseando plantillas aprobadas:', e);
+                plantillasAprobadas = [];
+              }
+
+              // Deshabilitar todos los inputs de plantillas y botones +/-
+              globalTemplates.forEach(t => {
+                const input = document.getElementById('val_' + t.key);
+                const btnMinus = document.querySelector(`button[onclick="decrementCounter('${t.key}', false)"]`);
+                const btnPlus = document.querySelector(`button[onclick="incrementCounter('${t.key}', false)"]`);
+
+                if (input) {
+                  input.value = '0';
+                  input.disabled = true;
+                }
+                if (btnMinus) btnMinus.disabled = true;
+                if (btnPlus) btnPlus.disabled = true;
+              });
+
+              // Inyectar cantidades aprobadas en los inputs correspondientes
+              plantillasAprobadas.forEach(t => {
+                const input = document.getElementById('val_' + t.key);
+                if (input && t.copies > 0) {
+                  input.value = t.copies;
+                  console.log(`✓ Plantilla ${t.key} autorizada con ${t.copies} copia(s)`);
+                }
+              });
+
+              console.log(`✓ Orden ${currentOrderNo} con solicitud aprobada ${response.approvedRequest.id} - Desbloqueo condicional activado`);
+              updateGoButtonState();
+            } else if (response.orderStatus === 'Impreso' || response.orderStatus === 'Reimpreso') {
+              // Orden ya impresa sin aprobación: bloquear impresión normal, mostrar solicitud extraordinaria
+              goBtn.style.display = 'none';
+              goBtn.disabled = true;
+              panelSolicitudExtra.style.display = 'block';
+              console.log(`🔒 Orden ${currentOrderNo} con STATUS '${response.orderStatus}' - Bloqueando impresión libre`);
+            } else if (response.orderStatus === 'Autorizada') {
+              // Orden autorizada: permitir impresión normal
+              goBtn.style.display = 'block';
+              panelSolicitudExtra.style.display = 'none';
+              console.log(`✓ Orden ${currentOrderNo} con STATUS 'Autorizada' - Permitiendo impresión`);
+            } else {
+              // Otros estados: mantener comportamiento por defecto
+              goBtn.style.display = 'block';
+              panelSolicitudExtra.style.display = 'none';
+            }
+
             // Update status to show data is ready
             if (status && !status.innerText.includes("Impresión registrada")) {
               status.innerText = response.ready ? "✅ Documentos listos para impresión" : "⚠️ Faltan documentos requeridos";
@@ -738,7 +823,13 @@
 
           document.getElementById('loader').style.display = 'none';
           updateGoButtonState();
-          
+
+          // Cargar lista de órdenes válidas para impresión (sin caché)
+          google.script.run
+            .withSuccessHandler(populateOrdenesList)
+            .withFailureHandler(e => console.error('Error cargando órdenes válidas:', e.message))
+            .getOrdenesValidasParaImpresion();
+
           // Add event listener for background preloading on orderNo input
           const orderNoInput = document.getElementById('orderNo');
           const debouncedPreload = debounce((value) => {
@@ -749,7 +840,7 @@
               setPreloadBanner('', '');
             }
           }, 600);
-          
+
           orderNoInput.addEventListener('input', (e) => {
             if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
               resetPreloadState();
@@ -758,7 +849,7 @@
             updateGoButtonState();
             debouncedPreload(e.target.value);
           });
-          
+
           orderNoInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -769,6 +860,27 @@
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
         }).getInitialData();
       };
+
+      function populateOrdenesList(ordenes) {
+        const datalist = document.getElementById('ordenesList');
+        if (!datalist) return;
+
+        datalist.innerHTML = '';
+
+        if (!ordenes || ordenes.length === 0) {
+          console.log('No hay órdenes válidas para mostrar en datalist');
+          return;
+        }
+
+        ordenes.forEach(orden => {
+          const option = document.createElement('option');
+          option.value = orden.noOrden;
+          option.textContent = orden.label;
+          datalist.appendChild(option);
+        });
+
+        console.log(`✓ Datalist poblado con ${ordenes.length} órdenes válidas`);
+      }
 
       // PDF generation processing function (extracted for reuse)
       async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status) {
@@ -1093,7 +1205,7 @@
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
 
         if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
-          setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca “Documentos listos para impresión”.');
+          setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca "Documentos listos para impresión".');
           status.innerText = "⏳ Esperando documentos dinámicos...";
           status.className = "info-text";
           return;
@@ -1116,6 +1228,95 @@
         console.log(`✓ Usando documentos dinámicos precargados para orden ${orderNo}`);
         const payload = buildPayloadFromPreload(config);
         processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
+      }
+
+      async function enviarSolicitudExtraordinaria() {
+        const orderNo = document.getElementById('orderNo').value.trim();
+        const userName = document.getElementById('userName').value.trim();
+        const tipoSolicitud = document.getElementById('solicitudTipo').value;
+        const motivo = document.getElementById('solicitudMotivo').value.trim();
+        const btn = document.getElementById('btnSolicitarExtra');
+        const status = document.getElementById('status');
+        const panelSolicitudExtra = document.getElementById('panelSolicitudExtra');
+
+        // Recopilar plantillas requeridas (igual que run())
+        const config = globalTemplates.map(t => ({
+          key: t.key, fileId: t.fileId, hasAccess: t.hasAccess,
+          copies: parseInt(document.getElementById('val_' + t.key).value) || 0
+        })).filter(c => c.copies > 0);
+
+        // Validaciones
+        if (!orderNo || !userName) {
+          alert("Error: Complete los campos No. de Orden y Usuario.");
+          return;
+        }
+
+        if (config.length === 0) {
+          alert("Error: Seleccione al menos 1 copia de alguna plantilla para solicitar.");
+          return;
+        }
+
+        if (!motivo) {
+          alert("Error: El motivo de la solicitud es obligatorio.");
+          document.getElementById('solicitudMotivo').focus();
+          return;
+        }
+
+        // Buscar el UserID correspondiente al Nombre Completo seleccionado
+        const userObj = window.globalUsers.find(u => u.nombreCompleto === userName);
+        if (!userObj) {
+          alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
+          document.getElementById('userName').focus();
+          return;
+        }
+        const userId = userObj.userId;
+
+        // Mostrar loading
+        btn.disabled = true;
+        btn.innerText = "⏳ Enviando...";
+        status.innerText = "📨 Enviando solicitud a QA...";
+        status.className = "info-text";
+
+        try {
+          const response = await fetch(window.globalWebAppUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              operation: 'solicitarImpresion',
+              noOrden: orderNo,
+              tipoSolicitud: tipoSolicitud,
+              motivo: motivo,
+              plantillas: JSON.stringify(config),
+              userId: userId,
+              pinFirma: window.globalUserPin || ''
+            })
+          });
+
+          const result = await response.json();
+
+          if (result.status === 'success') {
+            // Éxito: ocultar panel, resetear formulario y mostrar mensaje
+            panelSolicitudExtra.style.display = 'none';
+            document.getElementById('solicitudMotivo').value = '';
+            document.getElementById('solicitudTipo').value = 'Reimpresión';
+            status.innerText = "✅ " + result.message;
+            status.className = "success-text";
+            console.log(`✓ Solicitud enviada exitosamente: ${result.idSolicitud}`);
+          } else {
+            // Error: mostrar alerta
+            alert("Error al enviar solicitud: " + result.message);
+            status.innerText = "❌ Error: " + result.message;
+            status.className = "error-text";
+          }
+        } catch (error) {
+          alert("Error de comunicación: " + error.message);
+          status.innerText = "❌ Error de comunicación: " + error.message;
+          status.className = "error-text";
+          console.error("Error en enviarSolicitudExtraordinaria:", error);
+        } finally {
+          btn.disabled = false;
+          btn.innerText = "📨 Enviar Solicitud a QA";
+        }
       }
 
       // --- Inicializar sistema de drag y resize ---

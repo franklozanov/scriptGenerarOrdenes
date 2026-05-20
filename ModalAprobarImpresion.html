@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aprobar Impresiones Extraordinarias</title>
+  
+  <!-- FASE 6: Design System Centralizado -->
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  
+  <!-- Scripts Globales -->
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+  
+  <style>
+    /* Estilos específicos de este modal */
+    .table-container {
+      margin-top: 20px;
+      overflow-x: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 13px;
+    }
+    
+    th {
+      background-color: #f8fafc;
+      font-weight: 600;
+      color: #475569;
+    }
+    
+    tr:hover {
+      background-color: #f1f5f9;
+    }
+    
+    .checkbox-cell {
+      width: 50px;
+      text-align: center;
+    }
+    
+    .tipo-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    .tipo-reimpresion {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+    
+    .tipo-adicional {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    
+    .no-requests {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+    
+    .authorization-section {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .form-row {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #334155;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    
+    .action-buttons button {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="mainContainer" style="display: none;">
+    <div class="info">
+      Seleccione las solicitudes de impresión extraordinaria que desea aprobar o rechazar. Solo se pueden procesar solicitudes con estado "Pendiente QA".
+    </div>
+    
+    <div class="table-container">
+      <table id="solicitudesTable">
+        <thead>
+          <tr>
+            <th class="checkbox-cell">
+              <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+            </th>
+            <th>ID Solicitud</th>
+            <th>No. Orden</th>
+            <th>Tipo</th>
+            <th>Solicitado Por</th>
+            <th>Motivo</th>
+            <th>Plantillas</th>
+          </tr>
+        </thead>
+        <tbody id="solicitudesTableBody">
+          <!-- Las filas se generarán dinámicamente -->
+        </tbody>
+      </table>
+      <div id="noRequestsMessage" class="no-requests" style="display: none;">
+        No hay solicitudes pendientes de aprobación.
+      </div>
+    </div>
+    
+    <div class="authorization-section">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="pinFirma">PIN de Autorización (Firma Electrónica) *</label>
+          <input type="password" id="pinFirma" placeholder="Ingrese su PIN de autorización" maxlength="20">
+        </div>
+      </div>
+      
+      <div class="action-buttons">
+        <button id="btnAprobar" class="btn btn-primary" onclick="procesarAprobacion('Aprobada')">
+          ✅ Aprobar Seleccionadas
+        </button>
+        <button id="btnRechazar" class="btn btn-danger" onclick="procesarAprobacion('Rechazada')">
+          ❌ Rechazar Seleccionadas
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="loading-spinner"></div>
+    <div id="loading-text">Procesando...</div>
+  </div>
+  
+  <script>
+    var globalWebAppUrl = '';
+    var solicitudesData = [];
+    
+    window.onload = function() {
+      // Inicializar drag y resize
+      initializeModalDragResize({
+        title: 'Aprobar Impresiones Extraordinarias',
+        enableDrag: true,
+        enableResize: true,
+        minWidth: 900,
+        minHeight: 600,
+        maxWidth: 1200,
+        maxHeight: 900
+      });
+      
+      // Obtener datos iniciales
+      showLoading('Cargando datos...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (data && data.webAppUrl) {
+            globalWebAppUrl = data.webAppUrl;
+          }
+          setFrontendPermissions(data.userPermissions);
+          loadSolicitudesPendientes();
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar datos iniciales: ' + error.message);
+          document.getElementById('mainContainer').style.display = 'block';
+        })
+        .getInitialData();
+    };
+    
+    function loadSolicitudesPendientes() {
+      google.script.run
+        .withSuccessHandler(function(solicitudes) {
+          solicitudesData = solicitudes;
+          hideLoading();
+          document.getElementById('mainContainer').style.display = 'block';
+          renderTable(solicitudes);
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar solicitudes: ' + error.message);
+          document.getElementById('mainContainer').style.display = 'block';
+        })
+        .getSolicitudesPendientesQA();
+    }
+    
+    function renderTable(solicitudes) {
+      var tbody = document.getElementById('solicitudesTableBody');
+      var noRequestsMsg = document.getElementById('noRequestsMessage');
+      var table = document.getElementById('solicitudesTable');
+      
+      tbody.innerHTML = '';
+      
+      if (!solicitudes || solicitudes.length === 0) {
+        table.style.display = 'none';
+        noRequestsMsg.style.display = 'block';
+        return;
+      }
+      
+      table.style.display = 'table';
+      noRequestsMsg.style.display = 'none';
+      
+      solicitudes.forEach(function(solicitud, index) {
+        var row = document.createElement('tr');
+        
+        // Clase para el badge de tipo
+        var tipoClass = solicitud.tipoSolicitud === 'Reimpresión' ? 'tipo-reimpresion' : 'tipo-adicional';
+        var tipoDisplay = solicitud.tipoSolicitud || 'Desconocido';
+        
+        // Formatear fecha si existe
+        var fechaDisplay = '';
+        if (solicitud.fecha) {
+          try {
+            var fecha = new Date(solicitud.fecha);
+            fechaDisplay = fecha.toLocaleDateString('es-ES') + ' ' + fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+          } catch(e) {
+            fechaDisplay = solicitud.fecha;
+          }
+        }
+        
+        row.innerHTML = `
+          <td class="checkbox-cell">
+            <input type="checkbox" class="solicitud-checkbox" data-idsolicitud="${solicitud.idSolicitud}">
+          </td>
+          <td><strong>${solicitud.idSolicitud}</strong></td>
+          <td>${solicitud.noOrden}</td>
+          <td><span class="tipo-badge ${tipoClass}">${tipoDisplay}</span></td>
+          <td>${solicitud.solicitadoPor}</td>
+          <td>${solicitud.motivo}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${solicitud.plantillas}">${solicitud.plantillas}</td>
+        `;
+        
+        tbody.appendChild(row);
+      });
+    }
+    
+    function toggleSelectAll() {
+      var selectAll = document.getElementById('selectAll');
+      var checkboxes = document.querySelectorAll('.solicitud-checkbox:not(:disabled)');
+      
+      checkboxes.forEach(function(checkbox) {
+        checkbox.checked = selectAll.checked;
+      });
+    }
+    
+    function getSelectedSolicitudes() {
+      var checkboxes = document.querySelectorAll('.solicitud-checkbox:checked');
+      var selectedIds = [];
+      
+      checkboxes.forEach(function(checkbox) {
+        selectedIds.push(checkbox.getAttribute('data-idsolicitud'));
+      });
+      
+      return selectedIds;
+    }
+    
+    function procesarAprobacion(accion) {
+      var selectedIds = getSelectedSolicitudes();
+      var pinFirma = document.getElementById('pinFirma').value.trim();
+      
+      // Validaciones
+      if (selectedIds.length === 0) {
+        showAlert('Debe seleccionar al menos una solicitud para procesar.', 'warning');
+        return;
+      }
+      
+      if (!pinFirma) {
+        showAlert('Debe ingresar el PIN de autorización.', 'warning');
+        return;
+      }
+      
+      var accionTexto = accion === 'Aprobada' ? 'aprobar' : 'rechazar';
+      
+      // Confirmación
+      if (!confirm('¿Está seguro que desea ' + accionTexto + ' las ' + selectedIds.length + ' solicitud(es) seleccionada(s)?')) {
+        return;
+      }
+      
+      // Enviar solicitud
+      showLoading(accion === 'Aprobada' ? 'Aprobando solicitudes...' : 'Rechazando solicitudes...');
+      
+      fetch(globalWebAppUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          operation: 'procesarAprobacionImpresionQA',
+          targetIds: selectedIds,
+          accion: accion,
+          pinFirma: pinFirma
+        })
+      })
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        hideLoading();
+        
+        if (data.status === 'success') {
+          showAlert(data.message || 'Solicitudes procesadas exitosamente.', 'success');
+          document.getElementById('pinFirma').value = '';
+          document.getElementById('selectAll').checked = false;
+          loadSolicitudesPendientes(); // Recargar tabla
+        } else {
+          showAlert(data.message || 'Error al procesar solicitudes.', 'error');
+        }
+      })
+      .catch(function(error) {
+        hideLoading();
+        showError('Error de comunicación: ' + error.message);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -75,7 +75,11 @@ function onOpen() {
   if (hasPermissionByRol(validUser.rol, PERMISOS.AUTORIZAR_QA)) {
     mainMenu.addItem('✅ Autorizar Órdenes (QA)', 'abrirModalAutorizarQA');
   }
-  
+
+  if (hasPermissionByRol(validUser.rol, PERMISOS.APROBAR_REIMPRESION)) {
+    mainMenu.addItem('📋 Aprobar Solicitudes de Impresión', 'abrirModalAprobarImpresion');
+  }
+
   if (configMenu) {
     mainMenu.addSeparator().addSubMenu(configMenu);
   }
