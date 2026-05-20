@@ -265,3 +265,47 @@ function clearPermissionsCache() {
   cache.removeAll(['Permisos_ADMINISTRADOR', 'Permisos_ADMIN', 'Permisos_Administrador de Sistema']);
   Logger.log("Caché de permisos limpiado");
 }
+
+/**
+ * Busca al usuario en la hoja 'Usuarios' por su correo electrónico.
+ * (Implementación de la función faltante)
+ * @param {string} email - Correo del usuario activo.
+ * @returns {Object|null} Objeto con {email, rol} o null si no se encuentra.
+ */
+function getUserRecordByEmail_(email) {
+  if (!email) return null;
+  
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Usuarios');
+    if (!sheet) {
+      Logger.log("❌ Error: No se encontró la hoja 'Usuarios'");
+      return null;
+    }
+    
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return null; // No hay registros
+    
+    var headers = data[0];
+    
+    // Usar la función utilitaria existente para buscar columnas, o por defecto A (0) y B (1)
+    var emailCol = getColumnIndexByNameCaseInsensitive(headers, 'Correo', false) || getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
+    var rolCol = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+    
+    var emailIdx = emailCol ? emailCol - 1 : 0;
+    var rolIdx = rolCol ? rolCol - 1 : 1;
+    
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = data[i][emailIdx] ? data[i][emailIdx].toString().trim().toLowerCase() : '';
+      if (rowEmail === email.toLowerCase()) {
+        return {
+          email: data[i][emailIdx].toString().trim(),
+          rol: data[i][rolIdx].toString().trim()
+        };
+      }
+    }
+  } catch (e) {
+    Logger.log("Error en getUserRecordByEmail_: " + e.message);
+  }
+  
+  return null;
+}
