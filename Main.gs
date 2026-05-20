@@ -35,7 +35,9 @@ function onOpen() {
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu;
   // Fallback de seguridad: El Administrador siempre ve el menú de inicialización (cubriendo variaciones de nombre)
-  var isAdminFallback = (validUser.rol === 'Administrador' || validUser.rol === 'ADMIN' || validUser.rol === 'Administrador de Sistema');
+  var rolUpper = validUser.rol ? validUser.rol.toUpperCase() : '';
+  var isAdminFallback = (rolUpper === 'ADMINISTRADOR' || rolUpper === 'ADMIN' || rolUpper === 'ADMINISTRADOR DE SISTEMA');
+  
   if (hasPermissionByRol(validUser.rol, PERMISOS.MENU_ADMIN) || isAdminFallback) {
     adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
       .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
@@ -47,41 +49,55 @@ function onOpen() {
     configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
       .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
       .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp');
-    
-    if (adminMenu) {
-      configMenu.addSeparator().addSubMenu(adminMenu);
-    }
   }
 
   // 3. Menú Principal (Gestionar OA) - Construido condicionalmente según permisos
   var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
   
+  var hasMainMenuItems = false;
+
   if (hasPermissionByRol(validUser.rol, PERMISOS.CARGAR_ORDENES)) {
     mainMenu.addItem('📥 Cargar Nuevas Órdenes', 'abrirModalCargaOrdenes');
+    hasMainMenuItems = true;
   }
   
   if (hasPermissionByRol(validUser.rol, PERMISOS.SUBIR_DOCUMENTOS)) {
     mainMenu.addItem('📤 Subir documentos', 'abrirModalSubidaGeneral');
+    hasMainMenuItems = true;
   }
   
   if (hasPermissionByRol(validUser.rol, PERMISOS.IMPRIMIR_ORDEN)) {
     mainMenu.addItem('🖨️ Imprimir Orden', 'openPrintDialog');
+    hasMainMenuItems = true;
   }
   
   if (hasPermissionByRol(validUser.rol, PERMISOS.REGISTRAR_NOVEDAD)) {
     mainMenu.addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad');
+    hasMainMenuItems = true;
   }
   
   if (hasPermissionByRol(validUser.rol, PERMISOS.AUTORIZAR_QA)) {
     mainMenu.addItem('✅ Autorizar Órdenes (QA)', 'abrirModalAutorizarQA');
+    hasMainMenuItems = true;
   }
 
   if (hasPermissionByRol(validUser.rol, PERMISOS.APROBAR_REIMPRESION)) {
     mainMenu.addItem('📋 Aprobar Solicitudes de Impresión', 'abrirModalAprobarImpresion');
+    hasMainMenuItems = true;
   }
 
   if (configMenu) {
     mainMenu.addSeparator().addSubMenu(configMenu);
+    hasMainMenuItems = true;
+  }
+
+  if (adminMenu) {
+    mainMenu.addSeparator().addSubMenu(adminMenu);
+    hasMainMenuItems = true;
+  }
+  
+  if (!hasMainMenuItems) {
+    mainMenu.addItem('🚫 Sin opciones disponibles', 'mostrarAlertaSinPermisos');
   }
   
   mainMenu.addToUi();
@@ -171,4 +187,81 @@ function syncVerifCantDisponible() {
     Logger.log("ERROR en syncVerifCantDisponible: " + e.message);
     Logger.log("Stack trace: " + e.stack);
   }
+}
+
+/**
+ * Función de fallback cuando el menú no tiene opciones por falta de permisos.
+ */
+function mostrarAlertaSinPermisos() {
+  SpreadsheetApp.getUi().alert(
+    'Sin Permisos', 
+    'Tu rol actual no tiene habilitada ninguna acción para este menú.', 
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+// ============================================================
+// 🛠️ HERRAMIENTA DE DIAGNÓSTICO PROFUNDO (ROOT CAUSE ANALYSIS)
+// Ejecutar esta función manualmente desde el editor de Apps Script
+// ============================================================
+function runDeepDiagnosticAdmin() {
+  Logger.log("=== INICIANDO DIAGNÓSTICO PROFUNDO DE PERMISOS ===");
+  
+  var email = Session.getActiveUser().getEmail();
+  Logger.log("1. Usuario Activo: '" + email + "'");
+  
+  // 1. Verificar registro del usuario
+  var validUser = getUserRecordByEmail_(email);
+  Logger.log("2. Objeto validUser recuperado: " + JSON.stringify(validUser));
+  if (!validUser) {
+    Logger.log("❌ FALLO CRÍTICO: validUser es null o undefined.");
+    return;
+  }
+  
+  // 2. Verificar string exacto del rol (revelar espacios ocultos)
+  var rol = validUser.rol;
+  Logger.log("3. Rol crudo: '" + rol + "' | Longitud: " + (rol ? rol.length : 0));
+  Logger.log("4. Rol en uppercase: '" + (rol ? rol.toUpperCase() : 'NULO') + "'");
+  Logger.log("5. Car codes del rol: " + (rol ? rol.split('').map(function(c) { return c.charCodeAt(0); }).join(' ') : 'NULO'));
+  
+  // 6. Verificar estado de las constantes
+  Logger.log("6. Constante PERMISOS.MENU_ADMIN tiene valor: '" + (typeof PERMISOS !== 'undefined' ? PERMISOS.MENU_ADMIN : 'INDEFINIDO') + "'");
+  
+  // 7. Verificar mapa de permisos extraído de la hoja
+  var userPermissions = getUserPermissions(rol);
+  Logger.log("7. Mapa de permisos devuelto por getUserPermissions: " + JSON.stringify(userPermissions));
+  
+  if (userPermissions && typeof PERMISOS !== 'undefined') {
+    var permisoEspecifico = userPermissions[PERMISOS.MENU_ADMIN];
+    Logger.log("8. Valor extraído para MENU_ADMIN en el mapa: " + permisoEspecifico + " (Tipo de dato: " + typeof permisoEspecifico + ")");
+  }
+  
+  // 9. Probar la función evaluadora final
+  var hasPerm = hasPermissionByRol(rol, typeof PERMISOS !== 'undefined' ? PERMISOS.MENU_ADMIN : null);
+  Logger.log("9. Resultado final de hasPermissionByRol(): " + hasPerm + " (Tipo de dato: " + typeof hasPerm + ")");
+  
+  // 10. Verificar fallback de admin
+  var rolUpper = rol ? rol.toUpperCase() : '';
+  var isAdminFallback = (rolUpper === 'ADMINISTRADOR' || rolUpper === 'ADMIN' || rolUpper === 'ADMINISTRADOR DE SISTEMA');
+  Logger.log("10. Resultado de isAdminFallback: " + isAdminFallback);
+  
+  // 11. Verificar caché
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'Permisos_' + rol;
+  var cachedPermissions = cache.get(cacheKey);
+  Logger.log("11. Caché existe: " + (cachedPermissions ? 'SÍ' : 'NO'));
+  if (cachedPermissions) {
+    Logger.log("12. Contenido del caché: " + cachedPermissions);
+  }
+  
+  Logger.log("=== FIN DEL DIAGNÓSTICO ===");
+}
+
+/**
+ * Utilidad para limpiar el caché de permisos si el diagnóstico lo requiere (Paso 3).
+ */
+function clearPermissionsCache() {
+  var cache = CacheService.getScriptCache();
+  cache.removeAll(['Permisos_ADMINISTRADOR', 'Permisos_ADMIN', 'Permisos_Administrador de Sistema']);
+  Logger.log("Caché de permisos limpiado");
 }
