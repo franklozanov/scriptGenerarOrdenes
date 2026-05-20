@@ -8,12 +8,48 @@
 // --- TRIGGER PRINCIPAL: onOpen() ---
 
 /**
- * Trigger que se ejecuta al abrir el libro de trabajo.
- * Crea los menús de la aplicación y precarga datos en caché.
+ * Trigger simple (fallback) - NO captura correo en contextos inter-dominio.
+ * Delegará al trigger instalable onOpenMain() si está configurado.
+ * Si el correo no está disponible, solicitará al usuario que lo ingrese.
  */
 function onOpen() {
   var activeEmail = Session.getActiveUser().getEmail();
-  var validUser = getUserRecordByEmail_(activeEmail); // Función a implementar que busque en 'Usuarios'
+  
+  // Fallback: Si el trigger simple no captura el correo (string vacío),
+  // solicitar al usuario que ingrese su correo manualmente
+  if (!activeEmail || activeEmail === "") {
+    Logger.log("onOpen: Correo no disponible en trigger simple, solicitando input manual");
+    var inputEmail = Browser.inputBox(
+      'Identificación Requerida',
+      'Su correo no pudo ser detectado automáticamente.\n\nPor favor, ingrese su correo corporativo:',
+      Browser.Buttons.OK_CANCEL
+    );
+    
+    if (inputEmail === 'cancel') {
+      SpreadsheetApp.getUi().alert('Cancelado: No se puede continuar sin identificación.');
+      return;
+    }
+    
+    if (!inputEmail || inputEmail.trim() === "") {
+      SpreadsheetApp.getUi().alert('Error: Correo inválido. No se puede continuar.');
+      return;
+    }
+    
+    activeEmail = inputEmail.trim();
+  }
+  
+  // Delegar al trigger instalable
+  onOpenMain(activeEmail);
+}
+
+/**
+ * Trigger instalable (RECOMENDADO) - Captura correo completo en contextos inter-dominio.
+ * Configurar este trigger desde: Triggers → Añadir Trigger → Al Abrir → onOpenMain
+ * @param {string} email - Correo del usuario (opcional, si no se pasa se detectará)
+ */
+function onOpenMain(email) {
+  var activeEmail = email || Session.getActiveUser().getEmail();
+  var validUser = getUserRecordByEmail_(activeEmail);
   
   if (!validUser) {
     SpreadsheetApp.getUi().alert(
@@ -110,6 +146,14 @@ function onOpen() {
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
   }
+}
+
+/**
+ * Wrapper para compatibilidad - permite llamar onOpenMain sin parámetros
+ * (útil si se configura trigger instalable sin pasar email explícitamente)
+ */
+function onOpenMainWrapper() {
+  onOpenMain();
 }
 
 // --- SINCRONIZACIÓN DE DATOS ---
