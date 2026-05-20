@@ -75,9 +75,18 @@ function getInitialData() {
   try {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v2');
+    
+    // Obtener usuario actual para sus permisos (se hace siempre, no desde caché)
+    var activeEmail = Session.getActiveUser().getEmail();
+    var validUser = getUserRecordByEmail_(activeEmail);
+    var userPermissions = {};
+    if (validUser && validUser.rol) {
+      userPermissions = getUserPermissions(validUser.rol);
+    }
+    
     if (cached) {
-      try { 
-        var parsedData = JSON.parse(cached); 
+      try {
+        var parsedData = JSON.parse(cached);
         for (var i = 0; i < parsedData.templates.length; i++) {
           var t = parsedData.templates[i];
           if (STATIC_TEMPLATE_KEYS_.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
@@ -89,14 +98,16 @@ function getInitialData() {
         if (!parsedData.webAppUrl) {
           try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
         }
-        return parsedData; 
+        // Agregar permisos del usuario actual dinámicamente (NO desde caché)
+        parsedData.userPermissions = userPermissions;
+        return parsedData;
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
       }
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+
     var users = [];
     var userSheet = ss.getSheetByName('Usuarios');
     if (!userSheet) {
@@ -260,7 +271,9 @@ function getInitialData() {
 
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl };
+    
+    // Los permisos ya se calcularon al inicio de la función
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions };
     
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
@@ -278,6 +291,7 @@ function getInitialData() {
       return 0;
     });
     
+    // NO cachear userPermissions - son específicos por usuario
     var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];

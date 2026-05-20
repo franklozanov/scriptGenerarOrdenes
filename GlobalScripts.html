@@ -546,4 +546,46 @@
       }
     });
   }
+
+  // === SISTEMA DE PERMISOS RBAC (FRONTEND) ===
+
+  /**
+   * Variable global para almacenar los permisos del usuario actual
+   */
+  var currentUserPermissions = {};
+
+  /**
+   * Establece los permisos del usuario actual y aplica las restricciones de UI
+   * @param {Object} permissions - Objeto de permisos del usuario
+   */
+  function setFrontendPermissions(permissions) {
+    currentUserPermissions = permissions || {};
+    applyFrontendPermissions();
+  }
+
+  /**
+   * Verifica si el usuario tiene un permiso específico
+   * @param {string} permissionKey - Clave del permiso a verificar
+   * @returns {boolean} True si tiene el permiso
+   */
+  function checkPermission(permissionKey) {
+    return currentUserPermissions[permissionKey] === true;
+  }
+
+  /**
+   * Aplica las restricciones de permisos a los elementos del DOM
+   * Busca elementos con atributo data-requires-permission y los oculta si el usuario no tiene el permiso
+   */
+  function applyFrontendPermissions() {
+    var elementsWithPermissions = document.querySelectorAll('[data-requires-permission]');
+    
+    elementsWithPermissions.forEach(function(element) {
+      var requiredPermission = element.getAttribute('data-requires-permission');
+      
+      if (!checkPermission(requiredPermission)) {
+        element.classList.add('hidden');
+        element.style.display = 'none';
+      }
+    });
+  }
 </script>

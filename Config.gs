@@ -27,6 +27,20 @@ var VALORES_STATUS = {
   CERRADA: "Cerrada"
 };
 
+// --- PERMISOS RBAC (Role-Based Access Control) ---
+// Claves de permisos del sistema
+var PERMISOS = {
+  MENU_ADMIN: 'MENU_ADMIN',
+  MENU_CONFIG: 'MENU_CONFIG',
+  CARGAR_ORDENES: 'CARGAR_ORDENES',
+  SUBIR_DOCUMENTOS: 'SUBIR_DOCUMENTOS',
+  REGISTRAR_NOVEDAD: 'REGISTRAR_NOVEDAD',
+  IMPRIMIR_ORDEN: 'IMPRIMIR_ORDEN',
+  SOLICITAR_REIMPRESION: 'SOLICITAR_REIMPRESION',
+  APROBAR_REIMPRESION: 'APROBAR_REIMPRESION',
+  AUTORIZAR_QA: 'AUTORIZAR_QA'
+};
+
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
@@ -41,5 +55,6 @@ const REQUIRED_SHEETS = {
   'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'ImpresoPor', 'STATUS'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
-  'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']
+  'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
+  'PermisosRoles': ['Rol', 'MENU_ADMIN', 'MENU_CONFIG', 'CARGAR_ORDENES', 'SUBIR_DOCUMENTOS', 'REGISTRAR_NOVEDAD', 'IMPRIMIR_ORDEN', 'SOLICITAR_REIMPRESION', 'APROBAR_REIMPRESION', 'AUTORIZAR_QA']
 };

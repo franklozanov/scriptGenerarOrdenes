@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cargar Órdenes Masivamente</title>
+  
+  <!-- FASE 6: Design System Centralizado -->
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  
+  <style>
+    /* Estilos específicos de este modal */
+    .table-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+    
+    table {
+      margin-bottom: 0;
+    }
+    
+    th, td {
+      padding: 8px;
+      font-size: 12px;
+    }
+    
+    .btn-delete {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .btn-delete:hover {
+      background-color: #e53935;
+    }
+    
+    .btn-add-row {
+      margin-bottom: 16px;
+    }
+    
+    .paste-instruction {
+      background-color: #e3f2fd;
+      border-left: 4px solid #1976d2;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: #333;
+      border-radius: 0 4px 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="mainContainer" style="display: none;">
+    <h2>Cargar Órdenes Masivamente</h2>
+    <div class="subtitle">Pegue datos de Excel o agregue filas manualmente</div>
+
+    <div class="paste-instruction">
+      <strong>Instrucciones:</strong> Copie los datos de Excel (columnas: Proceso, Codigo, Descripcion, Lote, Exp, Cantidad, NoAnalisis, NoOrden) y péguelos en esta página. Los datos se cargarán automáticamente en la tabla.
+    </div>
+
+    <div class="button-group" style="margin-bottom: 16px;">
+      <button type="button" class="btn btn-secondary btn-add-row" id="btnAddRow">+ Agregar Fila</button>
+      <button type="button" class="btn btn-secondary" id="btnClearTable">Limpiar Tabla</button>
+    </div>
+
+    <div class="table-container">
+      <table id="ordersTable">
+        <thead>
+          <tr>
+            <th style="width: 8%;">Proceso</th>
+            <th style="width: 10%;">Código</th>
+            <th style="width: 15%;">Descripción</th>
+            <th style="width: 8%;">Lote</th>
+            <th style="width: 8%;">Exp</th>
+            <th style="width: 6%;">Cantidad</th>
+            <th style="width: 8%;">NoAnálisis</th>
+            <th style="width: 8%;">NoOrden</th>
+            <th style="width: 10%;">Archivo OA</th>
+            <th style="width: 10%;">Archivo COA</th>
+            <th style="width: 9%;">Acción</th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody">
+          <!-- Las filas se agregarán dinámicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="info" id="tableInfo">
+      No hay filas agregadas. Agregue datos pegando de Excel o usando el botón "Agregar Fila".
+    </div>
+
+    <form id="cargaForm">
+      <!-- 21 CFR Part 11: PIN de confirmación (Firma Electrónica) -->
+      <div class="form-row" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
+        <div class="form-group" style="width: 50%;">
+          <label for="userPin">PIN de Autorización (Firma Electrónica) <span style="color: red;">*</span></label>
+          <input type="password" id="userPin" required maxlength="6" placeholder="Ingrese su PIN" style="letter-spacing: 3px; font-weight: bold; text-align: center;">
+        </div>
+      </div>
+
+      <div class="button-group" style="margin-top: 20px;">
+        <button type="submit" class="btn btn-primary" id="btnSubmit">Cargar Órdenes</button>
+        <button type="button" class="btn btn-secondary" id="btnCancel">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="loading-overlay hidden" id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Procesando...</div>
+  </div>
+
+  <!-- FASE 6: JavaScript Compartido -->
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+
+  <script>
+    var globalWebAppUrl = '';
+    var users = [];
+
+    function initialize() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (data && data.webAppUrl) {
+            globalWebAppUrl = data.webAppUrl;
+          }
+          if (data && data.users) {
+            users = data.users;
+          }
+          hideLoading();
+          document.getElementById('mainContainer').style.display = 'block';
+        })
+        .withFailureHandler(function(error) {
+          showError('Error al cargar datos iniciales: ' + error.message);
+          hideLoading();
+          document.getElementById('mainContainer').style.display = 'block';
+        })
+        .getInitialData();
+
+      document.getElementById('btnCancel').addEventListener('click', function() {
+        google.script.host.close();
+      });
+
+      document.getElementById('btnAddRow').addEventListener('click', addOrderRow);
+      document.getElementById('btnClearTable').addEventListener('click', clearTable);
+      document.getElementById('cargaForm').addEventListener('submit', handleSubmit);
+
+      // Event listener para pegar datos de Excel
+      document.addEventListener('paste', handlePaste);
+    }
+
+    function addOrderRow() {
+      var tbody = document.getElementById('ordersTableBody');
+      var row = document.createElement('tr');
+      
+      row.innerHTML = `
+        <td><input type="text" class="form-input" data-field="Proceso" placeholder="Proceso"></td>
+        <td><input type="text" class="form-input" data-field="Codigo" placeholder="Código"></td>
+        <td><input type="text" class="form-input" data-field="Descripcion" placeholder="Descripción"></td>
+        <td><input type="text" class="form-input" data-field="Lote" placeholder="Lote"></td>
+        <td><input type="text" class="form-input" data-field="Exp" placeholder="Exp"></td>
+        <td><input type="number" class="form-input" data-field="Cantidad" placeholder="0"></td>
+        <td><input type="text" class="form-input" data-field="NoAnalisis" placeholder="NoAnálisis"></td>
+        <td><input type="text" class="form-input" data-field="NoOrden" placeholder="NoOrden"></td>
+        <td><input type="file" accept="application/pdf" class="form-input" data-field="FileOA"></td>
+        <td><input type="file" accept="application/pdf" class="form-input" data-field="FileCOA"></td>
+        <td><button type="button" class="btn-delete" onclick="deleteRow(this)">Eliminar</button></td>
+      `;
+      
+      tbody.appendChild(row);
+      updateTableInfo();
+    }
+
+    function deleteRow(button) {
+      var row = button.closest('tr');
+      row.remove();
+      updateTableInfo();
+    }
+
+    function clearTable() {
+      var tbody = document.getElementById('ordersTableBody');
+      tbody.innerHTML = '';
+      updateTableInfo();
+    }
+
+    function updateTableInfo() {
+      var tbody = document.getElementById('ordersTableBody');
+      var info = document.getElementById('tableInfo');
+      var rowCount = tbody.rows.length;
+      
+      if (rowCount === 0) {
+        info.textContent = 'No hay filas agregadas. Agregue datos pegando de Excel o usando el botón "Agregar Fila".';
+        info.style.display = 'block';
+      } else {
+        info.textContent = rowCount + ' fila(s) agregada(s).';
+        info.style.display = 'block';
+      }
+    }
+
+    function handlePaste(e) {
+      // Solo procesar si no estamos en un input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      e.preventDefault();
+      
+      var clipboardData = e.clipboardData || window.clipboardData;
+      var pastedText = clipboardData.getData('text');
+      
+      if (!pastedText) {
+        return;
+      }
+
+      // Parsear el texto pegado (separado por \n para filas y \t para columnas)
+      var rows = pastedText.split('\n');
+      var tbody = document.getElementById('ordersTableBody');
+      
+      rows.forEach(function(rowText) {
+        var columns = rowText.split('\t');
+        
+        // Si la fila tiene al menos algunas columnas, agregarla
+        if (columns.length >= 1 && columns[0].trim() !== '') {
+          var tr = document.createElement('tr');
+          
+          // Crear 8 celdas para las columnas principales de texto/número
+          var fields = ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden'];
+          
+          fields.forEach(function(field, index) {
+            var td = document.createElement('td');
+            var input = document.createElement('input');
+            input.type = field === 'Cantidad' ? 'number' : 'text';
+            input.className = 'form-input';
+            input.dataset.field = field;
+            input.value = columns[index] ? columns[index].trim() : '';
+            
+            if (field === 'Cantidad') {
+              input.placeholder = '0';
+            } else {
+              input.placeholder = field;
+            }
+            
+            td.appendChild(input);
+            tr.appendChild(td);
+          });
+          
+          // Agregar celdas vacías para archivos (FileOA y FileCOA) - se dejan vacíos para uso manual
+          var fileOATd = document.createElement('td');
+          var fileOAInput = document.createElement('input');
+          fileOAInput.type = 'file';
+          fileOAInput.accept = 'application/pdf';
+          fileOAInput.className = 'form-input';
+          fileOAInput.dataset.field = 'FileOA';
+          fileOATd.appendChild(fileOAInput);
+          tr.appendChild(fileOATd);
+          
+          var fileCOATd = document.createElement('td');
+          var fileCOAInput = document.createElement('input');
+          fileCOAInput.type = 'file';
+          fileCOAInput.accept = 'application/pdf';
+          fileCOAInput.className = 'form-input';
+          fileCOAInput.dataset.field = 'FileCOA';
+          fileCOATd.appendChild(fileCOAInput);
+          tr.appendChild(fileCOATd);
+          
+          // Celda de acción con botón eliminar
+          var actionTd = document.createElement('td');
+          var deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.className = 'btn-delete';
+          deleteBtn.textContent = 'Eliminar';
+          deleteBtn.onclick = function() { deleteRow(this); };
+          actionTd.appendChild(deleteBtn);
+          tr.appendChild(actionTd);
+          
+          tbody.appendChild(tr);
+        }
+      });
+      
+      updateTableInfo();
+      showAlert('Datos pegados exitosamente. Verifique la información antes de cargar.', 'success');
+    }
+
+    function collectTableData() {
+      var tbody = document.getElementById('ordersTableBody');
+      var rows = tbody.querySelectorAll('tr');
+      var records = [];
+      
+      rows.forEach(function(row) {
+        var textInputs = row.querySelectorAll('input.form-input:not([type="file"])');
+        var fileInputs = row.querySelectorAll('input.form-input[type="file"]');
+        var record = {};
+        
+        // Recopilar campos de texto/número
+        textInputs.forEach(function(input) {
+          var field = input.dataset.field;
+          record[field] = input.value.trim();
+        });
+        
+        // Solo agregar si hay al menos algún dato de texto
+        if (Object.values(record).some(function(val) { return val !== ''; })) {
+          // Agregar archivos si existen
+          var fileOA = fileInputs[0] ? fileInputs[0].files[0] : null;
+          var fileCOA = fileInputs[1] ? fileInputs[1].files[0] : null;
+          
+          record._fileOA = fileOA;
+          record._fileCOA = fileCOA;
+          
+          records.push(record);
+        }
+      });
+      
+      return records;
+    }
+
+    function fileToBase64(file) {
+      return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function() {
+          var base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      
+      var records = collectTableData();
+      var pin = document.getElementById('userPin').value;
+
+      if (records.length === 0) {
+        showError('No hay datos para cargar. Agregue filas a la tabla.');
+        return;
+      }
+
+      if (!pin) {
+        showError('El PIN de autorización es obligatorio.');
+        return;
+      }
+
+      // Procesar archivos asíncronamente
+      var filePromises = [];
+      
+      records.forEach(function(record) {
+        var promises = [];
+        
+        if (record._fileOA) {
+          promises.push(
+            fileToBase64(record._fileOA).then(function(base64) {
+              record.fileOABase64 = base64;
+              record.fileOAName = record._fileOA.name;
+            })
+          );
+        }
+        
+        if (record._fileCOA) {
+          promises.push(
+            fileToBase64(record._fileCOA).then(function(base64) {
+              record.fileCOABase64 = base64;
+              record.fileCOAName = record._fileCOA.name;
+            })
+          );
+        }
+        
+        filePromises.push(Promise.all(promises));
+      });
+
+      // Esperar a que todos los archivos se conviertan a Base64
+      Promise.all(filePromises).then(function() {
+        // Remover propiedades temporales de archivos
+        records.forEach(function(record) {
+          delete record._fileOA;
+          delete record._fileCOA;
+        });
+
+        var params = {
+          operation: 'cargarOrdenesMasivas',
+          records: records,
+          pinFirma: pin
+        };
+
+        showLoading('Cargando órdenes...');
+
+        fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: JSON.stringify(params)
+        })
+        .then(function(response) {
+          return response.json();
+        })
+        .then(function(result) {
+          hideLoading();
+          if (result.status === 'success') {
+            showAlert(result.message || 'Órdenes cargadas exitosamente.', 'success');
+            setTimeout(function() {
+              google.script.host.close();
+            }, 2000);
+          } else {
+            showError('Error al cargar órdenes: ' + (result.message || 'Error desconocido'));
+          }
+        })
+        .catch(function(error) {
+          hideLoading();
+          showError('Error al cargar órdenes: ' + error.message);
+        });
+      }).catch(function(error) {
+        hideLoading();
+        showError('Error al procesar archivos: ' + error.message);
+      });
+    }
+
+    // Inicializar al cargar
+    window.addEventListener('load', function() {
+      initialize();
+      
+      // Inicializar drag y resize
+      initializeModalDragResize({
+        title: 'Cargar Órdenes Masivamente',
+        enableDrag: true,
+        enableResize: true,
+        minWidth: 900,
+        minHeight: 600,
+        maxWidth: 1400,
+        maxHeight: 1000
+      });
+    });
+  </script>
+</body>
+</html>

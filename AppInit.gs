@@ -295,6 +295,13 @@ function createMissingSheets(ui) {
       sheet = ss.insertSheet(sheetName);
       sheet.getRange(1, 1, 1, REQUIRED_SHEETS[sheetName].length).setValues([REQUIRED_SHEETS[sheetName]]);
       Logger.log("✓ Hoja creada: " + sheetName);
+      
+      // Si se creó PermisosRoles, insertar filas de ejemplo
+      if (sheetName === 'PermisosRoles') {
+        sheet.getRange(2, 1, 1, 10).setValues([['Administrador', true, true, true, true, true, true, true, true, true]]);
+        sheet.getRange(3, 1, 1, 10).setValues([['Operario', false, false, false, true, true, true, true, false, false]]);
+        Logger.log("✓ Filas de ejemplo insertadas en PermisosRoles");
+      }
     }
   }
 }

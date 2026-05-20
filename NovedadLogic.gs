@@ -29,6 +29,22 @@ function abrirModalRegistroNovedad() {
   }
 }
 
+/**
+ * Abre el modal de carga masiva de órdenes.
+ * Muestra ModalCargaOrdenes.html para cargar múltiples órdenes desde Excel.
+ */
+function abrirModalCargaOrdenes() {
+  try {
+    var template = HtmlService.createTemplateFromFile('ModalCargaOrdenes');
+    var html = template.evaluate()
+      .setWidth(1000)
+      .setHeight(700);
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Cargar Órdenes Masivamente');
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
+  }
+}
+
 // --- OBTENCIÓN DE ÓRDENES DISPONIBLES ---
 
 /**
@@ -222,5 +238,201 @@ function procesarRegistroNovedad(params, userId) {
     Logger.log("ERROR en procesarRegistroNovedad: " + e.message);
     Logger.log("Stack trace: " + e.stack);
     return { status: 'error', message: 'Error al procesar registro de novedad: ' + e.message };
+  }
+}
+
+// --- CARGA MASIVA DE ÓRDENES ---
+
+/**
+ * Procesa la carga masiva de órdenes desde el modal.
+ * Valida los datos, mapea a las columnas correctas de la hoja Ordenes y las inserta.
+ * 
+ * @param {Object} params - Parámetros de la carga masiva
+ * @param {Array<Object>} params.records - Array de objetos con datos de órdenes
+ * @param {string} params.pinFirma - PIN de firma electrónica
+ * @param {string} userId - UserID del usuario autenticado
+ * @returns {Object} Resultado de la operación con status y mensaje
+ */
+function procesarCargaOrdenesMasivas(params, userId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Obtener información del usuario
+    var user = getUserRecordByUserId_(userId);
+    if (!user) {
+      return { status: 'error', message: 'Usuario no encontrado: ' + userId };
+    }
+    var nombreCorto = user.nombreCorto || userId;
+
+    // Obtener registros
+    var records = params.records || [];
+    if (!Array.isArray(records) || records.length === 0) {
+      return { status: 'error', message: 'No se recibieron registros para cargar.' };
+    }
+
+    // Obtener hoja Ordenes
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (!sheetOrdenes) {
+      return { status: 'error', message: 'La hoja Ordenes no existe.' };
+    }
+
+    // Obtener encabezados actuales
+    var headersOrdenes = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+    var numColumns = headersOrdenes.length;
+
+    // Obtener carpetas de destino desde hoja templates
+    var folderDocOrdenes = null;
+    var folderDocAnalisis = null;
+    
+    try {
+      var sheetTemplates = ss.getSheetByName('templates');
+      if (sheetTemplates) {
+        var templatesData = sheetTemplates.getDataRange().getValues();
+        templatesData.forEach(function(row) {
+          var key = row[0] ? row[0].toString().trim() : '';
+          var value = row[1] ? row[1].toString().trim() : '';
+          
+          if (key === 'DOC_ORDENES' && value) {
+            folderDocOrdenes = DriveApp.getFolderById(value);
+          }
+          if (key === 'DOC_ANALISIS' && value) {
+            folderDocAnalisis = DriveApp.getFolderById(value);
+          }
+        });
+      }
+    } catch (e) {
+      Logger.log("ADVERTENCIA: No se pudieron obtener carpetas de destino: " + e.message);
+    }
+
+    // Mapear índices de columnas
+    var colProceso = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Proceso', false);
+    var colCodigo = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Codigo', false);
+    var colDescripcion = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Descripcion', false);
+    var colLote = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Lote', false);
+    var colExp = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Exp', false);
+    var colCantidad = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Cantidad', false);
+    var colNoAnalisis = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoAnalisis', false);
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoOrden', false);
+    var colFabricante = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Fabricante', false);
+    var colAdjuntoCOA = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'AdjuntoCOA', false);
+    var colAdjuntoOA = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'AdjuntoOA', false);
+    var colEstadoCarga = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'EstadoCarga', false);
+    var colConsecutivoImp = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'ConsecutivoImp', false);
+    var colImpresoPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'ImpresoPor', false);
+    var colStatus = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
+    var colSolicitadaPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'SolicitadaPor', false);
+
+    if (!colNoOrden || !colCodigo) {
+      return { status: 'error', message: 'No se encontraron las columnas requeridas (NoOrden, Codigo) en la hoja Ordenes.' };
+    }
+
+    // Crear matriz 2D para insertar
+    var newRows = [];
+    var lastRow = sheetOrdenes.getLastRow();
+    var startRow = lastRow > 0 ? lastRow + 1 : 2;
+
+    // Procesar cada registro
+    var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    
+    records.forEach(function(record) {
+      var row = new Array(numColumns).fill('');
+      
+      // Variables para rastrear estado de carga de documentos
+      var oaCargado = false;
+      var coaCargado = false;
+
+      // Mapear valores del registro a las columnas correctas
+      if (colProceso) row[colProceso - 1] = record.Proceso || '';
+      if (colCodigo) row[colCodigo - 1] = record.Codigo || '';
+      if (colDescripcion) row[colDescripcion - 1] = record.Descripcion || '';
+      if (colLote) row[colLote - 1] = record.Lote || '';
+      if (colExp) row[colExp - 1] = record.Exp || '';
+      if (colCantidad) row[colCantidad - 1] = record.Cantidad || 0;
+      if (colNoAnalisis) row[colNoAnalisis - 1] = record.NoAnalisis || '';
+      if (colNoOrden) row[colNoOrden - 1] = record.NoOrden || '';
+      
+      // Procesar archivo OA si viene
+      if (record.fileOABase64 && folderDocOrdenes) {
+        try {
+          var decodedOA = Utilities.base64Decode(record.fileOABase64);
+          var blobOA = Utilities.newBlob(decodedOA, 'application/pdf', record.fileOAName || record.NoOrden + '_OA.pdf');
+          folderDocOrdenes.createFile(blobOA);
+          row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.CARGADO;
+          oaCargado = true;
+          Logger.log("Archivo OA guardado para orden: " + record.NoOrden);
+        } catch (e) {
+          Logger.log("ERROR al guardar archivo OA para orden " + record.NoOrden + ": " + e.message);
+          row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+          oaCargado = false;
+        }
+      } else {
+        row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+        oaCargado = false;
+      }
+      
+      // Procesar archivo COA si viene
+      if (record.fileCOABase64 && folderDocAnalisis) {
+        try {
+          var decodedCOA = Utilities.base64Decode(record.fileCOABase64);
+          var blobCOA = Utilities.newBlob(decodedCOA, 'application/pdf', record.fileCOAName || record.NoOrden + '_COA.pdf');
+          folderDocAnalisis.createFile(blobCOA);
+          row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.CARGADO;
+          coaCargado = true;
+          Logger.log("Archivo COA guardado para orden: " + record.NoOrden);
+        } catch (e) {
+          Logger.log("ERROR al guardar archivo COA para orden " + record.NoOrden + ": " + e.message);
+          row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+          coaCargado = false;
+        }
+      } else {
+        row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+        coaCargado = false;
+      }
+      
+      // Calcular EstadoCarga dinámicamente
+      if (oaCargado && coaCargado) {
+        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.CARGADOS;
+      } else if (oaCargado && !coaCargado) {
+        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_COA;
+      } else if (!oaCargado && coaCargado) {
+        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_OA;
+      } else {
+        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
+      }
+      
+      // Valores por defecto para columnas no proporcionadas
+      if (colFabricante) row[colFabricante - 1] = '';
+      if (colConsecutivoImp) row[colConsecutivoImp - 1] = '';
+      if (colImpresoPor) row[colImpresoPor - 1] = '';
+      if (colStatus) row[colStatus - 1] = 'Solicitada';
+      if (colSolicitadaPor) row[colSolicitadaPor - 1] = (nombreCorto || userId) + " | " + timestamp;
+
+      newRows.push(row);
+    });
+
+    // Insertar datos en la hoja
+    if (newRows.length > 0) {
+      sheetOrdenes.getRange(startRow, 1, newRows.length, numColumns).setValues(newRows);
+      Logger.log("procesarCargaOrdenesMasivas: Insertadas " + newRows.length + " filas en hoja Ordenes");
+    }
+
+    // Registrar en Logs
+    var userIdentity = getUserIdentityStringByUserId_(userId);
+    var logDescripcion = 'Carga masiva de órdenes: ' + newRows.length + ' órdenes cargadas por ' + nombreCorto;
+    logChange('CARGA_MASIVA_ORDENES', logDescripcion, userIdentity);
+
+    return {
+      status: 'success',
+      message: 'Se cargaron exitosamente ' + newRows.length + ' órdenes en la hoja Ordenes.',
+      data: {
+        rowsInserted: newRows.length,
+        insertedBy: nombreCorto
+      }
+    };
+
+  } catch (e) {
+    Logger.log("ERROR en procesarCargaOrdenesMasivas: " + e.message);
+    Logger.log("Stack trace: " + e.stack);
+    return { status: 'error', message: 'Error al procesar carga masiva de órdenes: ' + e.message };
   }
 }

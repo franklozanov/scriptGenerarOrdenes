@@ -26,28 +26,47 @@ function onOpen() {
 
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu;
-  if (validUser.rol === 'Administrador' || validUser.rol === 'QA') {
+  if (hasPermission(validUser.userId, PERMISOS.MENU_ADMIN)) {
     adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
       .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
   }
 
   // 2. Menú de Configuración General
-  var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
-    .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
-    .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp');
+  var configMenu;
+  if (hasPermission(validUser.userId, PERMISOS.MENU_CONFIG)) {
+    configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
+      .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
+      .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp');
     
-  if (adminMenu) {
-    configMenu.addSeparator().addSubMenu(adminMenu);
+    if (adminMenu) {
+      configMenu.addSeparator().addSubMenu(adminMenu);
+    }
   }
 
-  // 3. Menú Principal (Gestionar OA)
-  SpreadsheetApp.getUi().createMenu('Gestionar OA')
-    .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
-    .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
-    .addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad')
-    .addSeparator()
-    .addSubMenu(configMenu)
-    .addToUi();
+  // 3. Menú Principal (Gestionar OA) - Construido condicionalmente según permisos
+  var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
+  
+  if (hasPermission(validUser.userId, PERMISOS.CARGAR_ORDENES)) {
+    mainMenu.addItem('📥 Cargar Nuevas Órdenes', 'abrirModalCargaOrdenes');
+  }
+  
+  if (hasPermission(validUser.userId, PERMISOS.SUBIR_DOCUMENTOS)) {
+    mainMenu.addItem('📤 Subir documentos', 'abrirModalSubidaGeneral');
+  }
+  
+  if (hasPermission(validUser.userId, PERMISOS.IMPRIMIR_ORDEN)) {
+    mainMenu.addItem('🖨️ Imprimir Orden', 'openPrintDialog');
+  }
+  
+  if (hasPermission(validUser.userId, PERMISOS.REGISTRAR_NOVEDAD)) {
+    mainMenu.addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad');
+  }
+  
+  if (configMenu) {
+    mainMenu.addSeparator().addSubMenu(configMenu);
+  }
+  
+  mainMenu.addToUi();
   
   // Cache warmup: precargar datos silenciosamente
   try {

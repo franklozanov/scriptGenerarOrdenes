@@ -511,6 +511,7 @@
             showError('No hay usuarios configurados en la hoja Usuarios.');
             return;
           }
+          setFrontendPermissions(data.userPermissions);
           loadPendingOrders();
         })
         .withFailureHandler(function(error) {

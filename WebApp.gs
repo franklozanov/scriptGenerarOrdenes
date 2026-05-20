@@ -121,6 +121,9 @@ function handlePrivilegedOperation_(params) {
   Logger.log("WebApp - UserID validado: " + callingUserId);
 
   if (operation === 'uploadDocument') {
+    if (!hasPermission(callingUserId, PERMISOS.SUBIR_DOCUMENTOS)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
     if (!params.base64Data || !params.mimeType || !params.fileName || !params.referenceNo || !params.docType) {
       return { status: 'error', message: 'Faltan parámetros requeridos para subir documento.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
@@ -131,6 +134,9 @@ function handlePrivilegedOperation_(params) {
   }
 
   if (operation === 'saveFinalPDF') {
+    if (!hasPermission(callingUserId, PERMISOS.IMPRIMIR_ORDEN)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
     if (!params.base64Data || !params.orderNo) {
       return { status: 'error', message: 'Faltan parámetros requeridos para guardar el PDF final.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
@@ -139,6 +145,9 @@ function handlePrivilegedOperation_(params) {
   }
 
   if (operation === 'updateTraceability') {
+    if (!hasPermission(callingUserId, PERMISOS.IMPRIMIR_ORDEN)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
     if (!params.orderNo || !params.userId || !params.pagesPrinted || !params.printType) {
       return { status: 'error', message: 'Faltan parámetros requeridos para actualizar trazabilidad.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
@@ -147,6 +156,9 @@ function handlePrivilegedOperation_(params) {
   }
 
   if (operation === 'finalizeFinalPdf') {
+    if (!hasPermission(callingUserId, PERMISOS.IMPRIMIR_ORDEN)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
     if (!params.orderNo || !params.fileId) {
       return { status: 'error', message: 'Faltan parámetros requeridos para finalizar post-guardado.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
@@ -155,17 +167,30 @@ function handlePrivilegedOperation_(params) {
   }
 
   if (operation === 'registrarNovedad') {
+    if (!hasPermission(callingUserId, PERMISOS.REGISTRAR_NOVEDAD)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
     if (!params.noOrden || !params.codigo || !params.tipoNovedad || !params.status || !params.realizadoPor) {
       return { status: 'error', message: 'Faltan parámetros requeridos para registrar novedad.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
     return procesarRegistroNovedad(params, callingUserId);
   }
 
+  if (operation === 'cargarOrdenesMasivas') {
+    if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.records || !Array.isArray(params.records) || params.records.length === 0) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para cargar órdenes masivas.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return procesarCargaOrdenesMasivas(params, callingUserId);
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas']
   };
 }
 

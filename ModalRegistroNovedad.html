@@ -114,6 +114,7 @@
             users = data.users;
             populateUsuariosList();
           }
+          setFrontendPermissions(data.userPermissions);
           loadOrdenes();
         })
         .withFailureHandler(function(error) {

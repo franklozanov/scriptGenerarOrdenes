@@ -334,6 +334,8 @@ function applyStatusDataValidation(silent) {
     
     // Usar constantes de Config.gs para asegurar consistencia
     var statusOptions = [
+      'Solicitada',
+      'Autorizada',
       VALORES_STATUS.IMPRESO,
       VALORES_STATUS.REIMPRESO,
       VALORES_STATUS.RECIBIDA_QA,
@@ -398,6 +400,16 @@ function applyStatusDataValidation(silent) {
       // Definir colores para cada estado
       var colorRules = [
         {
+          status: 'Solicitada',
+          bgColor: '#f8f9fa',    // Gris muy claro
+          textColor: '#475569'   // Gris oscuro
+        },
+        {
+          status: 'Autorizada',
+          bgColor: '#dcfce7',    // Verde esmeralda claro
+          textColor: '#047857'   // Verde esmeralda oscuro
+        },
+        {
           status: 'Impreso',
           bgColor: '#d9d9d9',    // Gris claro
           textColor: '#434343'   // Gris oscuro
@@ -454,6 +466,8 @@ function applyStatusDataValidation(silent) {
             'Se aplicaron validaciones de datos y formato condicional a la columna STATUS en:\n\n' +
             sheetsProcessed.join('\n') + '\n\n' +
             'Estados disponibles:\n' +
+            '⚪ Solicitada (gris claro)\n' +
+            '✅ Autorizada (verde esmeralda)\n' +
             '⚫ Impreso (gris)\n' +
             '🟡 Reimpreso (amarillo)\n' +
             '🔵 RecibidaQA (azul)\n' +
@@ -527,4 +541,113 @@ function promptApplyStatusValidation() {
   withAdminAuth('Aplicar Validaciones de STATUS', function(ui) {
     applyStatusDataValidation();
   });
+}
+
+// --- MOTOR DE AUTORIZACIÓN RBAC ---
+
+/**
+ * Obtiene los permisos de un rol desde la hoja PermisosRoles con caché.
+ * @param {string} userRol - Rol del usuario
+ * @returns {Object} Objeto con permisos del rol (ej: { MENU_ADMIN: true, CARGAR_ORDENES: false, ... })
+ */
+function getUserPermissions(userRol) {
+  try {
+    if (!userRol) {
+      Logger.log("getUserPermissions: Rol vacío o nulo");
+      return {};
+    }
+
+    // Verificar caché primero (6 horas = 21600 segundos)
+    var cacheKey = 'Permisos_' + userRol;
+    var cache = CacheService.getScriptCache();
+    var cachedPermissions = cache.get(cacheKey);
+    
+    if (cachedPermissions) {
+      Logger.log("getUserPermissions: Permisos obtenidos desde caché para rol: " + userRol);
+      return JSON.parse(cachedPermissions);
+    }
+
+    // Leer desde hoja PermisosRoles
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetPermisos = ss.getSheetByName('PermisosRoles');
+    
+    if (!sheetPermisos) {
+      Logger.log("getUserPermissions: Hoja PermisosRoles no existe");
+      return {};
+    }
+
+    var data = sheetPermisos.getDataRange().getValues();
+    var headers = data[0];
+    var permissions = {};
+
+    // Buscar fila del rol (Columna A)
+    for (var i = 1; i < data.length; i++) {
+      var rolEnHoja = data[i][0] ? data[i][0].toString().trim() : '';
+      
+      if (rolEnHoja.toLowerCase() === userRol.toLowerCase()) {
+        // Mapear valores booleanos a los encabezados
+        for (var j = 1; j < headers.length; j++) {
+          var permisoKey = headers[j] ? headers[j].toString().trim() : '';
+          if (permisoKey) {
+            permissions[permisoKey] = data[i][j] === true;
+          }
+        }
+        
+        // Guardar en caché
+        cache.put(cacheKey, JSON.stringify(permissions), 21600);
+        Logger.log("getUserPermissions: Permisos obtenidos desde hoja y cacheados para rol: " + userRol);
+        return permissions;
+      }
+    }
+
+    // Rol no encontrado
+    Logger.log("getUserPermissions: Rol no encontrado en hoja PermisosRoles: " + userRol);
+    return {};
+
+  } catch (e) {
+    Logger.log("ERROR en getUserPermissions: " + e.message);
+    return {};
+  }
+}
+
+/**
+ * Verifica si un usuario tiene un permiso específico.
+ * @param {string} userId - UserID del usuario
+ * @param {string} permisoRequerido - Clave del permiso a verificar (ej: PERMISOS.CARGAR_ORDENES)
+ * @returns {boolean} true si tiene permiso, false en caso contrario
+ */
+function hasPermission(userId, permisoRequerido) {
+  try {
+    if (!userId || !permisoRequerido) {
+      Logger.log("hasPermission: userId o permisoRequerido vacío");
+      return false;
+    }
+
+    // Obtener usuario desde hoja Usuarios
+    var user = getUserRecordByUserId_(userId);
+    
+    if (!user) {
+      Logger.log("hasPermission: Usuario no encontrado: " + userId);
+      return false;
+    }
+
+    if (!user.rol) {
+      Logger.log("hasPermission: Usuario sin rol: " + userId);
+      return false;
+    }
+
+    // Obtener permisos del rol
+    var permissions = getUserPermissions(user.rol);
+    
+    // Verificar permiso específico
+    var tienePermiso = permissions[permisoRequerido] === true;
+    
+    Logger.log("hasPermission: Usuario " + userId + " con rol " + user.rol + " - Permiso " + permisoRequerido + ": " + tienePermiso);
+    
+    return tienePermiso;
+
+  } catch (e) {
+    Logger.log("ERROR en hasPermission: " + e.message);
+    return false;
+  }
 }
