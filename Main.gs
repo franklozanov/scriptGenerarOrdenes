@@ -48,7 +48,8 @@ function onOpen() {
  * @param {string} email - Correo del usuario (opcional, si no se pasa se detectará)
  */
 function onOpenMain(email) {
-  var activeEmail = email || Session.getActiveUser().getEmail();
+  // Si 'email' es un objeto de evento del trigger, ignorarlo y usar Session
+  var activeEmail = (typeof email === 'string' && email.trim() !== '') ? email.trim() : Session.getActiveUser().getEmail();
   var validUser = getUserRecordByEmail_(activeEmail);
   
   if (!validUser) {
