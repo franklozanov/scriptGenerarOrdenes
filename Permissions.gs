@@ -643,11 +643,38 @@ function hasPermission(userId, permisoRequerido) {
     var tienePermiso = permissions[permisoRequerido] === true;
     
     Logger.log("hasPermission: Usuario " + userId + " con rol " + user.rol + " - Permiso " + permisoRequerido + ": " + tienePermiso);
-    
+
     return tienePermiso;
 
   } catch (e) {
     Logger.log("ERROR en hasPermission: " + e.message);
+    return false;
+  }
+}
+
+/**
+ * Verifica si un rol tiene un permiso específico (sin consultar hoja de usuarios).
+ * Optimizada para uso en onOpen() donde ya conocemos el rol.
+ * @param {string} rol - Rol del usuario
+ * @param {string} permisoRequerido - Clave del permiso a verificar
+ * @returns {boolean} true si tiene permiso, false en caso contrario
+ */
+function hasPermissionByRol(rol, permisoRequerido) {
+  try {
+    if (!rol || !permisoRequerido) {
+      Logger.log("hasPermissionByRol: rol o permisoRequerido vacío");
+      return false;
+    }
+
+    var permissions = getUserPermissions(rol);
+    var tienePermiso = permissions[permisoRequerido] === true;
+
+    Logger.log("hasPermissionByRol: Rol " + rol + " - Permiso " + permisoRequerido + ": " + tienePermiso);
+
+    return tienePermiso;
+
+  } catch (e) {
+    Logger.log("ERROR en hasPermissionByRol: " + e.message);
     return false;
   }
 }

@@ -213,14 +213,44 @@ function fetchOrderData(orderNo) {
   var errors = [];
   var dynamicPdfs = [];
   
-  // --- VALIDACIÓN DE STATUS PARA IMPRESIÓN ---
+  // --- VALIDACIÓN DE STATUS PARA IMPRESIÓN (GAMP 5 Compliance) ---
   var colStatusCol = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
   var statusValue = "";
   if (colStatusCol) {
     statusValue = targetRowData[colStatusCol - 1] ? targetRowData[colStatusCol - 1].toString().trim() : "";
   }
   
-  // Bloquear impresión si STATUS es RecibidaQA, DevueltaQA o Cerrada
+  // Bloquear impresión si STATUS es Solicitada (no aprobada por QA)
+  if (statusValue === "Solicitada") {
+    Logger.log("fetchOrderData: Orden " + orderNo + " con STATUS 'Solicitada' - Bloqueando impresión por falta de aprobación QA");
+    return {
+      status: "error",
+      ready: false,
+      orderNo: orderNo,
+      noAnalisis: "",
+      formData: {},
+      coords: dynamicCoords,
+      pdfs: [],
+      errors: [{ key: "STATUS_BLOCKED", message: "No se puede imprimir esta orden. Su STATUS actual es 'Solicitada' y requiere aprobación QA. Contacte al administrador." }]
+    };
+  }
+  
+  // Bloquear impresión si STATUS está vacío o es un valor no reconocido
+  if (!statusValue || statusValue === "") {
+    Logger.log("fetchOrderData: Orden " + orderNo + " con STATUS vacío - Bloqueando impresión");
+    return {
+      status: "error",
+      ready: false,
+      orderNo: orderNo,
+      noAnalisis: "",
+      formData: {},
+      coords: dynamicCoords,
+      pdfs: [],
+      errors: [{ key: "STATUS_BLOCKED", message: "No se puede imprimir esta orden. Su STATUS no está definido. Contacte al administrador." }]
+    };
+  }
+  
+  // Bloquear impresión si STATUS es RecibidaQA, DevueltaQA o Cerrada (lógica existente)
   if (statusValue === "RecibidaQA" || statusValue === "DevueltaQA" || statusValue === "Cerrada") {
     var currentUser = "";
     try { currentUser = Session.getActiveUser().getEmail(); } catch(e) {}
@@ -272,6 +302,11 @@ function fetchOrderData(orderNo) {
         errors: [{ key: "STATUS_BLOCKED", message: "No se puede imprimir esta orden. Su STATUS actual es '" + statusValue + "'. Contacte al administrador si necesita imprimir esta orden." }]
       };
     }
+  }
+  
+  // Log de diagnóstico: orden autorizada para impresión
+  if (statusValue === "Autorizada") {
+    Logger.log("fetchOrderData: Orden " + orderNo + " con STATUS 'Autorizada' - Permitiendo impresión (GAMP 5 Compliance)");
   }
   // --- FIN VALIDACIÓN DE STATUS ---
   
@@ -393,6 +428,21 @@ function preparePrintPayload(orderNo, templateConfig) {
   
   if (targetRowIndex === -1) throw new Error("Order " + orderNo + " not found in 'Ordenes' sheet.");
   var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
+
+  // --- VALIDACIÓN DE STATUS PARA PREPARACIÓN DE PAYLOAD (GAMP 5 Compliance) ---
+  var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+  if (colStatus) {
+    var statusValue = targetRowData[colStatus - 1];
+    var statusStr = statusValue ? statusValue.toString().trim() : "";
+    
+    if (statusStr === "Solicitada" || statusStr === "") {
+      Logger.log("preparePrintPayload: Orden " + orderNo + " con STATUS '" + statusStr + "' - Bloqueando preparación de payload");
+      throw new Error("Acceso denegado: No se puede preparar el payload de impresión para una orden que no ha sido Autorizada por QA.");
+    }
+    
+    Logger.log("preparePrintPayload: Orden " + orderNo + " con STATUS '" + statusStr + "' - Permitiendo preparación de payload");
+  }
+  // --- FIN VALIDACIÓN DE STATUS ---
 
   var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
   var formData = {};
@@ -517,6 +567,7 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     // Buscar columnas por nombre
     var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
     var colConsecutivo = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', true);
+    var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
     
     // Buscar fila de la orden
     var orderValues = sheet.getRange(1, colNoOrden, sheet.getLastRow(), 1).getValues();
@@ -534,6 +585,20 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     if (rowIndex === -1) {
       throw new Error("No se encontró la orden " + orderNo + " en la hoja Ordenes.");
     }
+    
+    // --- VALIDACIÓN DE STATUS PARA GENERACIÓN DE PDF (GAMP 5 Compliance) ---
+    if (colStatus) {
+      var statusValue = sheet.getRange(rowIndex, colStatus).getValue();
+      var statusStr = statusValue ? statusValue.toString().trim() : "";
+      
+      if (statusStr === "Solicitada" || statusStr === "") {
+        Logger.log("saveFinalUnifiedPDF: Orden " + orderNo + " con STATUS '" + statusStr + "' - Bloqueando generación de PDF final");
+        throw new Error("Acceso denegado: No se puede guardar el PDF final de una orden que no ha sido Autorizada por QA.");
+      }
+      
+      Logger.log("saveFinalUnifiedPDF: Orden " + orderNo + " con STATUS '" + statusStr + "' - Permitiendo generación de PDF final");
+    }
+    // --- FIN VALIDACIÓN DE STATUS ---
     
     // Leer consecutivo actual e incrementar
     var rawConsecutivo = sheet.getRange(rowIndex, colConsecutivo).getValue();

@@ -1,0 +1,16 @@
+Cascade, el flujo de Autorización QA está finalizado. Para garantizar el cumplimiento GAMP 5, necesitamos asegurar que el módulo de impresión sea estricto y bloquee cualquier intento de imprimir órdenes que no hayan sido aprobadas por QA.
+
+Por favor, realiza una REVISIÓN Y REFACTORIZACIÓN del flujo de Impresión bajo la siguiente regla estricta: Ejecuta SOLO un paso a la vez, genera un micro-resumen y pide autorización para continuar.
+
+---
+
+PASO 1: Filtrado Frontend en la Obtención de Órdenes
+Archivo a buscar y modificar: El archivo que contenga la lógica para poblar el modal de impresión (probablemente `PrintLogic.gs`, `PrintBackend.gs` o similar. Busca la función que retorne las órdenes a imprimir al frontend).
+
+Cambios a implementar:
+- Ubica la función que recopila las órdenes disponibles para el modal de impresión (Ej: `getOrdersForPrint()`).
+- Modifica la condición de filtrado. El sistema DEBE requerir que el `STATUS` de la orden sea **estrictamente** `'Autorizada'` para una impresión de primera vez.
+- (Si el sistema también maneja solicitudes de reimpresión en esta misma función, asegúrate de no romper esa lógica, pero bloquea definitivamente el estado 'Solicitada' o valores en blanco).
+- Agrega logs descriptivos que indiquen cuántas órdenes "Autorizadas" se enviaron al frontend.
+
+REGLA ESTRICTA FINAL: Al terminar este paso, detente por completo. Genera un micro-resumen sumamente compacto indicando el archivo modificado y el cambio exacto. Luego, pregunta explícitamente: "¿Me autorizas a proceder con la validación de seguridad en el backend de impresión (PASO 2)?"

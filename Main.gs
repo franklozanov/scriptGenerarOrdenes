@@ -24,18 +24,26 @@ function onOpen() {
     return; // Detiene la creación de menús
   }
 
+  // Diagnóstico de permisos antes de construir menú
+  var userPermissions = getUserPermissions(validUser.rol);
+  Logger.log("Diagnóstico Menú - Rol: " + validUser.rol + " | Permisos obtenidos: " + JSON.stringify(userPermissions));
+  
+  if (Object.keys(userPermissions).length === 0) {
+    SpreadsheetApp.getUi().toast('⚠️ Atención: Tu rol "' + validUser.rol + '" no tiene permisos configurados. Verifica la hoja PermisosRoles.', 'Sistema de Permisos', 10);
+  }
+
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu;
-  // Fallback de seguridad: El Administrador siempre ve el menú de inicialización
-  var isAdminFallback = validUser.rol === 'Administrador';
-  if (hasPermission(validUser.userId, PERMISOS.MENU_ADMIN) || isAdminFallback) {
+  // Fallback de seguridad: El Administrador siempre ve el menú de inicialización (cubriendo variaciones de nombre)
+  var isAdminFallback = (validUser.rol === 'Administrador' || validUser.rol === 'ADMIN' || validUser.rol === 'Administrador de Sistema');
+  if (hasPermissionByRol(validUser.rol, PERMISOS.MENU_ADMIN) || isAdminFallback) {
     adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
       .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
   }
 
   // 2. Menú de Configuración General
   var configMenu;
-  if (hasPermission(validUser.userId, PERMISOS.MENU_CONFIG)) {
+  if (hasPermissionByRol(validUser.rol, PERMISOS.MENU_CONFIG)) {
     configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
       .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
       .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp');
@@ -48,20 +56,24 @@ function onOpen() {
   // 3. Menú Principal (Gestionar OA) - Construido condicionalmente según permisos
   var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
   
-  if (hasPermission(validUser.userId, PERMISOS.CARGAR_ORDENES)) {
+  if (hasPermissionByRol(validUser.rol, PERMISOS.CARGAR_ORDENES)) {
     mainMenu.addItem('📥 Cargar Nuevas Órdenes', 'abrirModalCargaOrdenes');
   }
   
-  if (hasPermission(validUser.userId, PERMISOS.SUBIR_DOCUMENTOS)) {
+  if (hasPermissionByRol(validUser.rol, PERMISOS.SUBIR_DOCUMENTOS)) {
     mainMenu.addItem('📤 Subir documentos', 'abrirModalSubidaGeneral');
   }
   
-  if (hasPermission(validUser.userId, PERMISOS.IMPRIMIR_ORDEN)) {
+  if (hasPermissionByRol(validUser.rol, PERMISOS.IMPRIMIR_ORDEN)) {
     mainMenu.addItem('🖨️ Imprimir Orden', 'openPrintDialog');
   }
   
-  if (hasPermission(validUser.userId, PERMISOS.REGISTRAR_NOVEDAD)) {
+  if (hasPermissionByRol(validUser.rol, PERMISOS.REGISTRAR_NOVEDAD)) {
     mainMenu.addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad');
+  }
+  
+  if (hasPermissionByRol(validUser.rol, PERMISOS.AUTORIZAR_QA)) {
+    mainMenu.addItem('✅ Autorizar Órdenes (QA)', 'abrirModalAutorizarQA');
   }
   
   if (configMenu) {

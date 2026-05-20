@@ -186,11 +186,21 @@ function handlePrivilegedOperation_(params) {
     return procesarCargaOrdenesMasivas(params, callingUserId);
   }
 
+  if (operation === 'autorizarOrdenesQA') {
+    if (!hasPermission(callingUserId, PERMISOS.AUTORIZAR_QA)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.targetIds || !Array.isArray(params.targetIds) || params.targetIds.length === 0) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para autorizar órdenes.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return procesarAutorizacionQA(params, callingUserId);
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA']
   };
 }
 
