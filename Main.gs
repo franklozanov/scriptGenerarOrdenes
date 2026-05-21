@@ -151,6 +151,7 @@ function onOpenMain(email) {
   try {
     getInitialData();
     syncVerifCantDisponible();
+    hideUnauthorizedSheets_();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Use "Gestionar OA → 📝 Registrar Entrega / Novedad" para registrar novedades.', 'Sistema QMS', 7);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
@@ -231,6 +232,30 @@ function syncVerifCantDisponible() {
   } catch (e) {
     Logger.log("ERROR en syncVerifCantDisponible: " + e.message);
     Logger.log("Stack trace: " + e.stack);
+  }
+}
+
+/**
+ * Oculta todas las hojas del documento excepto las permitidas para el flujo operativo.
+ */
+function hideUnauthorizedSheets_() {
+  try {
+    var allowedSheets = ['Ordenes', 'RegistroNovedad', 'SolicitudesImpresion'];
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = ss.getSheets();
+    
+    for (var i = 0; i < sheets.length; i++) {
+      var sheet = sheets[i];
+      var sheetName = sheet.getName();
+      
+      if (allowedSheets.indexOf(sheetName) === -1) {
+        if (!sheet.isSheetHidden()) {
+          sheet.hideSheet();
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("ERROR en hideUnauthorizedSheets_: " + e.message);
   }
 }
 
