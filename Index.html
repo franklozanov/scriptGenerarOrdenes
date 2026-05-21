@@ -811,6 +811,11 @@
 
           // Guardar usuarios globalmente para acceder después
           window.globalUsers = data.users;
+          
+          // Inicializar URL de la WebApp para peticiones Fetch
+          if (data && data.webAppUrl) {
+            window.globalWebAppUrl = data.webAppUrl;
+          }
           document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
           document.getElementById('userName').addEventListener('input', updateGoButtonState);
 
@@ -1097,8 +1102,6 @@
 
           status.innerText = "🔄 Guardando en Drive y registrando impresión...";
 
-          console.log('DEBUG → orderNo:', orderNo, '| userId:', userId, '| totalPages:', totalPages, '| printType:', printType);
-
           // Paso 1: Guardar en Drive
           console.time('drive-save');
           let saveResult;
@@ -1277,6 +1280,12 @@
         status.innerText = "📨 Enviando solicitud a QA...";
         status.className = "info-text";
 
+        // Solicitar PIN de firma si no está predefinido en la sesión
+        let pin = window.globalUserPin || '';
+        if (!pin) {
+          pin = prompt("Por favor, ingrese su PIN de autorización para enviar esta solicitud:") || '';
+        }
+
         try {
           const response = await fetch(window.globalWebAppUrl, {
             method: 'POST',
@@ -1288,7 +1297,7 @@
               motivo: motivo,
               plantillas: JSON.stringify(config),
               userId: userId,
-              pinFirma: window.globalUserPin || ''
+              pinFirma: pin
             })
           });
 
