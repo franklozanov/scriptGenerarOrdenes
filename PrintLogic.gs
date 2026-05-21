@@ -579,6 +579,10 @@ function preparePrintPayload(orderNo, templateConfig) {
  * @throws {Error} Si hay problemas al guardar el PDF
  */
 function saveFinalUnifiedPDF(base64Data, orderNo) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) {
+    throw new Error("El sistema está procesando otra orden simultánea. Por favor, intente nuevamente en unos segundos.");
+  }
   try {
     var startedAt = new Date().getTime();
     var printConfig = getPrintConfig_();
@@ -658,6 +662,7 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     
     // Actualizar consecutivo en la hoja
     sheet.getRange(rowIndex, colConsecutivo).setValue(nextConsecutivo);
+    SpreadsheetApp.flush(); // Forzar escritura síncrona
     
     // Construir nombre de archivo
     var targetFileName = 'Orden_' + orderNo + '_' + nextConsecutivo + '.pdf';
@@ -676,7 +681,9 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var fileId = file.getId();
     
     var drivePreviewUrl = file.getUrl();
-    var viewerUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
+    
+    var webAppUrl = getWebAppUrl();
+    var viewerUrl = webAppUrl + '?action=secure&fileId=' + fileId + '&orderNo=' + orderNo;
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
     // Retornar URLs y consecutivo
@@ -691,6 +698,8 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
   } catch (e) {
     Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
     throw new Error("Error al guardar PDF final: " + e.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1098,5 +1107,93 @@ function procesarAprobacionImpresionQA(params, userId) {
   } catch (e) {
     Logger.log("Error en procesarAprobacionImpresionQA: " + e.message);
     throw new Error("Error al procesar aprobación: " + e.message);
+  }
+}
+
+/**
+ * Obtiene el archivo PDF en Base64 para el visor seguro.
+ * @param {string} fileId - ID del archivo en Drive
+ * @returns {string} PDF codificado en Base64
+ */
+function getPdfSeguroBase64(fileId) {
+  try {
+    var activeEmail = Session.getActiveUser().getEmail();
+    var userRecord = getUserRecordByEmail_(activeEmail);
+    
+    // Se requiere tener al menos permiso general de impresión o permiso de visor nativo
+    if (!userRecord || (!hasPermissionByRol(userRecord.rol, 'IMPRIMIR_ORDEN') && !hasPermissionByRol(userRecord.rol, 'VER_NATIVO_DRIVE'))) {
+      throw new Error("Acceso denegado. No tiene los permisos requeridos para visualizar este documento.");
+    }
+    
+    var file = DriveApp.getFileById(fileId);
+    var blob = file.getBlob();
+    return Utilities.base64Encode(blob.getBytes());
+  } catch (e) {
+    Logger.log("Error en getPdfSeguroBase64: " + e.message);
+    throw new Error("No se pudo acceder al documento o no existe.");
+  }
+}
+
+/**
+ * Evalúa permisos si el visor seguro falla en renderizar.
+ * Usa RBAC: Si tiene el permiso VER_NATIVO_DRIVE -> Retorna URL de Drive.
+ * Si NO tiene permiso -> Ejecuta rollback de impresión y retorna error.
+ */
+function handleViewerFallback(fileId, orderNo) {
+  var activeEmail = Session.getActiveUser().getEmail();
+  var userRecord = getUserRecordByEmail_(activeEmail);
+  
+  if (!userRecord) {
+    return { action: 'error', message: 'Usuario no encontrado para ejecutar recuperación.' };
+  }
+  
+  // Evaluamos usando el sistema de permisos (RBAC) centralizado.
+  // Requiere que la columna 'VER_NATIVO_DRIVE' exista en la hoja PermisosRoles.
+  var tienePermiso = hasPermissionByRol(userRecord.rol, 'VER_NATIVO_DRIVE');
+  
+  if (tienePermiso) {
+    return { 
+      action: 'redirect', 
+      url: 'https://drive.google.com/file/d/' + fileId + '/view' 
+    };
+  } else {
+    // Rollback para no contabilizar la impresión fallida en personal operativo
+    if (orderNo) {
+      rollbackPrint(orderNo, fileId);
+    }
+    return { 
+      action: 'error', 
+      message: 'Ha ocurrido un error al cargar el documento. Solicite al administrador realizar la reimpresión.' 
+    };
+  }
+}
+
+/**
+ * Revierte el conteo de una impresión fallida eliminando el PDF creado.
+ */
+function rollbackPrint(orderNo, fileId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colConsecutivo = getColumnIndexByNameCaseInsensitive(headers, 'ConsecutivoImp', true);
+    
+    var orderValues = sheet.getRange(1, colNoOrden, sheet.getLastRow(), 1).getValues();
+    for (var idx = 1; idx < orderValues.length; idx++) {
+      if (orderValues[idx] == orderNo) {
+        var cell = sheet.getRange(idx + 1, colConsecutivo);
+        var currentVal = Number(cell.getValue());
+        if (currentVal > 0) {
+          cell.setValue(currentVal - 1);
+        }
+        break;
+      }
+    }
+    
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch(e) {}
+    Logger.log("Rollback ejecutado exitosamente para orden: " + orderNo);
+  } catch(e) {
+    Logger.log("Error en rollbackPrint: " + e.message);
   }
 }

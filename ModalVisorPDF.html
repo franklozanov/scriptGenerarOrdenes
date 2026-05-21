@@ -120,6 +120,8 @@
     // Variables globales de estado del PDF
     let pdfDocument = null,
         currentPageNum = 1,
+        TARGET_FILE_ID = '<?!= typeof fileId !== "undefined" ? fileId : "" ?>',
+        TARGET_ORDER_NO = '<?!= typeof orderNo !== "undefined" ? orderNo : "" ?>',
         isPageRendering = false,
         pageNumPending = null,
         currentScale = 1.5,
@@ -138,8 +140,12 @@
         minHeight: 600
       });
 
-      // Solicitar el PDF al backend de GAS (Reemplaza getPdfSeguroBase64 por la función real de tu backend)
-      // El backend debe retornar el documento en formato Base64.
+      if (!TARGET_FILE_ID) {
+        showError('No se proporcionó un ID de archivo válido para visualizar.');
+        return;
+      }
+
+      // Solicitar el PDF al backend de GAS
       google.script.run
         .withSuccessHandler(function(base64Data) {
           hideLoading();
@@ -147,14 +153,39 @@
             rawPdfBase64 = base64Data;
             renderPdfFromBase64(base64Data);
           } else {
-            showError('No se encontró el documento solicitado.');
+            triggerFallback(new Error('No se recibió la información binaria del servidor.'));
           }
         })
-        .withFailureHandler(function(error) {
-          handleServerError(error, 'Carga de Documento');
-        })
-        .getPdfSeguroBase64(); // <--- IMPORTANTE: Asegúrate de tener esta función en tu código .gs
+        .withFailureHandler(triggerFallback)
+        .getPdfSeguroBase64(TARGET_FILE_ID);
     };
+
+    /**
+     * Dispara la compensación y evaluación RBAC del backend si el canvas falla.
+     */
+    function triggerFallback(error) {
+      console.error("Falla en motor PDF, iniciando contingencia:", error);
+      showLoading('Verificando acceso a visor de recuperación...');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.action === 'redirect') {
+            window.location.href = res.url;
+          } else {
+            hideLoading();
+            document.querySelector('.canvas-wrapper').innerHTML = `
+              <div style="text-align:center; padding:40px; color:#dc2626;">
+                <h3>⚠️ Fallo de Procesamiento de PDF</h3>
+                <p><b>${res.message}</b></p>
+              </div>`;
+            showError(res.message);
+          }
+        })
+        .withFailureHandler(function(err) {
+          hideLoading();
+          showError('Falla crítica en recuperación: ' + err.message);
+        })
+        .handleViewerFallback(TARGET_FILE_ID, TARGET_ORDER_NO);
+    }
 
     /**
      * Convierte Base64 a Uint8Array y carga el PDF
@@ -174,7 +205,7 @@
         hideLoading();
         renderPage(currentPageNum);
       }).catch(function(error) {
-        showError('Error procesando el PDF: ' + error.message);
+        triggerFallback(error);
       });
     }
 

@@ -17,50 +17,25 @@ function doGet(e) {
   var fileId = e.parameter.fileId;
   var action = e.parameter.action;
   
-  // Si action=viewpdf, servir el PDF directamente con headers inline
-  if (action === 'viewpdf' && fileId) {
-    try {
-      Logger.log('doGet: Intentando servir PDF con fileId: ' + fileId);
-      var file = DriveApp.getFileById(fileId);
-      
-      // Verificar que el archivo sea un PDF
-      if (file.getMimeType() !== 'application/pdf') {
-        throw new Error('El archivo no es un PDF válido');
-      }
-      
-      Logger.log('doGet: Archivo encontrado: ' + file.getName());
-      var blob = file.getBlob();
-      var base64 = Utilities.base64Encode(blob.getBytes());
-      Logger.log('doGet: PDF codificado en base64');
-      
-      // Servir el PDF usando data URI para que se abra en el visor del navegador
-      var html = '<!DOCTYPE html><html><head><title>' + file.getName() + '</title></head><body>' +
-        '<iframe src="data:application/pdf;base64,' + base64 + '" ' +
-        'style="position:fixed;top:0;left:0;width:100%;height:100%;border:none;" ' +
-        'type="application/pdf"></iframe>' +
-        '</body></html>';
-      
-      return HtmlService.createHtmlOutput(html)
-        .setTitle(file.getName())
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    } catch (error) {
-      Logger.log('doGet ERROR: ' + error.message);
-      return ContentService.createTextOutput('Error al cargar el PDF: ' + error.message + '\n\nFileId: ' + fileId)
-        .setMimeType(ContentService.MimeType.TEXT);
-    }
+  // Autenticación estricta en el entrypoint
+  var activeEmail = Session.getActiveUser().getEmail();
+  var userRecord = getUserRecordByEmail_(activeEmail);
+  if (!userRecord || userRecord.estado !== "Activo") {
+    return HtmlService.createHtmlOutput('<h1>Acceso Denegado</h1><p>Usuario no registrado o inactivo.</p>');
   }
   
-  // Comportamiento original: mostrar visor HTML
-  var html = HtmlService.createTemplateFromFile('PDFViewer')
-    .evaluate()
-    .setTitle('Visor de PDF')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  // Si action=secure, mostrar visor seguro con PDF.js
+  if (action === 'secure' && fileId) {
+    var htmlSecure = HtmlService.createTemplateFromFile('ModalVisorPDF');
+    htmlSecure.fileId = fileId;
+    htmlSecure.orderNo = e.parameter.orderNo || '';
+    return htmlSecure.evaluate()
+      .setTitle('Visor Restringido')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
   
-  // Inyectar fileId en el HTML
-  html = html.getContent().replace('{{fileId}}', fileId || '');
-  
-  return HtmlService.createHtmlOutput(html);
+  return HtmlService.createHtmlOutput('<h1>Ruta Inválida</h1><p>No se especificó una acción segura.</p>');
 }
 
 // --- ENDPOINT POST: Operaciones Privilegiadas ---
