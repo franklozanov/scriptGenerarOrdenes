@@ -116,6 +116,11 @@ function onOpenMain(email) {
     hasMainMenuItems = true;
   }
   
+  if (hasPermissionByRol(validUser.rol, PERMISOS.SOLICITAR_REIMPRESION)) {
+    mainMenu.addItem('📋 Solicitar Reimpresión', 'abrirModalSolicitarReimpresion');
+    hasMainMenuItems = true;
+  }
+  
   if (hasPermissionByRol(validUser.rol, PERMISOS.REGISTRAR_NOVEDAD)) {
     mainMenu.addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad');
     hasMainMenuItems = true;
