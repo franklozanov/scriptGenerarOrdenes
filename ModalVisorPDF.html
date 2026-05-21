@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visor de Documentos Seguro</title>
+  
+  <!-- FASE 6: Design System Centralizado -->
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  
+  <!-- Librería pre-compilada de PDF.js (Mejor práctica para GAS) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Configurar el worker necesario para procesar el PDF en segundo plano
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+
+  <style>
+    /* Estilos específicos del visor */
+    body { background-color: #f8fafc; }
+    
+    .viewer-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    /* Toolbar de controles restringidos (Sin botón de descarga) */
+    .toolbar-secure {
+      background-color: #1e293b;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tool-btn {
+      background-color: #334155;
+      color: white;
+      border: 1px solid #475569;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background-color 0.2s;
+    }
+
+    .tool-btn:hover:not(:disabled) { background-color: #475569; }
+    .tool-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .btn-print-secure {
+      background-color: var(--color-primary);
+      border-color: var(--color-primary-dark);
+      font-weight: bold;
+    }
+
+    .btn-print-secure:hover { background-color: var(--color-primary-dark); }
+
+    .page-info { font-size: 13px; font-weight: 500; }
+
+    /* Contenedor del Canvas */
+    .canvas-wrapper {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+      background-color: #cbd5e1;
+    }
+
+    #pdf-render-canvas {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      background-color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-layout">
+    <div class="toolbar-secure">
+      <div class="toolbar-group">
+        <button class="tool-btn" id="prev-page">⬅ Anterior</button>
+        <span class="page-info">Pág. <span id="page-num">0</span> de <span id="page-count">0</span></span>
+        <button class="tool-btn" id="next-page">Siguiente ➡</button>
+      </div>
+      <div class="toolbar-group">
+        <button class="tool-btn" id="zoom-out">➖ Zoom</button>
+        <button class="tool-btn" id="zoom-in">➕ Zoom</button>
+        <!-- Solo impresión permitida, descarga omitida intencionalmente -->
+        <button class="tool-btn btn-print-secure" id="print-doc">🖨️ Imprimir</button>
+      </div>
+    </div>
+    
+    <div class="canvas-wrapper">
+      <canvas id="pdf-render-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Scripts Globales -->
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+  
+  <!-- Overlay para la carga nativa -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Cargando documento seguro...</div>
+  </div>
+
+  <script>
+    // Variables globales de estado del PDF
+    let pdfDocument = null,
+        currentPageNum = 1,
+        isPageRendering = false,
+        pageNumPending = null,
+        currentScale = 1.5,
+        canvas = document.getElementById('pdf-render-canvas'),
+        ctx = canvas.getContext('2d'),
+        rawPdfBase64 = null;
+
+    // Inicialización al cargar la ventana
+    window.onload = function() {
+      // Usando el sistema de Drag & Resize de GlobalScripts
+      initializeModalDragResize({
+        title: 'Visor Restringido (Solo Lectura/Impresión)',
+        enableDrag: true,
+        enableResize: true,
+        minWidth: 800,
+        minHeight: 600
+      });
+
+      // Solicitar el PDF al backend de GAS (Reemplaza getPdfSeguroBase64 por la función real de tu backend)
+      // El backend debe retornar el documento en formato Base64.
+      google.script.run
+        .withSuccessHandler(function(base64Data) {
+          hideLoading();
+          if(base64Data) {
+            rawPdfBase64 = base64Data;
+            renderPdfFromBase64(base64Data);
+          } else {
+            showError('No se encontró el documento solicitado.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          handleServerError(error, 'Carga de Documento');
+        })
+        .getPdfSeguroBase64(); // <--- IMPORTANTE: Asegúrate de tener esta función en tu código .gs
+    };
+
+    /**
+     * Convierte Base64 a Uint8Array y carga el PDF
+     */
+    function renderPdfFromBase64(base64) {
+      showLoading('Renderizando documento...');
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdfDoc) {
+        pdfDocument = pdfDoc;
+        document.getElementById('page-count').textContent = pdfDoc.numPages;
+        hideLoading();
+        renderPage(currentPageNum);
+      }).catch(function(error) {
+        showError('Error procesando el PDF: ' + error.message);
+      });
+    }
+
+    /**
+     * Renderiza una página específica en el Canvas
+     */
+    function renderPage(num) {
+      isPageRendering = true;
+      pdfDocument.getPage(num).then(function(page) {
+        const viewport = page.getViewport({ scale: currentScale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport
+        };
+
+        page.render(renderContext).promise.then(function() {
+          isPageRendering = false;
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+        document.getElementById('page-num').textContent = num;
+      });
+    }
+
+    /**
+     * Encola el renderizado de la página si otra ya se está dibujando
+     */
+    function queueRenderPage(num) {
+      if (isPageRendering) {
+        pageNumPending = num;
+      } else {
+        renderPage(num);
+      }
+    }
+
+    // --- EVENTOS DE LA BARRA DE HERRAMIENTAS --- //
+
+    document.getElementById('prev-page').addEventListener('click', function() {
+      if (currentPageNum <= 1) return;
+      currentPageNum--;
+      queueRenderPage(currentPageNum);
+    });
+
+    document.getElementById('next-page').addEventListener('click', function() {
+      if (currentPageNum >= pdfDocument.numPages) return;
+      currentPageNum++;
+      queueRenderPage(currentPageNum);
+    });
+
+    document.getElementById('zoom-in').addEventListener('click', function() {
+      currentScale += 0.25;
+      queueRenderPage(currentPageNum);
+    });
+
+    document.getElementById('zoom-out').addEventListener('click', function() {
+      if (currentScale <= 0.5) return; // Limite mínimo de zoom
+      currentScale -= 0.25;
+      queueRenderPage(currentPageNum);
+    });
+
+    // Lógica de Impresión Segura
+    document.getElementById('print-doc').addEventListener('click', function() {
+      if(!rawPdfBase64) return;
+      
+      showLoading('Preparando cola de impresión...');
+      
+      // Creamos un Blob en memoria a partir del Base64 original
+      const binaryString = atob(rawPdfBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Usamos un iframe oculto para disparar el diálogo nativo de impresión sin exponer el archivo
+      const printIframe = document.createElement('iframe');
+      printIframe.style.display = 'none';
+      printIframe.src = blobUrl;
+      document.body.appendChild(printIframe);
+
+      printIframe.onload = function() {
+        hideLoading();
+        setTimeout(function() {
+          printIframe.contentWindow.focus();
+          printIframe.contentWindow.print();
+          // Limpieza posterior
+          setTimeout(function() {
+            URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(printIframe);
+          }, 60000); // Darle tiempo a la cola de impresión antes de destruir el objeto
+        }, 500);
+      };
+    });
+  </script>
+
+</body>
+</html>

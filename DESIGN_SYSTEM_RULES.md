@@ -228,6 +228,42 @@ Modal Individual (Solo overrides específicos)
 }
 ```
 
+### 🔒 Componente de Contraseña con Toggle
+
+**Descripción:** Input de contraseña con botón integrado para mostrar/ocultar el texto.
+
+**Uso:**
+```html
+<div class="form-group">
+  <label for="passwordField">Contraseña</label>
+  <div class="password-input-wrapper">
+    <input type="password" id="passwordField" placeholder="Contraseña">
+    <button type="button" id="togglePassword" class="password-toggle-btn" aria-label="Mostrar contraseña" title="Mostrar contraseña" onclick="togglePasswordVisibility('passwordField', 'togglePassword')">
+      <!-- Icono por defecto (ojo abierto) -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+    </button>
+  </div>
+</div>
+```
+
+**Estilos CSS (definidos en Theme.html):**
+- `.password-input-wrapper` - Contenedor con posicionamiento relativo
+- `.password-input-wrapper input` - Input con padding derecho para el botón
+- `.password-toggle-btn` - Botón posicionado absolutamente a la derecha
+- `.password-toggle-btn:hover` - Color de hover azul
+- `.password-toggle-btn svg` - Dimensiones del icono
+
+**Función JavaScript (definida en GlobalScripts.html):**
+- `togglePasswordVisibility(inputId, buttonId)` - Alterna entre `type="password"` y `type="text"`, cambia el icono SVG y actualiza atributos de accesibilidad
+
+**Accesibilidad:**
+- Incluir siempre `aria-label` y `title` en el botón
+- La función actualiza automáticamente estos atributos al alternar
+
+**Ejemplos de implementación:**
+- `ModalAutorizarQA.html` - PIN de autorización
+- `ModalAprobarImpresion.html` - PIN de autorización
+
 ---
 
 ## 📦 Contenedores y Layout
