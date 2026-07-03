@@ -1048,6 +1048,9 @@ function registrarSolicitudImpresion(params, userId) {
  */
 function procesarAprobacionImpresionQA(params, userId) {
   try {
+    params.userId = userId;
+    requireAuthorizedUserStrict_(params);
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
     if (!solicitudesSheet) throw new Error("La hoja 'SolicitudesImpresion' no existe.");

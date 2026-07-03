@@ -545,6 +545,9 @@ function procesarCargaOrdenesMasivas(params, userId) {
  */
 function procesarAutorizacionQA(params, userId) {
   try {
+    params.userId = userId;
+    requireAuthorizedUserStrict_(params);
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // Obtener información del usuario
