@@ -1165,7 +1165,7 @@
           }, 3000);
 
         } catch (pdfError) {
-          alert("Error generando PDF: " + pdfError.message);
+          showToast("Error generando PDF: " + pdfError.message, 'error');
           status.innerText = "❌ Error: " + pdfError.message;
           status.className = "error-text";
           btn.disabled = false;
@@ -1186,26 +1186,26 @@
           copies: parseInt(document.getElementById('val_' + t.key).value) || 0
         })).filter(c => c.copies > 0);
 
-        if (!orderNo || !userName) { alert("Error: Complete los campos No. de Orden y Usuario."); return; }
+        if (!orderNo || !userName) { showToast("Error: Complete los campos No. de Orden y Usuario.", 'error'); return; }
 
         // Verificar si hay plantillas sin acceso seleccionadas
         const noAccessSelected = config.filter(c => c.hasAccess === false);
         if (noAccessSelected.length > 0) {
           const names = noAccessSelected.map(c => globalTemplates.find(t => t.key === c.key).name).join('\n- ');
-          alert("Error: Las siguientes plantillas no tienen acceso:\n\n- " + names + "\n\nPor favor, use el menú 'Diagnosticar Plantillas' para resolver este problema.");
+          showToast("Error: Las siguientes plantillas no tienen acceso:\n\n- " + names + "\n\nPor favor, use el menú 'Diagnosticar Plantillas' para resolver este problema.", 'error');
           return;
         }
 
         // Buscar el UserID correspondiente al Nombre Completo seleccionado
         const userObj = window.QMSContext.users.find(u => u.nombreCompleto === userName);
         if (!userObj) {
-          alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
+          showToast("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.", 'error');
           document.getElementById('userName').focus();
           return;
         }
         const userId = userObj.userId;
 
-        if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
+        if (config.length === 0) { showToast("Error: Seleccione al menos 1 copia de alguna plantilla.", 'error'); return; }
 
         if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
           setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca "Documentos listos para impresión".');
@@ -1250,17 +1250,17 @@
 
         // Validaciones
         if (!orderNo || !userName) {
-          alert("Error: Complete los campos No. de Orden y Usuario.");
+          showToast("Error: Complete los campos No. de Orden y Usuario.", 'error');
           return;
         }
 
         if (config.length === 0) {
-          alert("Error: Seleccione al menos 1 copia de alguna plantilla para solicitar.");
+          showToast("Error: Seleccione al menos 1 copia de alguna plantilla para solicitar.", 'error');
           return;
         }
 
         if (!motivo) {
-          alert("Error: El motivo de la solicitud es obligatorio.");
+          showToast("Error: El motivo de la solicitud es obligatorio.", 'error');
           document.getElementById('solicitudMotivo').focus();
           return;
         }
@@ -1268,7 +1268,7 @@
         // Buscar el UserID correspondiente al Nombre Completo seleccionado
         const userObj = window.QMSContext.users.find(u => u.nombreCompleto === userName);
         if (!userObj) {
-          alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
+          showToast("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.", 'error');
           document.getElementById('userName').focus();
           return;
         }
@@ -1283,13 +1283,17 @@
         // Solicitar PIN de firma si no está predefinido en el contexto
         let pin = window.QMSContext.userPin || '';
         if (!pin) {
-          pin = prompt("Por favor, ingrese su PIN de autorización para enviar esta solicitud:") || '';
+          try {
+            pin = await promptSecurityPin("Por favor, ingrese su PIN de autorización para enviar esta solicitud:");
+          } catch (e) {
+            showToast(e.message, 'warning');
+            return;
+          }
         }
 
         try {
           const response = await fetch(window.QMSContext.webAppUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               operation: 'solicitarImpresion',
               noOrden: orderNo,
@@ -1313,12 +1317,12 @@
             console.log(`✓ Solicitud enviada exitosamente: ${result.idSolicitud}`);
           } else {
             // Error: mostrar alerta
-            alert("Error al enviar solicitud: " + result.message);
+            showToast("Error al enviar solicitud: " + result.message, 'error');
             status.innerText = "❌ Error: " + result.message;
             status.className = "error-text";
           }
         } catch (error) {
-          alert("Error de comunicación: " + error.message);
+          showToast("Error de comunicación: " + error.message, 'error');
           status.innerText = "❌ Error de comunicación: " + error.message;
           status.className = "error-text";
           console.error("Error en enviarSolicitudExtraordinaria:", error);

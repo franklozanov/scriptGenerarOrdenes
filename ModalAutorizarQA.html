@@ -131,18 +131,6 @@
     </div>
     
     <div class="authorization-section">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="pinFirma">PIN de Autorización (Firma Electrónica) *</label>
-          <div class="password-input-wrapper">
-            <input type="password" id="pinFirma" placeholder="Ingrese su PIN de autorización" maxlength="20">
-            <button type="button" id="togglePinFirma" class="password-toggle-btn" aria-label="Mostrar contraseña" title="Mostrar contraseña" onclick="togglePasswordVisibility('pinFirma', 'togglePinFirma')">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      
       <button id="btnAutorizar" class="btn btn-primary" onclick="autorizarOrdenes()">
         ✅ Firmar y Autorizar Seleccionadas
       </button>
@@ -271,18 +259,20 @@
       return selectedIds;
     }
     
-    function autorizarOrdenes() {
+    async function autorizarOrdenes() {
       var selectedIds = getSelectedOrdenes();
-      var pinFirma = document.getElementById('pinFirma').value.trim();
       
       // Validaciones
       if (selectedIds.length === 0) {
-        showAlert('Debe seleccionar al menos una orden para autorizar.', 'warning');
+        showToast('Debe seleccionar al menos una orden para autorizar.', 'warning');
         return;
       }
       
-      if (!pinFirma) {
-        showAlert('Debe ingresar el PIN de autorización.', 'warning');
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese su PIN para autorizar las órdenes seleccionadas:');
+      } catch (e) {
+        showToast(e.message, 'warning');
         return;
       }
       
@@ -304,8 +294,7 @@
         hideLoading();
         
         if (data.status === 'success') {
-          showAlert(data.message || 'Órdenes autorizadas exitosamente.', 'success');
-          document.getElementById('pinFirma').value = '';
+          showToast(data.message || 'Órdenes autorizadas exitosamente.', 'success');
           loadOrdenesSolicitadas(); // Recargar tabla
         } else {
           showAlert(data.message || 'Error al autorizar órdenes.', 'error');

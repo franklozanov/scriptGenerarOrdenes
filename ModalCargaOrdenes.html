@@ -100,16 +100,8 @@
     </div>
 
     <form id="cargaForm">
-      <!-- 21 CFR Part 11: PIN de confirmación (Firma Electrónica) -->
-      <div class="form-row" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
-        <div class="form-group" style="width: 50%;">
-          <label for="userPin">PIN de Autorización (Firma Electrónica) <span style="color: red;">*</span></label>
-          <input type="password" id="userPin" required maxlength="6" placeholder="Ingrese su PIN" style="letter-spacing: 3px; font-weight: bold; text-align: center;">
-        </div>
-      </div>
-
-      <div class="button-group" style="margin-top: 20px;">
-        <button type="submit" class="btn btn-primary" id="btnSubmit">Cargar Órdenes</button>
+      <div style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px; display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-primary" onclick="guardarDatos()">Guardar Órdenes</button>
         <button type="button" class="btn btn-secondary" id="btnCancel">Cancelar</button>
       </div>
     </form>
@@ -152,7 +144,6 @@
 
       document.getElementById('btnAddRow').addEventListener('click', addOrderRow);
       document.getElementById('btnClearTable').addEventListener('click', clearTable);
-      document.getElementById('cargaForm').addEventListener('submit', handleSubmit);
 
       // Event listener para pegar datos de Excel
       document.addEventListener('paste', handlePaste);
@@ -334,19 +325,19 @@
       });
     }
 
-    function handleSubmit(e) {
-      e.preventDefault();
-      
+    async function guardarDatos() {
       var records = collectTableData();
-      var pin = document.getElementById('userPin').value;
 
       if (records.length === 0) {
         showError('No hay datos para cargar. Agregue filas a la tabla.');
         return;
       }
-
-      if (!pin) {
-        showError('El PIN de autorización es obligatorio.');
+      
+      let pin;
+      try {
+        pin = await promptSecurityPin('Ingrese su PIN para autorizar la carga masiva:');
+      } catch (e) {
+        showToast(e.message, 'warning');
         return;
       }
 

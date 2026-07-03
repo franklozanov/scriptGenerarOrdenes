@@ -45,17 +45,39 @@
    * @param {string} type - Tipo de alerta: 'success', 'error', 'warning'
    */
   function showAlert(message, type = 'info') {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type}`;
-    alertDiv.textContent = message;
+    // Buscar o crear el contenedor de toasts
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
     
-    const container = document.querySelector('.container') || document.body;
-    container.insertBefore(alertDiv, container.firstChild);
+    // Icono según tipo
+    let icon = 'ℹ️';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+    if (type === 'warning') icon = '⚠️';
+
+    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-message">${message}</span>`;
+    
+    toastContainer.appendChild(toast);
+    
+    // Forzar reflow para animación
+    toast.offsetHeight;
+    toast.classList.add('show');
     
     setTimeout(() => {
-      alertDiv.remove();
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
     }, 5000);
   }
+
+  // Alias estándar para la nueva nomenclatura de notificaciones
+  const showToast = showAlert;
 
   /**
    * Muestra un mensaje de éxito y cierra el modal
@@ -98,7 +120,125 @@
    */
   function validateEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
+    return re.test(String(email).toLowerCase());
+  }
+
+  /**
+   * Muestra el modal global de PIN de seguridad de 4 dígitos.
+   * @param {string} message - Mensaje a mostrar en el modal
+   * @returns {Promise<string>} Promesa que resuelve con el PIN o rechaza si se cancela
+   */
+  function promptSecurityPin(message = "Ingrese su PIN de autorización (4 dígitos)") {
+    return new Promise((resolve, reject) => {
+      // Eliminar modal anterior si existe
+      let existingOverlay = document.querySelector('.pin-overlay');
+      if (existingOverlay) existingOverlay.remove();
+
+      // Crear contenedor
+      const overlay = document.createElement('div');
+      overlay.className = 'pin-overlay';
+      
+      overlay.innerHTML = `
+        <div class="pin-modal">
+          <h3>Autorización Requerida</h3>
+          <p>${message}</p>
+          <div class="pin-display">
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+          </div>
+          <div class="pin-pad">
+            <button class="pin-btn">1</button>
+            <button class="pin-btn">2</button>
+            <button class="pin-btn">3</button>
+            <button class="pin-btn">4</button>
+            <button class="pin-btn">5</button>
+            <button class="pin-btn">6</button>
+            <button class="pin-btn">7</button>
+            <button class="pin-btn">8</button>
+            <button class="pin-btn">9</button>
+            <button class="pin-btn action-btn cancel-btn">❌</button>
+            <button class="pin-btn">0</button>
+            <button class="pin-btn action-btn delete-btn">⌫</button>
+          </div>
+          <input type="password" inputmode="numeric" maxlength="4" class="hidden-pin-input" autofocus>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const dots = overlay.querySelectorAll('.pin-dot');
+      const hiddenInput = overlay.querySelector('.hidden-pin-input');
+      let currentPin = "";
+
+      function updateDots() {
+        dots.forEach((dot, index) => {
+          if (index < currentPin.length) {
+            dot.classList.add('filled');
+          } else {
+            dot.classList.remove('filled');
+          }
+        });
+      }
+
+      function submitPin() {
+        if (currentPin.length === 4) {
+          overlay.classList.add('fade-out');
+          setTimeout(() => {
+            overlay.remove();
+            resolve(currentPin);
+          }, 200);
+        }
+      }
+
+      function handleInput(val) {
+        if (currentPin.length < 4) {
+          currentPin += val;
+          hiddenInput.value = currentPin;
+          updateDots();
+          if (currentPin.length === 4) {
+            setTimeout(submitPin, 100);
+          }
+        }
+      }
+
+      function handleDelete() {
+        if (currentPin.length > 0) {
+          currentPin = currentPin.slice(0, -1);
+          hiddenInput.value = currentPin;
+          updateDots();
+        }
+      }
+
+      function handleCancel() {
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+          overlay.remove();
+          reject(new Error("PIN cancelado por el usuario"));
+        }, 200);
+      }
+
+      // Listeners
+      const padButtons = overlay.querySelectorAll('.pin-pad .pin-btn:not(.action-btn)');
+      padButtons.forEach(btn => {
+        btn.addEventListener('click', () => handleInput(btn.textContent));
+      });
+
+      overlay.querySelector('.delete-btn').addEventListener('click', handleDelete);
+      overlay.querySelector('.cancel-btn').addEventListener('click', handleCancel);
+
+      hiddenInput.addEventListener('input', (e) => {
+        currentPin = hiddenInput.value.replace(/\D/g, '').slice(0, 4);
+        hiddenInput.value = currentPin;
+        updateDots();
+        if (currentPin.length === 4) {
+          setTimeout(submitPin, 100);
+        }
+      });
+      
+      setTimeout(() => hiddenInput.focus(), 100);
+      overlay.addEventListener('click', () => hiddenInput.focus());
+    });
   }
 
   /**

@@ -144,18 +144,6 @@
     </div>
     
     <div class="authorization-section">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="pinFirma">PIN de Autorización (Firma Electrónica) *</label>
-          <div class="password-input-wrapper">
-            <input type="password" id="pinFirma" placeholder="Ingrese su PIN de autorización" maxlength="20">
-            <button type="button" id="togglePinFirma" class="password-toggle-btn" aria-label="Mostrar contraseña" title="Mostrar contraseña" onclick="togglePasswordVisibility('pinFirma', 'togglePinFirma')">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      
       <div class="action-buttons">
         <button id="btnAprobar" class="btn btn-primary" onclick="procesarAprobacion('Aprobada')">
           ✅ Aprobar Seleccionadas
@@ -292,25 +280,22 @@
       return selectedIds;
     }
     
-    function procesarAprobacion(accion) {
+    async function procesarAprobacion(accion) {
       var selectedIds = getSelectedSolicitudes();
-      var pinFirma = document.getElementById('pinFirma').value.trim();
       
       // Validaciones
       if (selectedIds.length === 0) {
-        showAlert('Debe seleccionar al menos una solicitud para procesar.', 'warning');
-        return;
-      }
-      
-      if (!pinFirma) {
-        showAlert('Debe ingresar el PIN de autorización.', 'warning');
+        showToast('Debe seleccionar al menos una solicitud para procesar.', 'warning');
         return;
       }
       
       var accionTexto = accion === 'Aprobada' ? 'aprobar' : 'rechazar';
       
-      // Confirmación
-      if (!confirm('¿Está seguro que desea ' + accionTexto + ' las ' + selectedIds.length + ' solicitud(es) seleccionada(s)?')) {
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese su PIN para ' + accionTexto + ' las solicitudes seleccionadas:');
+      } catch (e) {
+        showToast(e.message, 'warning');
         return;
       }
       
@@ -333,8 +318,7 @@
         hideLoading();
         
         if (data.status === 'success') {
-          showAlert(data.message || 'Solicitudes procesadas exitosamente.', 'success');
-          document.getElementById('pinFirma').value = '';
+          showToast(data.message || 'Solicitudes procesadas exitosamente.', 'success');
           document.getElementById('selectAll').checked = false;
           loadSolicitudesPendientes(); // Recargar tabla
         } else {

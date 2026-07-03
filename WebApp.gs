@@ -212,26 +212,39 @@ function handlePrivilegedOperation_(params) {
  * @throws {Error} Si el usuario no existe, no está activo o el PIN es incorrecto.
  */
 function requireAuthorizedUserStrict_(params) {
-  // 1. Obtener la identidad REAL de la sesión de Google (Insuplantable si la WebApp requiere login)
-  var activeEmail = Session.getActiveUser().getEmail();
-  if (!activeEmail) {
-    throw new Error("No se pudo verificar la identidad de Google. Inicie sesión nuevamente.");
+  var userId = params.userId;
+  var pinRecibido = params.pinFirma || params.pin;
+
+  if (!userId) {
+    // Fallback: Si no mandan userId, intentamos obtenerlo de la sesión activa
+    var activeEmail = Session.getActiveUser().getEmail();
+    if (!activeEmail) {
+      throw new Error("No se proporcionó el UserID y no se pudo verificar la identidad de Google. Inicie sesión nuevamente.");
+    }
+    var userByEmail = getUserRecordByEmail_(activeEmail);
+    if (!userByEmail) throw new Error("ACCESO DENEGADO: El correo " + activeEmail + " no está registrado.");
+    userId = userByEmail.userId;
   }
 
-  // 2. Buscar usuario en base de datos (Hoja Usuarios)
-  var validUser = getUserRecordByEmail_(activeEmail);
+  // 1. Buscar usuario en base de datos (Hoja Usuarios) por UserID
+  var validUser = getUserRecordByUserId_(userId);
   if (!validUser) {
-    throw new Error("ACCESO DENEGADO: El correo " + activeEmail + " no está registrado en el sistema.");
+    throw new Error("ACCESO DENEGADO: El usuario con ID " + userId + " no está registrado en el sistema.");
   }
 
   if (validUser.estado !== "Activo") {
     throw new Error("ACCESO DENEGADO: Su usuario se encuentra inactivo.");
   }
 
-  // 3. Validar Firma Electrónica (PIN) para solventar el "Timeout"
-  var pinRecibido = params.pinFirma || params.pin;
+  // 2. Validar Firma Electrónica (PIN)
   if (!pinRecibido || pinRecibido.toString() !== validUser.pin.toString()) {
     throw new Error("FIRMA INVÁLIDA: El PIN ingresado es incorrecto.");
+  }
+
+  // Loguear inconsistencias de sesión si existen (Auditoría)
+  var sessionEmail = Session.getActiveUser().getEmail();
+  if (sessionEmail && sessionEmail.toLowerCase() !== validUser.email.toLowerCase()) {
+    Logger.log("AUDITORÍA: Sesión activa (" + sessionEmail + ") ejecutando acción en nombre de (" + validUser.email + "). Autorizado por PIN.");
   }
 
   return validUser.userId;
