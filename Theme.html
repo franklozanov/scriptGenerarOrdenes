@@ -338,73 +338,36 @@
 
   .pin-overlay.fade-out { animation: fadeOut 0.2s ease forwards; }
 
-  .pin-modal {
+  .modern-pin-modal {
     background: white;
-    padding: 32px 24px;
-    border-radius: 16px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     text-align: center;
     width: 320px;
-    position: relative;
-    overflow: hidden;
+    max-width: 90%;
   }
 
-  .pin-modal h3 { color: #1e293b; margin-bottom: 8px; font-size: 18px; }
-  .pin-modal p { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+  .modern-pin-modal h3 { margin-top: 0; color: #1e293b; font-size: 18px; margin-bottom: 10px; }
+  .modern-pin-modal p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
 
-  .pin-display {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    margin-bottom: 32px;
+  .pin-inputs-container { display: flex; justify-content: center; gap: 12px; margin-bottom: 24px; }
+
+  .modern-pin-input {
+    width: 50px; height: 60px; font-size: 24px; text-align: center;
+    border: 2px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f172a; transition: all 0.2s;
   }
 
-  .pin-dot {
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    border: 2px solid #cbd5e1;
-    transition: all 0.2s;
+  .modern-pin-input:focus {
+    outline: none; border-color: #3b82f6; background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
-  .pin-dot.filled {
-    background-color: #1976d2;
-    border-color: #1976d2;
-    transform: scale(1.2);
-  }
+  .modern-pin-input::-webkit-outer-spin-button,
+  .modern-pin-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-  .pin-pad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    max-width: 240px;
-    margin: 0 auto;
-  }
-
-  .pin-btn {
-    aspect-ratio: 1;
-    border-radius: 50%;
-    border: none;
-    background: #f1f5f9;
-    color: #334155;
-    font-size: 24px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.1s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .pin-btn:active { background: #e2e8f0; transform: scale(0.95); }
-  
-  .pin-btn.action-btn { background: transparent; color: #64748b; font-size: 20px; }
-  .pin-btn.action-btn:active { background: #f1f5f9; }
-
-  .hidden-pin-input {
-    position: absolute;
-    opacity: 0;
-    top: -100px;
-  }
+  .pin-actions { display: flex; justify-content: center; }
+  .pin-actions .cancel-btn { width: 100%; padding: 12px; }
 
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
@@ -448,6 +411,9 @@
     font-size: 14px;
     font-weight: 500;
   }
+
+  /* === PIN MODAL === */
+
 
   /* === PROGRESS BAR === */
   .progress-container {

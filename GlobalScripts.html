@@ -139,74 +139,33 @@
       overlay.className = 'pin-overlay';
       
       overlay.innerHTML = `
-        <div class="pin-modal">
+        <div class="pin-modal modern-pin-modal">
           <h3>Autorización Requerida</h3>
           <p>${message}</p>
-          <div class="pin-display">
-            <div class="pin-dot"></div>
-            <div class="pin-dot"></div>
-            <div class="pin-dot"></div>
-            <div class="pin-dot"></div>
+          <div class="pin-inputs-container">
+            <input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric" autofocus>
+            <input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+            <input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+            <input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
           </div>
-          <div class="pin-pad">
-            <button class="pin-btn">1</button>
-            <button class="pin-btn">2</button>
-            <button class="pin-btn">3</button>
-            <button class="pin-btn">4</button>
-            <button class="pin-btn">5</button>
-            <button class="pin-btn">6</button>
-            <button class="pin-btn">7</button>
-            <button class="pin-btn">8</button>
-            <button class="pin-btn">9</button>
-            <button class="pin-btn action-btn cancel-btn">❌</button>
-            <button class="pin-btn">0</button>
-            <button class="pin-btn action-btn delete-btn">⌫</button>
+          <div class="pin-actions">
+            <button class="btn btn-secondary cancel-btn">Cancelar</button>
           </div>
-          <input type="password" inputmode="numeric" maxlength="4" class="hidden-pin-input" autofocus>
         </div>
       `;
       document.body.appendChild(overlay);
 
-      const dots = overlay.querySelectorAll('.pin-dot');
-      const hiddenInput = overlay.querySelector('.hidden-pin-input');
-      let currentPin = "";
-
-      function updateDots() {
-        dots.forEach((dot, index) => {
-          if (index < currentPin.length) {
-            dot.classList.add('filled');
-          } else {
-            dot.classList.remove('filled');
-          }
-        });
-      }
+      const inputs = overlay.querySelectorAll('.modern-pin-input');
+      const cancelBtn = overlay.querySelector('.cancel-btn');
 
       function submitPin() {
-        if (currentPin.length === 4) {
+        let pin = Array.from(inputs).map(i => i.value).join('');
+        if (pin.length === 4) {
           overlay.classList.add('fade-out');
           setTimeout(() => {
             overlay.remove();
-            resolve(currentPin);
+            resolve(pin);
           }, 200);
-        }
-      }
-
-      function handleInput(val) {
-        if (currentPin.length < 4) {
-          currentPin += val;
-          hiddenInput.value = currentPin;
-          updateDots();
-          if (currentPin.length === 4) {
-            setTimeout(submitPin, 100);
-          }
-        }
-      }
-
-      function handleDelete() {
-        if (currentPin.length > 0) {
-          currentPin = currentPin.slice(0, -1);
-          hiddenInput.value = currentPin;
-          updateDots();
         }
       }
 
@@ -218,26 +177,58 @@
         }, 200);
       }
 
-      // Listeners
-      const padButtons = overlay.querySelectorAll('.pin-pad .pin-btn:not(.action-btn)');
-      padButtons.forEach(btn => {
-        btn.addEventListener('click', () => handleInput(btn.textContent));
+      inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+          // Solo permitir números
+          input.value = input.value.replace(/[^0-9]/g, '');
+          
+          if (input.value.length === 1) {
+            if (index < inputs.length - 1) {
+              inputs[index + 1].focus();
+            } else {
+              // Es el último input, enviar
+              setTimeout(submitPin, 100);
+            }
+          }
+        });
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && input.value === '') {
+            if (index > 0) {
+              inputs[index - 1].focus();
+              inputs[index - 1].value = '';
+            }
+          }
+        });
+        
+        // Manejar Pegado (Paste)
+        input.addEventListener('paste', (e) => {
+          e.preventDefault();
+          let pastedData = (e.clipboardData || window.clipboardData).getData('text');
+          let digits = pastedData.replace(/[^0-9]/g, '').substring(0, 4);
+          
+          if (digits.length > 0) {
+            for (let i = 0; i < digits.length; i++) {
+              if (index + i < inputs.length) {
+                inputs[index + i].value = digits[i];
+              }
+            }
+            if (index + digits.length - 1 < inputs.length) {
+              inputs[index + digits.length - 1].focus();
+            } else {
+              inputs[3].focus();
+            }
+            if (Array.from(inputs).map(i => i.value).join('').length === 4) {
+              setTimeout(submitPin, 100);
+            }
+          }
+        });
       });
 
-      overlay.querySelector('.delete-btn').addEventListener('click', handleDelete);
-      overlay.querySelector('.cancel-btn').addEventListener('click', handleCancel);
+      cancelBtn.addEventListener('click', handleCancel);
 
-      hiddenInput.addEventListener('input', (e) => {
-        currentPin = hiddenInput.value.replace(/\D/g, '').slice(0, 4);
-        hiddenInput.value = currentPin;
-        updateDots();
-        if (currentPin.length === 4) {
-          setTimeout(submitPin, 100);
-        }
-      });
-      
-      setTimeout(() => hiddenInput.focus(), 100);
-      overlay.addEventListener('click', () => hiddenInput.focus());
+      // Focus en el primer input
+      setTimeout(() => inputs[0].focus(), 100);
     });
   }
 
