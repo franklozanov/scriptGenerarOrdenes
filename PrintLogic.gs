@@ -902,7 +902,7 @@ function getOrdenesValidasParaImpresion() {
     var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
 
     var ordenesValidas = [];
-    var statusValidos = ['Autorizada', 'Impreso', 'Reimpreso'];
+    var statusValidos = ['Autorizada'];
 
     for (var i = 1; i < data.length; i++) {
       var noOrden = colNoOrden ? (data[i][colNoOrden - 1] || '').toString().trim() : '';
@@ -911,16 +911,11 @@ function getOrdenesValidasParaImpresion() {
       if (!noOrden) continue;
 
       if (statusValidos.indexOf(status) !== -1) {
-        var label = '';
-
-        if (status === 'Autorizada') {
-          label = noOrden + ' - Autorizada';
-        } else if (status === 'Impreso' || status === 'Reimpreso') {
-          if (solicitudesAprobadas[noOrden]) {
-            label = noOrden + ' - Solicitud Extra Aprobada';
-          } else {
-            label = noOrden + ' - Impresa (Requiere solicitar permiso)';
-          }
+        var label = noOrden + ' - Autorizada';
+        // Check if there is an approved request for this order even if it's not strictly Impreso,
+        // just in case we need to show extra info, though typically it applies to Impreso.
+        if (solicitudesAprobadas[noOrden]) {
+          label = noOrden + ' - Solicitud Extra Aprobada';
         }
 
         ordenesValidas.push({ noOrden: noOrden, label: label });
