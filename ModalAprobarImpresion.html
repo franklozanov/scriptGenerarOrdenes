@@ -330,34 +330,26 @@
       // Enviar solicitud
       showLoading(accion === 'Aprobada' ? 'Aprobando solicitudes...' : 'Rechazando solicitudes...');
       
-      fetch(window.QMSContext.webAppUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          operation: 'procesarAprobacionImpresionQA',
+      google.script.run
+        .withSuccessHandler(function(data) {
+          hideLoading();
+          if (data.status === 'success') {
+            showToast(data.message || 'Solicitudes procesadas exitosamente.', 'success');
+            document.getElementById('selectAll').checked = false;
+            loadSolicitudesPendientes(); // Recargar tabla
+          } else {
+            showAlert(data.message || 'Error al procesar solicitudes.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error de comunicación: ' + error.message);
+        })
+        .procesarAprobacionImpresionQA({
           targetIds: selectedIds,
           accion: accion,
-          pinFirma: pinFirma,
-          userId: currentUserId
-        })
-      })
-      .then(function(response) {
-        return response.json();
-      })
-      .then(function(data) {
-        hideLoading();
-        
-        if (data.status === 'success') {
-          showToast(data.message || 'Solicitudes procesadas exitosamente.', 'success');
-          document.getElementById('selectAll').checked = false;
-          loadSolicitudesPendientes(); // Recargar tabla
-        } else {
-          showAlert(data.message || 'Error al procesar solicitudes.', 'error');
-        }
-      })
-      .catch(function(error) {
-        hideLoading();
-        showError('Error de comunicación: ' + error.message);
-      });
+          pinFirma: pinFirma
+        }, currentUserId);
     }
   </script>
 </body>

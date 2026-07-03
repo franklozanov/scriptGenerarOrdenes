@@ -307,32 +307,24 @@
       // Enviar solicitud
       showLoading('Autorizando órdenes...');
       
-      fetch(globalWebAppUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          operation: 'autorizarOrdenesQA',
-          targetIds: selectedIds,
-          pinFirma: pinFirma,
-          userId: currentUserId
+      google.script.run
+        .withSuccessHandler(function(data) {
+          hideLoading();
+          if (data.status === 'success') {
+            showToast(data.message || 'Órdenes autorizadas exitosamente.', 'success');
+            loadOrdenesSolicitadas(); // Recargar tabla
+          } else {
+            showAlert(data.message || 'Error al autorizar órdenes.', 'error');
+          }
         })
-      })
-      .then(function(response) {
-        return response.json();
-      })
-      .then(function(data) {
-        hideLoading();
-        
-        if (data.status === 'success') {
-          showToast(data.message || 'Órdenes autorizadas exitosamente.', 'success');
-          loadOrdenesSolicitadas(); // Recargar tabla
-        } else {
-          showAlert(data.message || 'Error al autorizar órdenes.', 'error');
-        }
-      })
-      .catch(function(error) {
-        hideLoading();
-        showError('Error de comunicación: ' + error.message);
-      });
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error de comunicación: ' + error.message);
+        })
+        .procesarAutorizacionQA({
+          targetIds: selectedIds,
+          pinFirma: pinFirma
+        }, currentUserId);
     }
   </script>
 </body>

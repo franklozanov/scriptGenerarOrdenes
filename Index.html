@@ -1347,20 +1347,13 @@
         }
 
         try {
-          const response = await fetch(window.QMSContext.webAppUrl, {
-            method: 'POST',
-            body: JSON.stringify({
-              operation: 'solicitarImpresion',
-              noOrden: orderNo,
-              tipoSolicitud: tipoSolicitud,
-              motivo: motivo,
-              plantillas: JSON.stringify(config),
-              userId: userId,
-              pinFirma: pin
-            })
-          });
-
-          const result = await response.json();
+          const result = await gsRun('registrarSolicitudImpresion', [{
+            noOrden: orderNo,
+            tipoSolicitud: tipoSolicitud,
+            motivo: motivo,
+            plantillas: JSON.stringify(config),
+            pinFirma: pin
+          }, userId]);
 
           if (result.status === 'success') {
             // Éxito: ocultar panel, resetear formulario y mostrar mensaje

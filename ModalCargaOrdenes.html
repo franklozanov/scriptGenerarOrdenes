@@ -411,31 +411,23 @@
 
         showLoading('Cargando órdenes...');
 
-        fetch(globalWebAppUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain'
-          },
-          body: JSON.stringify(params)
-        })
-        .then(function(response) {
-          return response.json();
-        })
-        .then(function(result) {
-          hideLoading();
-          if (result.status === 'success') {
-            showAlert(result.message || 'Órdenes cargadas exitosamente.', 'success');
-            setTimeout(function() {
-              google.script.host.close();
-            }, 2000);
-          } else {
-            showError('Error al cargar órdenes: ' + (result.message || 'Error desconocido'));
-          }
-        })
-        .catch(function(error) {
-          hideLoading();
-          showError('Error al cargar órdenes: ' + error.message);
-        });
+        google.script.run
+          .withSuccessHandler(function(result) {
+            hideLoading();
+            if (result.status === 'success') {
+              showAlert(result.message || 'Órdenes cargadas exitosamente.', 'success');
+              setTimeout(function() {
+                google.script.host.close();
+              }, 2000);
+            } else {
+              showError(result.message || 'Error al guardar órdenes.');
+            }
+          })
+          .withFailureHandler(function(error) {
+            hideLoading();
+            showError('Error de comunicación: ' + error.message);
+          })
+          .procesarCargaOrdenesMasivas(params, currentUserId);
       }).catch(function(error) {
         hideLoading();
         showError('Error al procesar archivos: ' + error.message);

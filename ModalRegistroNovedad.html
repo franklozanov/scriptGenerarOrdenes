@@ -307,29 +307,21 @@
 
       showLoading('Registrando novedad...');
 
-      fetch(globalWebAppUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain'
-        },
-        body: JSON.stringify(params)
-      })
-      .then(function(response) {
-        return response.json();
-      })
-      .then(function(result) {
-        hideLoading();
-        if (result.status === 'success') {
-          showAlert('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
-          resetearCamposNovedad();
-        } else {
-          showError('Error al registrar novedad: ' + (result.message || 'Error desconocido'));
-        }
-      })
-      .catch(function(error) {
-        hideLoading();
-        showError('Error al registrar novedad: ' + error.message);
-      });
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          if (result.status === 'success') {
+            showAlert('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
+            resetearCamposNovedad();
+          } else {
+            showError(result.message || 'Error al registrar novedad.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error de comunicación: ' + error.message);
+        })
+        .procesarRegistroNovedad(params, currentUserId);
     }
 
     function resetearCamposNovedad() {

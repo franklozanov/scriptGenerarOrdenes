@@ -50,8 +50,6 @@ function getPendingOrdersList() {
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-    var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-    var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
     var colNoAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
     
     var lastRow = sheet.getLastRow();
@@ -62,31 +60,175 @@ function getPendingOrdersList() {
     var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     var data = dataRange.getValues();
     
-    var ordenesPendientesOA = [];
-    var ordenesPendientesCOA = [];
+    // 1. Obtener IDs de carpetas de Drive desde templates
+    var tplSheet = ss.getSheetByName('templates');
+    var tplData = tplSheet.getDataRange().getValues();
+    var tplHeaders = tplData[0];
+    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false) - 1;
+    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false) - 1;
+    
+    var folderOaId = "";
+    var folderCoaId = "";
+    
+    for (var i = 1; i < tplData.length; i++) {
+      var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+      if (key === "DOC_ORDENES") {
+        folderOaId = tplData[i][colValorIdx] ? extractDriveId(tplData[i][colValorIdx].toString().trim()) : "";
+      } else if (key === "DOC_ANALISIS") {
+        folderCoaId = tplData[i][colValorIdx] ? extractDriveId(tplData[i][colValorIdx].toString().trim()) : "";
+      }
+    }
+    
+    // 2. Función auxiliar optimizada para leer archivos en Drive
+    function getUploadedFilesOptimized(folderId, pendingSet) {
+      var filesMap = {};
+      if (!folderId) return filesMap;
+      
+      var pendingKeys = Object.keys(pendingSet);
+      if (pendingKeys.length === 0) return filesMap;
+      
+      try {
+        var folder = DriveApp.getFolderById(folderId);
+        
+        // Si hay menos de 5 archivos pendientes, es más rápido consultarlos individualmente
+        if (pendingKeys.length <= 5) {
+          for (var k = 0; k < pendingKeys.length; k++) {
+            var fileName = pendingKeys[k];
+            var files = folder.getFilesByName(fileName + ".pdf");
+            if (files.hasNext()) {
+              filesMap[fileName] = true;
+            } else {
+              files = folder.getFilesByName(fileName + ".PDF");
+              if (files.hasNext()) filesMap[fileName] = true;
+            }
+          }
+        } else {
+          // Si son muchos, es más rápido listar la carpeta
+          var files = folder.getFilesByType(MimeType.PDF);
+          while (files.hasNext()) {
+            var file = files.next();
+            var name = file.getName().replace(/\.pdf$/i, '').trim().toLowerCase();
+            // Solo nos interesa mapear si está en el set de pendientes
+            if (pendingSet[name]) {
+              filesMap[name] = true;
+            }
+          }
+        }
+      } catch(e) {
+        Logger.log("Error leyendo carpeta " + folderId + ": " + e.message);
+      }
+      return filesMap;
+    }
+    
+    // Preparación para sincronización visual de la hoja
+    var colStatusIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+    var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
+    var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+    var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    var needUpdate = colAdjuntoCOAIdx && colAdjuntoOAIdx && colEstadoCargaIdx;
+    
+    var updatesCOA = [];
+    var updatesOA = [];
+    var updatesEstado = [];
+    
+    // 3. Primer barrido: Identificar qué filas REALMENTE necesitan verificación
+    var rowsToProcess = [];
+    var pendingOASet = {};
+    var pendingCOASet = {};
     
     for (var i = 0; i < data.length; i++) {
       var noOrden = data[i][colNoOrdenCol - 1];
-      var estadoCOA = colAdjuntoCOACol ? data[i][colAdjuntoCOACol - 1] : "Pendiente";
-      var estadoOA = colAdjuntoOACol ? data[i][colAdjuntoOACol - 1] : "Pendiente";
       var noAnalisis = colNoAnalisisCol ? data[i][colNoAnalisisCol - 1] : null;
+      var status = colStatusIdx ? (data[i][colStatusIdx - 1] || "").toString().trim() : "";
+      var estadoCarga = colEstadoCargaIdx ? (data[i][colEstadoCargaIdx - 1] || "").toString().trim() : "";
       
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
-      var estadoCOAStr = estadoCOA ? estadoCOA.toString().trim() : "Pendiente";
-      var estadoOAStr = estadoOA ? estadoOA.toString().trim() : "Pendiente";
       var noAnalisisStr = noAnalisis ? noAnalisis.toString().trim() : "";
+      
+      // Preservar valores actuales por si se hace actualización masiva
+      if (needUpdate) {
+        updatesCOA.push([data[i][colAdjuntoCOAIdx - 1]]);
+        updatesOA.push([data[i][colAdjuntoOAIdx - 1]]);
+        updatesEstado.push([data[i][colEstadoCargaIdx - 1]]);
+      }
       
       if (!noOrdenStr) continue;
       
-      // Agregar a lista de OA pendientes si AdjuntoOA != "✅ Cargado"
-      if (estadoOAStr !== "✅ Cargado") {
-        ordenesPendientesOA.push(noOrdenStr);
+      // OPTIMIZACIÓN: Si ya está "Cerrada", "Impreso" o "✅ Cargados", omitimos consulta a Drive
+      var isClosed = (status === VALORES_STATUS.CERRADA || status === VALORES_STATUS.IMPRESO);
+      var isLoaded = (estadoCarga === VALORES_ESTADO_CARGA.CARGADOS);
+      
+      if (isClosed || isLoaded) {
+        continue; // No verificamos en Drive para ahorrar segundos valiosos
       }
       
-      // Agregar a lista de COA pendientes si AdjuntoCOA != "✅ Cargado" Y tiene NoAnalisis
-      if (estadoCOAStr !== "✅ Cargado" && noAnalisisStr) {
-        ordenesPendientesCOA.push(noAnalisisStr); // Usar NoAnalisis para COA
+      var noOrdenLower = noOrdenStr.toLowerCase();
+      var noAnalisisLower = noAnalisisStr.toLowerCase();
+      
+      rowsToProcess.push({
+        index: i,
+        noOrdenStr: noOrdenStr,
+        noOrdenLower: noOrdenLower,
+        noAnalisisStr: noAnalisisStr,
+        noAnalisisLower: noAnalisisLower
+      });
+      
+      pendingOASet[noOrdenLower] = true;
+      if (noAnalisisStr) {
+        pendingCOASet[noAnalisisLower] = true;
       }
+    }
+    
+    // Solo consultamos Drive si hay órdenes pendientes
+    var uploadedOA = {};
+    var uploadedCOA = {};
+    
+    if (rowsToProcess.length > 0) {
+      uploadedOA = getUploadedFilesOptimized(folderOaId, pendingOASet);
+      uploadedCOA = getUploadedFilesOptimized(folderCoaId, pendingCOASet);
+    }
+    
+    var ordenesPendientesOA = [];
+    var ordenesPendientesCOA = [];
+    
+    // 4. Segundo barrido: Procesar solo las filas pendientes y armar respuesta
+    for (var j = 0; j < rowsToProcess.length; j++) {
+      var rowData = rowsToProcess[j];
+      var idx = rowData.index;
+      
+      var oaCargado = uploadedOA[rowData.noOrdenLower] ? true : false;
+      var coaCargado = (rowData.noAnalisisStr && uploadedCOA[rowData.noAnalisisLower]) ? true : false;
+      
+      if (!oaCargado) {
+        ordenesPendientesOA.push(rowData.noOrdenStr);
+      }
+      
+      if (rowData.noAnalisisStr && !coaCargado) {
+        ordenesPendientesCOA.push(rowData.noAnalisisStr);
+      }
+      
+      // Sincronización visual de las columnas para las filas pendientes
+      if (needUpdate) {
+        var valOa = oaCargado ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE;
+        var valCoa = coaCargado ? VALORES_DOCUMENTO.CARGADO : (rowData.noAnalisisStr ? VALORES_DOCUMENTO.PENDIENTE : VALORES_DOCUMENTO.PENDIENTE);
+        
+        var estadoConsolidado;
+        if (oaCargado && (coaCargado || !rowData.noAnalisisStr)) estadoConsolidado = VALORES_ESTADO_CARGA.CARGADOS;
+        else if (oaCargado && !coaCargado) estadoConsolidado = VALORES_ESTADO_CARGA.PENDIENTE_COA;
+        else if (!oaCargado && coaCargado) estadoConsolidado = VALORES_ESTADO_CARGA.PENDIENTE_OA;
+        else estadoConsolidado = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
+        
+        updatesCOA[idx] = [valCoa];
+        updatesOA[idx] = [valOa];
+        updatesEstado[idx] = [estadoConsolidado];
+      }
+    }
+    
+    // Escribir en bloque las actualizaciones de columnas para que el usuario las vea
+    if (needUpdate) {
+      sheet.getRange(2, colAdjuntoCOAIdx, updatesCOA.length, 1).setValues(updatesCOA);
+      sheet.getRange(2, colAdjuntoOAIdx, updatesOA.length, 1).setValues(updatesOA);
+      sheet.getRange(2, colEstadoCargaIdx, updatesEstado.length, 1).setValues(updatesEstado);
     }
     
     Logger.log("✓ Órdenes con OA pendiente: " + ordenesPendientesOA.length);
@@ -187,13 +329,10 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja. Puede haber sido eliminada mientras el modal estaba abierto.' };
     }
 
-    // Validación: verificar que el documento específico esté pendiente
-    var currentEstadoDoc = data[targetRowIndex - 1][targetAdjuntoCol - 1];
-    var currentEstadoDocStr = currentEstadoDoc ? currentEstadoDoc.toString().trim() : "Pendiente";
-    
-    if (currentEstadoDocStr === "✅ Cargado") {
-      return { status: 'error', message: 'El documento "' + docType + '" para "' + referenceNo + '" ya está cargado. Actualice el modal.' };
-    }
+    // En lugar de verificar el texto de la celda de la hoja, comprobamos si el archivo existe físicamente en la carpeta de Drive
+    var targetFileName = referenceNo + ".pdf";
+    // Esto se maneja más adelante en "Manejo de Históricos", por lo que aquí no bloquearemos si existe físicamente, a menos que realmente no queramos sobrescribir.
+    // La sobrescritura se maneja abajo de forma estándar.
 
     // Obtener carpeta desde templates
     var tplSheet = ss.getSheetByName('templates');
