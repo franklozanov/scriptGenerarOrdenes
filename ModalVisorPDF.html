@@ -18,7 +18,7 @@
 
   <style>
     /* Estilos específicos del visor */
-    body { background-color: #f8fafc; }
+    body { background-color: #f8fafc; margin: 0; user-select: none; } /* Prevenir selección de texto */
     
     .viewer-layout {
       display: flex;
@@ -83,10 +83,28 @@
     #pdf-render-canvas {
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
       background-color: white;
+      pointer-events: none; /* Previene interacción directa (ej. arrastrar imagen) */
+    }
+
+    /* Regla CSS Anti-Impresión de Pantalla: 
+       Si el usuario fuerza Ctrl+P en la ventana principal, saldrá en blanco */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      body::after {
+        content: "El documento solo puede ser impreso usando el botón seguro de imprimir.";
+        visibility: visible;
+        display: block;
+        text-align: center;
+        margin-top: 50px;
+        font-family: sans-serif;
+      }
     }
   </style>
 </head>
-<body>
+<!-- Bloquear clic derecho a nivel de body -->
+<body oncontextmenu="return false;">
   <div class="viewer-layout">
     <div class="toolbar-secure">
       <div class="toolbar-group">
@@ -128,6 +146,18 @@
         canvas = document.getElementById('pdf-render-canvas'),
         ctx = canvas.getContext('2d'),
         rawPdfBase64 = null;
+
+    // Prevención de atajos de teclado (Ctrl+S, Ctrl+P)
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        showError('La descarga está deshabilitada por políticas de seguridad.');
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        document.getElementById('print-doc').click(); // Interceptar y usar nuestra impresión
+      }
+    });
 
     // Inicialización al cargar la ventana
     window.onload = function() {
@@ -286,22 +316,30 @@
       const blob = new Blob([bytes], { type: 'application/pdf' });
       const blobUrl = URL.createObjectURL(blob);
 
-      // Usamos un iframe oculto para disparar el diálogo nativo de impresión sin exponer el archivo
+      // Usar iframes posicionado fuera de pantalla (más robusto que display: none)
       const printIframe = document.createElement('iframe');
-      printIframe.style.display = 'none';
+      printIframe.style.position = 'absolute';
+      printIframe.style.top = '-10000px';
+      printIframe.style.left = '-10000px';
+      printIframe.style.width = '1px';
+      printIframe.style.height = '1px';
       printIframe.src = blobUrl;
       document.body.appendChild(printIframe);
 
       printIframe.onload = function() {
         hideLoading();
         setTimeout(function() {
-          printIframe.contentWindow.focus();
-          printIframe.contentWindow.print();
+          try {
+            printIframe.contentWindow.focus();
+            printIframe.contentWindow.print();
+          } catch(e) {
+            showError("El navegador bloqueó la impresión. Intente nuevamente.");
+          }
           // Limpieza posterior
           setTimeout(function() {
             URL.revokeObjectURL(blobUrl);
             document.body.removeChild(printIframe);
-          }, 60000); // Darle tiempo a la cola de impresión antes de destruir el objeto
+          }, 120000); // Darle tiempo a la cola de impresión antes de destruir el objeto
         }, 500);
       };
     });
