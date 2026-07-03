@@ -176,22 +176,43 @@
         maxHeight: 900
       });
       
-      // Obtener datos iniciales
-      showLoading('Cargando datos...');
-      google.script.run
-        .withSuccessHandler(function(data) {
-          if (data && data.webAppUrl) {
-            window.QMSContext.webAppUrl = data.webAppUrl;
-          }
-          setFrontendPermissions(data.userPermissions);
-          loadSolicitudesPendientes();
-        })
-        .withFailureHandler(function(error) {
-          hideLoading();
-          showError('Error al cargar datos iniciales: ' + error.message);
-          document.getElementById('mainContainer').style.display = 'block';
-        })
-        .getInitialData();
+      // Inyección de variables de servidor para carga instantánea
+      var serverInitialData = null;
+      var serverSolicitudes = null;
+      <? try { ?>
+        serverInitialData = <?!= typeof initialData !== 'undefined' ? initialData : 'null' ?>;
+      <? } catch(e) {} ?>
+      <? try { ?>
+        serverSolicitudes = <?!= typeof solicitudesPendientes !== 'undefined' ? solicitudesPendientes : 'null' ?>;
+      <? } catch(e) {} ?>
+      
+      if (serverInitialData && serverSolicitudes) {
+        // Carga ultrarrápida (0 segs)
+        if (serverInitialData.webAppUrl) {
+          window.QMSContext.webAppUrl = serverInitialData.webAppUrl;
+        }
+        setFrontendPermissions(serverInitialData.userPermissions);
+        solicitudesData = serverSolicitudes;
+        document.getElementById('mainContainer').style.display = 'block';
+        renderTable(serverSolicitudes);
+      } else {
+        // Fallback a carga tradicional
+        showLoading('Cargando datos...');
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (data && data.webAppUrl) {
+              window.QMSContext.webAppUrl = data.webAppUrl;
+            }
+            setFrontendPermissions(data.userPermissions);
+            loadSolicitudesPendientes();
+          })
+          .withFailureHandler(function(error) {
+            hideLoading();
+            showError('Error al cargar datos iniciales: ' + error.message);
+            document.getElementById('mainContainer').style.display = 'block';
+          })
+          .getInitialData();
+      }
     };
     
     function loadSolicitudesPendientes() {

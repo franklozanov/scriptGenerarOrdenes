@@ -21,7 +21,11 @@
  * Muestra el panel Index.html con las opciones de impresión.
  */
 function openPrintDialog() {
-  var template = HtmlService.createTemplateFromFile('Index');
+    var template = HtmlService.createTemplateFromFile('Index');
+  // Inyección de servidor (Server-side templating) para velocidad
+  template.initialData = JSON.stringify(getInitialData());
+  template.ordenesValidas = JSON.stringify(getOrdenesValidasParaImpresion());
+  
   var html = template.evaluate()
     .setWidth(550).setHeight(700);
   SpreadsheetApp.getUi().showModelessDialog(html, ' ');
@@ -845,6 +849,10 @@ function getSolicitudesPendientesQA() {
  */
 function abrirModalAprobarImpresion() {
   var template = HtmlService.createTemplateFromFile('ModalAprobarImpresion');
+  // Inyección de servidor (Server-side templating) para velocidad
+  template.initialData = JSON.stringify(getInitialData());
+  template.solicitudesPendientes = JSON.stringify(getSolicitudesPendientesQA());
+  
   var html = template.evaluate()
     .setWidth(950).setHeight(700);
   SpreadsheetApp.getUi().showModelessDialog(html, 'Aprobar Impresiones');

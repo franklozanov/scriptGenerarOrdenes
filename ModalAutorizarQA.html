@@ -159,22 +159,43 @@
         maxHeight: 900
       });
       
-      // Obtener datos iniciales
-      showLoading('Cargando datos...');
-      google.script.run
-        .withSuccessHandler(function(data) {
-          if (data && data.webAppUrl) {
-            globalWebAppUrl = data.webAppUrl;
-          }
-          setFrontendPermissions(data.userPermissions);
-          loadOrdenesSolicitadas();
-        })
-        .withFailureHandler(function(error) {
-          hideLoading();
-          showError('Error al cargar datos iniciales: ' + error.message);
-          document.getElementById('mainContainer').style.display = 'block';
-        })
-        .getInitialData();
+      // Inyección de variables de servidor para carga instantánea
+      var serverInitialData = null;
+      var serverOrdenes = null;
+      <? try { ?>
+        serverInitialData = <?!= typeof initialData !== 'undefined' ? initialData : 'null' ?>;
+      <? } catch(e) {} ?>
+      <? try { ?>
+        serverOrdenes = <?!= typeof ordenesSolicitadas !== 'undefined' ? ordenesSolicitadas : 'null' ?>;
+      <? } catch(e) {} ?>
+      
+      if (serverInitialData && serverOrdenes) {
+        // Carga ultrarrápida (0 segs)
+        if (serverInitialData.webAppUrl) {
+          globalWebAppUrl = serverInitialData.webAppUrl;
+        }
+        setFrontendPermissions(serverInitialData.userPermissions);
+        ordenesData = serverOrdenes;
+        document.getElementById('mainContainer').style.display = 'block';
+        renderTable(serverOrdenes);
+      } else {
+        // Fallback a carga tradicional
+        showLoading('Cargando datos...');
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (data && data.webAppUrl) {
+              globalWebAppUrl = data.webAppUrl;
+            }
+            setFrontendPermissions(data.userPermissions);
+            loadOrdenesSolicitadas();
+          })
+          .withFailureHandler(function(error) {
+            hideLoading();
+            showError('Error al cargar datos iniciales: ' + error.message);
+            document.getElementById('mainContainer').style.display = 'block';
+          })
+          .getInitialData();
+      }
     };
     
     function loadOrdenesSolicitadas() {

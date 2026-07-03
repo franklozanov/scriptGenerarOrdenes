@@ -774,7 +774,17 @@
       }
 
       window.onload = () => {
-        google.script.run.withSuccessHandler(data => {
+        // Inyección de variables de servidor para carga instantánea
+        var serverInitialData = null;
+        var serverOrdenesValidas = null;
+        <? try { ?>
+          serverInitialData = <?!= typeof initialData !== 'undefined' ? initialData : 'null' ?>;
+        <? } catch(e) {} ?>
+        <? try { ?>
+          serverOrdenesValidas = <?!= typeof ordenesValidas !== 'undefined' ? ordenesValidas : 'null' ?>;
+        <? } catch(e) {} ?>
+
+        function processInitialData(data) {
           console.log('🚀 Inicializando modal - data recibida:', data);
           globalTemplates = data.templates;
 
@@ -829,12 +839,6 @@
           document.getElementById('loader').style.display = 'none';
           updateGoButtonState();
 
-          // Cargar lista de órdenes válidas para impresión (sin caché)
-          google.script.run
-            .withSuccessHandler(populateOrdenesList)
-            .withFailureHandler(e => console.error('Error cargando órdenes válidas:', e.message))
-            .getOrdenesValidasParaImpresion();
-
           // Add event listener for background preloading on orderNo input
           const orderNoInput = document.getElementById('orderNo');
           const debouncedPreload = debounce((value) => {
@@ -861,9 +865,35 @@
               document.getElementById('goBtn').click();
             }
           });
-        }).withFailureHandler(e => {
-          document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
-        }).getInitialData();
+        }
+
+        if (serverInitialData) {
+          // Carga ultrarrápida (0 segs)
+          processInitialData(serverInitialData);
+          if (serverOrdenesValidas) {
+            populateOrdenesList(serverOrdenesValidas);
+          } else {
+            // Fallback para las órdenes
+            google.script.run
+              .withSuccessHandler(populateOrdenesList)
+              .withFailureHandler(e => console.error('Error cargando órdenes válidas:', e.message))
+              .getOrdenesValidasParaImpresion();
+          }
+        } else {
+          // Fallback a carga tradicional con google.script.run
+          google.script.run.withSuccessHandler(data => {
+            processInitialData(data);
+            
+            // Cargar lista de órdenes válidas para impresión (sin caché)
+            google.script.run
+              .withSuccessHandler(populateOrdenesList)
+              .withFailureHandler(e => console.error('Error cargando órdenes válidas:', e.message))
+              .getOrdenesValidasParaImpresion();
+
+          }).withFailureHandler(e => {
+            document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
+          }).getInitialData();
+        }
       };
 
       function populateOrdenesList(ordenes) {

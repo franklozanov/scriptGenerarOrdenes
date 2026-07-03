@@ -20,6 +20,10 @@
 function abrirModalRegistroNovedad() {
   try {
     var template = HtmlService.createTemplateFromFile('ModalRegistroNovedad');
+    // Inyección de servidor (Server-side templating) para velocidad
+    template.initialData = JSON.stringify(getInitialData());
+    template.ordenesData = JSON.stringify(getOrdenesParaNovedad());
+    
     var html = template.evaluate()
       .setWidth(600)
       .setHeight(650);
@@ -36,6 +40,9 @@ function abrirModalRegistroNovedad() {
 function abrirModalCargaOrdenes() {
   try {
     var template = HtmlService.createTemplateFromFile('ModalCargaOrdenes');
+    // Inyección de servidor (Server-side templating) para velocidad
+    template.initialData = JSON.stringify(getInitialData());
+    
     var html = template.evaluate()
       .setWidth(1000)
       .setHeight(700);
@@ -52,6 +59,10 @@ function abrirModalCargaOrdenes() {
 function abrirModalAutorizarQA() {
   try {
     var template = HtmlService.createTemplateFromFile('ModalAutorizarQA');
+    // Inyección de servidor (Server-side templating) para velocidad
+    template.initialData = JSON.stringify(getInitialData());
+    template.ordenesSolicitadas = JSON.stringify(getOrdenesSolicitadasParaQA());
+    
     var html = template.evaluate()
       .setWidth(950)
       .setHeight(700);

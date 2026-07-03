@@ -120,23 +120,42 @@
     var users = [];
 
     function initialize() {
-      google.script.run
-        .withSuccessHandler(function(data) {
-          if (data && data.webAppUrl) {
-            globalWebAppUrl = data.webAppUrl;
-          }
-          if (data && data.users) {
-            users = data.users;
-          }
-          hideLoading();
-          document.getElementById('mainContainer').style.display = 'block';
-        })
-        .withFailureHandler(function(error) {
-          showError('Error al cargar datos iniciales: ' + error.message);
-          hideLoading();
-          document.getElementById('mainContainer').style.display = 'block';
-        })
-        .getInitialData();
+      // Inyección de variables de servidor para carga instantánea
+      var serverInitialData = null;
+      <? try { ?>
+        serverInitialData = <?!= typeof initialData !== 'undefined' ? initialData : 'null' ?>;
+      <? } catch(e) {} ?>
+      
+      if (serverInitialData) {
+        // Carga ultrarrápida (0 segs)
+        if (serverInitialData.webAppUrl) {
+          globalWebAppUrl = serverInitialData.webAppUrl;
+        }
+        if (serverInitialData.users) {
+          users = serverInitialData.users;
+        }
+        hideLoading();
+        document.getElementById('mainContainer').style.display = 'block';
+      } else {
+        // Fallback a carga tradicional
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (data && data.webAppUrl) {
+              globalWebAppUrl = data.webAppUrl;
+            }
+            if (data && data.users) {
+              users = data.users;
+            }
+            hideLoading();
+            document.getElementById('mainContainer').style.display = 'block';
+          })
+          .withFailureHandler(function(error) {
+            showError('Error al cargar datos iniciales: ' + error.message);
+            hideLoading();
+            document.getElementById('mainContainer').style.display = 'block';
+          })
+          .getInitialData();
+      }
 
       document.getElementById('btnCancel').addEventListener('click', function() {
         google.script.host.close();
