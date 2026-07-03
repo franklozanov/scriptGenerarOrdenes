@@ -373,7 +373,7 @@ function procesarCargaOrdenesMasivas(params, userId) {
         var templatesData = sheetTemplates.getDataRange().getValues();
         templatesData.forEach(function(row) {
           var key = row[0] ? row[0].toString().trim() : '';
-          var value = row[1] ? row[1].toString().trim() : '';
+          var value = row[1] ? extractDriveId(row[1].toString().trim()) : '';
           
           if (key === 'DOC_ORDENES' && value) {
             folderDocOrdenes = DriveApp.getFolderById(value);

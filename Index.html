@@ -482,10 +482,10 @@
 
       function isUserSelectionValid() {
         const userNameInput = document.getElementById('userName');
-        if (!userNameInput || !window.globalUsers) return false;
+        if (!userNameInput || !window.QMSContext.users) return false;
         const val = userNameInput.value.trim();
         if (!val) return false;
-        return window.globalUsers.some(u => u.nombreCompleto === val);
+        return window.QMSContext.users.some(u => u.nombreCompleto === val);
       }
 
       function updateGoButtonState() {
@@ -799,22 +799,22 @@
             const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
             return `
               <div class="tpl-row" style="${rowStyle}">
-                <span class="tpl-name" title="${t.name}" style="${nameStyle}">${t.name}</span>
+                <span class="tpl-name" title="${t.description ? t.description : t.name}" style="${nameStyle}">${t.name}</span>
                 <div class="counter-control">
-                  <button type="button" class="counter-btn" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
+                  <button type="button" class="counter-btn" tabindex="-1" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
                   <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
-                  <button type="button" class="counter-btn" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
+                  <button type="button" class="counter-btn" tabindex="-1" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
                 </div>
               </div>
             `;
           }).join('');
 
           // Guardar usuarios globalmente para acceder después
-          window.globalUsers = data.users;
+          window.QMSContext.users = data.users;
           
           // Inicializar URL de la WebApp para peticiones Fetch
           if (data && data.webAppUrl) {
-            window.globalWebAppUrl = data.webAppUrl;
+            window.QMSContext.webAppUrl = data.webAppUrl;
           }
           document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
           document.getElementById('userName').addEventListener('input', updateGoButtonState);
@@ -1197,7 +1197,7 @@
         }
 
         // Buscar el UserID correspondiente al Nombre Completo seleccionado
-        const userObj = window.globalUsers.find(u => u.nombreCompleto === userName);
+        const userObj = window.QMSContext.users.find(u => u.nombreCompleto === userName);
         if (!userObj) {
           alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
           document.getElementById('userName').focus();
@@ -1266,7 +1266,7 @@
         }
 
         // Buscar el UserID correspondiente al Nombre Completo seleccionado
-        const userObj = window.globalUsers.find(u => u.nombreCompleto === userName);
+        const userObj = window.QMSContext.users.find(u => u.nombreCompleto === userName);
         if (!userObj) {
           alert("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.");
           document.getElementById('userName').focus();
@@ -1280,14 +1280,14 @@
         status.innerText = "📨 Enviando solicitud a QA...";
         status.className = "info-text";
 
-        // Solicitar PIN de firma si no está predefinido en la sesión
-        let pin = window.globalUserPin || '';
+        // Solicitar PIN de firma si no está predefinido en el contexto
+        let pin = window.QMSContext.userPin || '';
         if (!pin) {
           pin = prompt("Por favor, ingrese su PIN de autorización para enviar esta solicitud:") || '';
         }
 
         try {
-          const response = await fetch(window.globalWebAppUrl, {
+          const response = await fetch(window.QMSContext.webAppUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

@@ -174,8 +174,7 @@
   </div>
   
   <script>
-    var globalWebAppUrl = '';
-    var solicitudesData = [];
+    let solicitudesData = [];
     
     window.onload = function() {
       // Inicializar drag y resize
@@ -194,7 +193,7 @@
       google.script.run
         .withSuccessHandler(function(data) {
           if (data && data.webAppUrl) {
-            globalWebAppUrl = data.webAppUrl;
+            window.QMSContext.webAppUrl = data.webAppUrl;
           }
           setFrontendPermissions(data.userPermissions);
           loadSolicitudesPendientes();
@@ -318,7 +317,7 @@
       // Enviar solicitud
       showLoading(accion === 'Aprobada' ? 'Aprobando solicitudes...' : 'Rechazando solicitudes...');
       
-      fetch(globalWebAppUrl, {
+      fetch(window.QMSContext.webAppUrl, {
         method: 'POST',
         body: JSON.stringify({
           operation: 'procesarAprobacionImpresionQA',

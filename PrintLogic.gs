@@ -78,7 +78,7 @@ function getPrintConfig_() {
 
   for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
-    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+    var v = tplData[i][colValorIdx] ? extractDriveId(tplData[i][colValorIdx].toString().trim()) : "";
     if (k === "DOC_ORDENES") config.DOC_ORDENES = v;
     if (k === "DOC_ANALISIS") config.DOC_ANALISIS = v;
     if (k === "DOC_COMPLETO") config.DOC_COMPLETO = v;
@@ -445,7 +445,7 @@ function preparePrintPayload(orderNo, templateConfig) {
   
   for (var i = 1; i < tplData.length; i++) {
     var k = tplData[i][colClaveIdx].toString().trim();
-    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+    var v = tplData[i][colValorIdx] ? extractDriveId(tplData[i][colValorIdx].toString().trim()) : "";
     if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
     if (k === "COORD_FABRICANTE" && v) dynamicCoords["Fabricante"] = parseXY(v);

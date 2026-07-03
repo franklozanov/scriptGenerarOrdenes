@@ -5,6 +5,15 @@
      ============================================================ -->
 
 <script>
+  // === CONTEXTO GLOBAL DE LA APLICACIÓN (QMS) ===
+  window.QMSContext = {
+    users: null,
+    templates: null,
+    webAppUrl: '',
+    userPin: '',
+    userPermissions: {}
+  };
+
   // === UTILIDADES GENERALES ===
 
   /**
@@ -576,16 +585,11 @@
   // === SISTEMA DE PERMISOS RBAC (FRONTEND) ===
 
   /**
-   * Variable global para almacenar los permisos del usuario actual
-   */
-  var currentUserPermissions = {};
-
-  /**
-   * Establece los permisos del usuario actual y aplica las restricciones de UI
+   * Establece los permisos del usuario actual en el contexto global y aplica las restricciones de UI
    * @param {Object} permissions - Objeto de permisos del usuario
    */
   function setFrontendPermissions(permissions) {
-    currentUserPermissions = permissions || {};
+    window.QMSContext.userPermissions = permissions || {};
     applyFrontendPermissions();
   }
 
@@ -595,7 +599,7 @@
    * @returns {boolean} True si tiene el permiso
    */
   function checkPermission(permissionKey) {
-    return currentUserPermissions[permissionKey] === true;
+    return window.QMSContext.userPermissions[permissionKey] === true;
   }
 
   /**

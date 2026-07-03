@@ -28,6 +28,7 @@ function diagnosticarPlantillas() {
   // Obtener índices de columnas por nombre
   var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
   var colValorIdx = getColumnIndexByNameCaseInsensitive(headers, 'Valor', false);
+  var colTypeIdx = getColumnIndexByNameCaseInsensitive(headers, 'Type', false);
   
   // Si alguna columna no existe, usar índices por defecto
   if (!colClaveIdx) colClaveIdx = 1;
@@ -36,68 +37,66 @@ function diagnosticarPlantillas() {
   // Convertir a base-0 para acceso a array
   colClaveIdx = colClaveIdx - 1;
   colValorIdx = colValorIdx - 1;
-  
-  // Verificar carpetas dinámicas primero
-  for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
-    var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
-    if (k === "DOC_ORDENES") folderId = v;
-    if (k === "DOC_ANALISIS") folderAnalysisId = v;
-  }
-  
-  report += "CARPETAS DINÁMICAS:\n";
-  
-  // Verificar DOC_ORDENES
-  if (folderId) {
-    try {
-      var folder = DriveApp.getFolderById(folderId);
-      report += "✓ DOC_ORDENES → " + folder.getName() + "\n";
-      successCount++;
-    } catch (e) {
-      report += "✗ DOC_ORDENES → ERROR: " + e.message + "\n";
-      report += "  ID: " + folderId + "\n";
-      errorCount++;
-    }
-  } else {
-    report += "⚠ DOC_ORDENES → No configurado (requerido para buscar PDF de órdenes)\n";
-    errorCount++;
-  }
-  
-  // Verificar DOC_ANALISIS
-  if (folderAnalysisId) {
-    try {
-      var aFolder = DriveApp.getFolderById(folderAnalysisId);
-      report += "✓ DOC_ANALISIS (carpeta) → " + aFolder.getName() + "\n";
-      successCount++;
-    } catch (e) {
-      report += "✗ DOC_ANALISIS (carpeta) → ERROR: " + e.message + "\n";
-      report += "  ID: " + folderAnalysisId + "\n";
-      errorCount++;
-    }
-  } else {
-    report += "⚠ DOC_ANALISIS (carpeta) → No configurado\n";
-  }
-  
-  report += "\nPLANTILLAS ESTÁTICAS:\n";
+  if (colTypeIdx) colTypeIdx = colTypeIdx - 1;
   
   for (var i = 1; i < tplData.length; i++) {
-    var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
-    var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+    var rawValue = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+    var value = rawValue ? extractDriveId(rawValue) : "";
+    var type = (colTypeIdx !== undefined && colTypeIdx !== null && tplData[i][colTypeIdx]) ? tplData[i][colTypeIdx].toString().trim() : "";
     
-    if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
+    if (!key || key === "Clave") continue;
+
+    // Lógica retrocompatible si no hay columna Type
+    if (!type) {
+        if (key === "DOC_ORDENES" || key === "DOC_ANALISIS" || key === "DOC_COMPLETO") type = "Folder";
+        else if (key.indexOf("COORD_") !== -1) type = "Coordinate";
+        else type = "File";
+    }
+
+    if (type === "Folder") {
       if (value) {
         try {
-          var file = DriveApp.getFileById(value);
-          report += "✓ " + key + " → " + file.getName() + "\n";
+          var folder = DriveApp.getFolderById(value);
+          report += "✓ [Carpeta] " + key + " → " + folder.getName() + "\n";
           successCount++;
         } catch (e) {
-          report += "✗ " + key + " → ERROR: " + e.message + "\n";
+          report += "✗ [Carpeta] " + key + " → ERROR: " + e.message + "\n";
           errorCount++;
         }
       } else {
-        report += "⚠ " + key + " → No configurado\n";
+        report += "⚠ [Carpeta] " + key + " → No configurado\n";
         errorCount++;
       }
+    } else if (type === "File") {
+      // Ignoramos TPL_ORDEN porque no es de Drive sino un HTML
+      if (key === "TPL_ORDEN") continue;
+      
+      if (value) {
+        try {
+          var file = DriveApp.getFileById(value);
+          report += "✓ [Archivo] " + key + " → " + file.getName() + "\n";
+          successCount++;
+        } catch (e) {
+          report += "✗ [Archivo] " + key + " → ERROR: " + e.message + "\n";
+          errorCount++;
+        }
+      } else {
+        report += "⚠ [Archivo] " + key + " → No configurado\n";
+        errorCount++;
+      }
+    } else if (type === "Coordinate") {
+      if (rawValue.match(/x:\s*[0-9.]+/i) && rawValue.match(/y:\s*[0-9.]+/i)) {
+          report += "✓ [Coordenada] " + key + " → Formato correcto (" + rawValue + ")\n";
+          successCount++;
+      } else if (!rawValue || rawValue === "N/A" || rawValue === "FALSE") {
+          report += "⚠ [Coordenada] " + key + " → No configurada o inactiva\n";
+      } else {
+          report += "✗ [Coordenada] " + key + " → Formato incorrecto. Se esperaba 'x: N, y: N'. Se recibió: " + rawValue + "\n";
+          errorCount++;
+      }
+    } else {
+       report += "⚠ [Desconocido] " + key + " → Tipo '" + type + "' no soportado\n";
     }
   }
   

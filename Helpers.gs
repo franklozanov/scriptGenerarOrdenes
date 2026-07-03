@@ -123,3 +123,24 @@ function actualizarEstadoCarga(sheet, rowIndex, headers) {
   var estadoConsolidado = calcularEstadoCarga(estadoCOA, estadoOA);
   sheet.getRange(rowIndex, colEstadoIdx).setValue(estadoConsolidado);
 }
+
+/**
+ * Extrae el ID de Google Drive a partir de una URL compartida.
+ * Si el parámetro ya es un ID (no contiene 'http'), lo devuelve tal cual.
+ * @param {string} urlOrId - URL de Drive o ID directo
+ * @returns {string} El ID extraído
+ */
+function extractDriveId(urlOrId) {
+  if (!urlOrId) return "";
+  var str = urlOrId.toString().trim();
+  if (str.indexOf("http") === -1 && str.indexOf("drive.google.com") === -1) {
+    return str; // Probablemente ya es un ID
+  }
+  
+  // Expresión regular para extraer IDs de archivos o carpetas de Drive (generalmente de 25 a 35 caracteres)
+  var match = str.match(/[-\w]{25,}/);
+  if (match) {
+    return match[0];
+  }
+  return str;
+}

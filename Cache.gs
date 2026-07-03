@@ -171,6 +171,7 @@ function getInitialData() {
       var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
       var colValorIdx = getColumnIndexByNameCaseInsensitive(headers, 'Valor', false);
       var colNombreTemplateIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreTemplate', false);
+      var colDescriptionIdx = getColumnIndexByNameCaseInsensitive(headers, 'Description', false);
       
       if (!colClaveIdx) colClaveIdx = 1;
       if (!colValorIdx) colValorIdx = 2;
@@ -178,10 +179,16 @@ function getInitialData() {
       colClaveIdx = colClaveIdx - 1;
       colValorIdx = colValorIdx - 1;
       if (colNombreTemplateIdx) colNombreTemplateIdx = colNombreTemplateIdx - 1;
+      if (colDescriptionIdx) colDescriptionIdx = colDescriptionIdx - 1;
       
       for (var k = 1; k < tplData.length; k++) {
         var key = tplData[k][colClaveIdx] ? tplData[k][colClaveIdx].toString().trim() : "";
-        var value = tplData[k][colValorIdx] ? tplData[k][colValorIdx].toString().trim() : "";
+        var value = tplData[k][colValorIdx] ? extractDriveId(tplData[k][colValorIdx].toString().trim()) : "";
+        var description = "";
+        
+        if (colDescriptionIdx !== undefined && colDescriptionIdx !== null && k > 0 && tplData[k][colDescriptionIdx]) {
+          description = tplData[k][colDescriptionIdx].toString().trim();
+        }
       
         if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
           var displayName = key;
@@ -228,7 +235,7 @@ function getInitialData() {
               }
             }
           }
-          templates.push({ key: key, fileId: value, name: displayName, hasAccess: hasAccess, base64: base64 });
+          templates.push({ key: key, fileId: value, name: displayName, description: description, hasAccess: hasAccess, base64: base64 });
         }
         
         if (key === "DOC_ORDENES") {
@@ -241,7 +248,7 @@ function getInitialData() {
             }
           }
           
-          templates.push({ key: key, fileId: value, name: displayName, hasAccess: true, base64: null });
+          templates.push({ key: key, fileId: value, name: displayName, description: description, hasAccess: true, base64: null });
         }
         
         if (key === "DOC_ANALISIS") {
@@ -254,7 +261,7 @@ function getInitialData() {
             }
           }
           
-          templates.push({ key: key, fileId: value, name: displayName, hasAccess: true, base64: null });
+          templates.push({ key: key, fileId: value, name: displayName, description: description, hasAccess: true, base64: null });
         }
       }
       
@@ -295,7 +302,7 @@ function getInitialData() {
     var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];
-      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, hasAccess: t.hasAccess });
+      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, hasAccess: t.hasAccess });
     }
     
     try { cache.put('initialData_v2', JSON.stringify(dataToCache), 600); } catch (e) {

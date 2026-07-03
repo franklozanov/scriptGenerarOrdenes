@@ -220,7 +220,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     for (var i = 1; i < tplData.length; i++) {
       var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
       if (key === folderKey) {
-        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+        folderId = tplData[i][colValorIdx] ? extractDriveId(tplData[i][colValorIdx].toString().trim()) : "";
         break;
       }
     }
