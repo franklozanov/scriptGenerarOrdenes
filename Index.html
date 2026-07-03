@@ -963,6 +963,9 @@
           // Replace payload.pdfs with the merged array
           payload.pdfs = finalPdfs;
 
+          showPdfProgress('Generando Documentos', 'Paso 1: Iniciando motor PDF...', 10);
+          await new Promise(r => setTimeout(r, 50)); // Yield para mostrar UI
+
           const { PDFDocument, rgb, degrees } = PDFLib;
           const finalPdf = await PDFDocument.create();
           
@@ -979,8 +982,15 @@
           const now = new Date();
           const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-          for (const item of payload.pdfs) {
-            status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
+          // Yield to unblock UI
+          const yieldToMain = () => new Promise(r => setTimeout(r, 20));
+
+          for (let itemIdx = 0; itemIdx < payload.pdfs.length; itemIdx++) {
+            const item = payload.pdfs[itemIdx];
+            let progressPct = 20 + (50 * (itemIdx / payload.pdfs.length));
+            showPdfProgress('Combinando Plantillas', `Paso 2: Procesando ${item.key} (${itemIdx + 1}/${payload.pdfs.length})...`, progressPct);
+            status.innerText = `⏳ Procesando ${item.key}...`;
+            await yieldToMain();
 
             const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
             for (let i = 0; i < item.copies; i++) {
@@ -1027,6 +1037,7 @@
               const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
               copied.forEach(p => finalPdf.addPage(p));
               totalPages += copied.length;
+              await yieldToMain();
 
               // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
               console.log(`Plantilla: ${item.key}, Copia: ${i+1}, Páginas: ${copied.length}, Es impar: ${copied.length % 2 !== 0}`);
@@ -1053,7 +1064,15 @@
           // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
           const allPages = finalPdf.getPages();
 
-          allPages.forEach((p) => {
+          showPdfProgress('Añadiendo Detalles', 'Paso 3: Añadiendo pie de página...', 75);
+          status.innerText = "⏳ Añadiendo pie de página...";
+          await yieldToMain();
+
+          for (let pIdx = 0; pIdx < allPages.length; pIdx++) {
+            const p = allPages[pIdx];
+            
+            // Unblock UI every 10 pages
+            if (pIdx % 10 === 0) await yieldToMain();
             let { width, height } = p.getSize();
             let currentRotation = p.getRotation().angle || 0;
 
@@ -1092,9 +1111,11 @@
 
             drawVisualText(footerLeftText, 35, 20, 8);
             drawVisualText(footerRightText, width - 130, 20, 8);
-          });
+          } // End for loop for pages
 
-          status.innerText = "⏳ Paso 4/4: Optimizando PDF para impresión...";
+          showPdfProgress('Optimizando', 'Paso 4: Optimizando PDF para impresión...', 85);
+          status.innerText = "⏳ Optimizando PDF para impresión...";
+          await yieldToMain();
 
           // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
           try {
@@ -1126,11 +1147,12 @@
           console.timeEnd('pdf-save');
           console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
           
-          console.time('base64-conversion');
           const base64Data = uint8ArrayToBase64(new Uint8Array(pdfData));
           console.timeEnd('base64-conversion');
 
+          showPdfProgress('Guardando', 'Guardando en Drive y registrando...', 95);
           status.innerText = "🔄 Guardando en Drive y registrando impresión...";
+          await yieldToMain();
 
           // Paso 1: Guardar en Drive
           console.time('drive-save');
@@ -1141,6 +1163,7 @@
           } catch (saveErr) {
             console.timeEnd('drive-save');
             console.error('Error en saveFinalUnifiedPDF:', saveErr.message);
+            hidePdfProgress();
             status.innerText = "⚠️ Error al guardar PDF en Drive: " + saveErr.message;
             status.className = "error-text";
             btn.disabled = false;
@@ -1175,13 +1198,14 @@
             console.timeEnd('traceability-update');
           } catch (traceErr) {
             console.timeEnd('traceability-update');
-            console.error('Error en updateTraceability:', traceErr.message);
+            hidePdfProgress();
             status.innerText = "⚠️ PDF guardado y abierto, pero error al registrar impresión: " + traceErr.message;
             status.className = "error-text";
             btn.disabled = false;
             return;
           }
 
+          hidePdfProgress();
           status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
           status.className = "success-text";
           document.getElementById('orderNo').value = '';
@@ -1195,6 +1219,7 @@
           }, 3000);
 
         } catch (pdfError) {
+          hidePdfProgress();
           showToast("Error generando PDF: " + pdfError.message, 'error');
           status.innerText = "❌ Error: " + pdfError.message;
           status.className = "error-text";
