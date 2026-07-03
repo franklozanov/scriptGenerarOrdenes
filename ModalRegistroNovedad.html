@@ -97,6 +97,7 @@
     var globalWebAppUrl = '';
     var users = [];
     var ordenes = [];
+    var currentUserId = '';
 
     function initialize() {
       // Inyección de variables de servidor para carga instantánea
@@ -118,6 +119,9 @@
           users = serverInitialData.users;
           populateUsuariosList();
         }
+        if (serverInitialData.currentUser) {
+          currentUserId = serverInitialData.currentUser.userId;
+        }
         setFrontendPermissions(serverInitialData.userPermissions);
         ordenes = serverOrdenes;
         populateOrdenesSelect();
@@ -133,6 +137,9 @@
             if (data && data.users) {
               users = data.users;
               populateUsuariosList();
+            }
+            if (data && data.currentUser) {
+              currentUserId = data.currentUser.userId;
             }
             setFrontendPermissions(data.userPermissions);
             loadOrdenes();
@@ -294,8 +301,8 @@
         comentario: comentario,
         totalPags: Number(totalPags) || 0,
         noPagDevueltas: Number(noPagDevueltas) || 0,
-        pinFirma: pin
-        // userId y realizadoPor se inyectarán de forma segura en el backend
+        pinFirma: pin,
+        userId: currentUserId
       };
 
       showLoading('Registrando novedad...');

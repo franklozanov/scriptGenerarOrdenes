@@ -163,6 +163,7 @@
   
   <script>
     let solicitudesData = [];
+    var currentUserId = '';
     
     window.onload = function() {
       // Inicializar drag y resize
@@ -191,6 +192,9 @@
         if (serverInitialData.webAppUrl) {
           window.QMSContext.webAppUrl = serverInitialData.webAppUrl;
         }
+        if (serverInitialData.currentUser) {
+          currentUserId = serverInitialData.currentUser.userId;
+        }
         setFrontendPermissions(serverInitialData.userPermissions);
         solicitudesData = serverSolicitudes;
         document.getElementById('mainContainer').style.display = 'block';
@@ -202,6 +206,9 @@
           .withSuccessHandler(function(data) {
             if (data && data.webAppUrl) {
               window.QMSContext.webAppUrl = data.webAppUrl;
+            }
+            if (data && data.currentUser) {
+              currentUserId = data.currentUser.userId;
             }
             setFrontendPermissions(data.userPermissions);
             loadSolicitudesPendientes();
@@ -329,7 +336,8 @@
           operation: 'procesarAprobacionImpresionQA',
           targetIds: selectedIds,
           accion: accion,
-          pinFirma: pinFirma
+          pinFirma: pinFirma,
+          userId: currentUserId
         })
       })
       .then(function(response) {

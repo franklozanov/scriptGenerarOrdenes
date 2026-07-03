@@ -146,6 +146,7 @@
   <script>
     var globalWebAppUrl = '';
     var ordenesData = [];
+    var currentUserId = '';
     
     window.onload = function() {
       // Inicializar drag y resize
@@ -174,6 +175,9 @@
         if (serverInitialData.webAppUrl) {
           globalWebAppUrl = serverInitialData.webAppUrl;
         }
+        if (serverInitialData.currentUser) {
+          currentUserId = serverInitialData.currentUser.userId;
+        }
         setFrontendPermissions(serverInitialData.userPermissions);
         ordenesData = serverOrdenes;
         document.getElementById('mainContainer').style.display = 'block';
@@ -185,6 +189,9 @@
           .withSuccessHandler(function(data) {
             if (data && data.webAppUrl) {
               globalWebAppUrl = data.webAppUrl;
+            }
+            if (data && data.currentUser) {
+              currentUserId = data.currentUser.userId;
             }
             setFrontendPermissions(data.userPermissions);
             loadOrdenesSolicitadas();
@@ -305,7 +312,8 @@
         body: JSON.stringify({
           operation: 'autorizarOrdenesQA',
           targetIds: selectedIds,
-          pinFirma: pinFirma
+          pinFirma: pinFirma,
+          userId: currentUserId
         })
       })
       .then(function(response) {
