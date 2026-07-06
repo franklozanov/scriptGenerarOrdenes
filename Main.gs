@@ -13,6 +13,16 @@
  * crea menú de autorización nativa OAuth.
  */
 function onOpen() {
+  // 1. Prioridad Máxima: Abrir el sidebar inmediatamente para que el usuario pueda trabajar.
+  // El frontend (SPA) se encargará de pedir los datos vía google.script.run,
+  // evadiendo las restricciones de AuthMode.LIMITED del trigger onOpen.
+  try {
+    abrirSidebarQMS();
+  } catch (e) {
+    Logger.log("Error al abrir Sidebar temprano: " + e.message);
+  }
+
+  // 2. Capturar el correo
   var activeEmail = Session.getActiveUser().getEmail();
   
   if (!activeEmail || activeEmail === "") {
@@ -22,13 +32,14 @@ function onOpen() {
       .addToUi();
       
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Por favor, haz clic en "🔐 Iniciar Sesión" en el menú superior para cargar la aplicación.', 
+      'Por favor, haz clic en "🔐 Iniciar Sesión" en el menú superior para cargar los permisos de la aplicación.', 
       'Autorización Requerida', 
       10
     );
     return;
   }
   
+  // 3. Cargar el menú de opciones (ya con el correo válido)
   onOpenMain(activeEmail);
 }
 
@@ -121,20 +132,23 @@ function onOpenMain(email) {
   
   mainMenu.addToUi();
   
-  // Abrir Sidebar automáticamente al iniciar la hoja (debe ir antes de acciones pesadas)
-  try {
-    abrirSidebarQMS();
-  } catch (e) {
-    Logger.log("Error al abrir Sidebar: " + e.message);
-  }
-
   // Operaciones de UI secundarias
   try {
     hideUnauthorizedSheets_();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Cargando datos en el panel...', 'Sistema QMS', 3);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Cargando menús...', 'Sistema QMS', 3);
   } catch (e) {
     Logger.log("Error en operaciones secundarias: " + e.message);
   }
+}
+
+/**
+ * Abre el modal de bloqueo para validar/inicializar el sistema de forma segura.
+ */
+function abrirModalValidacionSistema() {
+  var html = HtmlService.createHtmlOutputFromFile('ModalValidacionSistema')
+      .setWidth(450)
+      .setHeight(280);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Validando Sistema');
 }
 
 /**

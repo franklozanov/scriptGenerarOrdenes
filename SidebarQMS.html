@@ -557,16 +557,17 @@
     // ========================================================
     // Configuración y Botones Simples
     async function ejecutarInicializacion() {
-      const confirmado = await showConfirm('Inicializar Sistema', '¿Inicializar el sistema? Se validarán hojas, columnas, permisos y protecciones. Puede aparecer un resumen sobre la hoja de cálculo.');
+      const confirmado = await showConfirm('Inicializar Sistema', '¿Inicializar el sistema? Se abrirá un modal seguro para validar hojas, columnas, permisos y protecciones.');
       if (!confirmado) return;
       
       var btn = document.getElementById('btn-init-system');
       if (btn) btn.disabled = true;
-      showToast('Inicializando sistema...', 'success');
+      showToast('Abriendo ventana segura de validación...', 'success');
+      
       google.script.run
-        .withSuccessHandler(function(msg){ if (btn) btn.disabled = false; showToast(msg || 'Sistema inicializado', 'success'); })
-        .withFailureHandler(function(err){ if (btn) btn.disabled = false; showError('Error al inicializar: ' + (err && err.message ? err.message : err)); })
-        .inicializarSistemaCompleto();
+        .withSuccessHandler(function(){ if (btn) btn.disabled = false; })
+        .withFailureHandler(function(err){ if (btn) btn.disabled = false; showError('Error al iniciar: ' + (err && err.message ? err.message : err)); })
+        .abrirModalValidacionSistema();
     }
 
     /* ========================================================
