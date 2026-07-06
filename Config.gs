@@ -38,8 +38,12 @@ var PERMISOS = {
   IMPRIMIR_ORDEN: 'IMPRIMIR_ORDEN',
   SOLICITAR_REIMPRESION: 'SOLICITAR_REIMPRESION',
   APROBAR_REIMPRESION: 'APROBAR_REIMPRESION',
-  AUTORIZAR_QA: 'AUTORIZAR_QA'
+  AUTORIZAR_QA: 'AUTORIZAR_QA',
+  GESTIONAR_AUTOAPROBACION: 'GESTIONAR_AUTOAPROBACION'
 };
+
+// --- CLAVE DE CONFIGURACIÓN DE AUTOAPROBACIÓN TEMPORAL (ScriptProperties) ---
+var AUTO_APPROVAL_PROP_KEY = 'AUTO_APPROVAL_CONFIG';
 
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
@@ -52,10 +56,10 @@ var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 // Estructura requerida de hojas y columnas
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder', 'FileFolderLink'],
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'ImpresoPor', 'STATUS'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'NoPags', 'Reimpresion', 'TotalPags', 'ImpresoPor', 'Reimpreso', 'HistorialImpresion', 'STATUS'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
-  'PermisosRoles': ['Rol', 'MENU_ADMIN', 'MENU_CONFIG', 'CARGAR_ORDENES', 'SUBIR_DOCUMENTOS', 'REGISTRAR_NOVEDAD', 'IMPRIMIR_ORDEN', 'SOLICITAR_REIMPRESION', 'APROBAR_REIMPRESION', 'AUTORIZAR_QA'],
+  'PermisosRoles': ['Rol', 'MENU_ADMIN', 'MENU_CONFIG', 'CARGAR_ORDENES', 'SUBIR_DOCUMENTOS', 'REGISTRAR_NOVEDAD', 'IMPRIMIR_ORDEN', 'SOLICITAR_REIMPRESION', 'APROBAR_REIMPRESION', 'AUTORIZAR_QA', 'GESTIONAR_AUTOAPROBACION'],
   'SolicitudesImpresion': ['ID_Solicitud', 'Fecha', 'NoOrden', 'SolicitadoPor', 'TipoSolicitud', 'Motivo', 'Plantillas', 'Estado', 'FirmaQA']
 };

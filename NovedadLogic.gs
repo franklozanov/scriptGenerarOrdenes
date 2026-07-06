@@ -274,6 +274,13 @@ function procesarRegistroNovedad(params, userId) {
     // Actualizar STATUS
     sheetOrdenes.getRange(filaEncontrada, colStatusCol).setValue(nuevoStatus);
 
+    // Registrar la novedad en el historial consolidado legible de la orden
+    var detalleNovedad = "NOVEDAD: " + (tipoNovedad || "-");
+    if (noPagDevueltas) detalleNovedad += " · " + noPagDevueltas + " pág devueltas";
+    if (comentario) detalleNovedad += " · " + comentario;
+    detalleNovedad += " · STATUS→" + nuevoStatus + " · " + nombreCorto;
+    appendHistorialImpresion_(sheetOrdenes, filaEncontrada, headersOrdenes, detalleNovedad);
+
     // Insertar registro en hoja RegistroNovedad
     var sheetRegistro = ss.getSheetByName('RegistroNovedad');
     if (!sheetRegistro) {

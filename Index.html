@@ -770,6 +770,13 @@
         return gsRun('finalizeFinalPdfForUser', [orderNo, fileId, archivoReemplazado, userId]);
       }
 
+      // Transacción atómica: genera el PDF, avanza el contador y registra trazabilidad en una
+      // sola llamada de servidor (reemplaza save + finalize + updateTraceability por separado).
+      function processPrintAsync(base64Data, orderNo, userId, printType, totalPages) {
+        if (!userId) return Promise.reject(new Error("No se pudo identificar el UserID del usuario seleccionado."));
+        return gsRun('processPrintForUser', [base64Data, orderNo, userId, printType, totalPages]);
+      }
+
       function uint8ArrayToBase64(bytes) {
         const chunkSize = 0x8000;
         let binary = '';
@@ -1169,17 +1176,18 @@
           status.innerText = "🔄 Guardando en Drive y registrando impresión...";
           await yieldToMain();
 
-          // Paso 1: Guardar en Drive
+          // Paso 1: Transacción atómica en el servidor (genera PDF, avanza contador y registra
+          // trazabilidad juntos, con rollback si algo falla).
           console.time('drive-save');
           let saveResult;
           try {
-            saveResult = await saveFinalUnifiedPdfAsync(base64Data, orderNo, userId);
+            saveResult = await processPrintAsync(base64Data, orderNo, userId, printType, totalPages);
             console.timeEnd('drive-save');
           } catch (saveErr) {
             console.timeEnd('drive-save');
-            console.error('Error en saveFinalUnifiedPDF:', saveErr.message);
+            console.error('Error en processPrintForUser:', saveErr.message);
             hidePdfProgress();
-            status.innerText = "⚠️ Error al guardar PDF en Drive: " + saveErr.message;
+            status.innerText = "⚠️ Error al registrar la impresión: " + saveErr.message;
             status.className = "error-text";
             btn.disabled = false;
             return;
@@ -1189,34 +1197,19 @@
             ? { fileId: saveResult }
             : saveResult;
 
-          // Paso 2: Abrir visualizador — si popup bloqueado, mostrar enlace y NO registrar impresión
+          // Paso 2: Abrir visualizador. La impresión YA quedó registrada de forma atómica en el
+          // servidor, por lo que un bloqueo de popup no produce inconsistencia de contadores.
           try {
             openSavedPdfPreview(normalizedResult);
           } catch (previewErr) {
             const url = previewErr.message.replace('POPUP_BLOCKED:', '');
-            status.innerHTML = '⚠️ PDF guardado en Drive, pero las ventanas emergentes están bloqueadas. '
-              + 'Habilítelas para que se registre la impresión. '
-              + '<a href="' + url + '" target="_blank">Abrir PDF</a>';
-            status.className = "error-text";
-            btn.disabled = false;
-            return;
-          }
-
-          // Paso 3: Log post-guardado (sin bloquear)
-          finalizeFinalPdfPostSaveAsync(orderNo, normalizedResult.fileId, normalizedResult.archivoReemplazado, userId)
-            .catch(e => console.error('Error en finalizeFinalPdfPostSave:', e.message));
-
-          // Paso 4: Registrar trazabilidad solo si el PDF se abrió correctamente
-          console.time('traceability-update');
-          try {
-            await updateTraceabilityAsync(orderNo, userId, totalPages, printType);
-            console.timeEnd('traceability-update');
-          } catch (traceErr) {
-            console.timeEnd('traceability-update');
             hidePdfProgress();
-            status.innerText = "⚠️ PDF guardado y abierto, pero error al registrar impresión: " + traceErr.message;
-            status.className = "error-text";
+            status.innerHTML = '✅ Impresión registrada. Las ventanas emergentes están bloqueadas: '
+              + '<a href="' + url + '" target="_blank">Abrir PDF</a>';
+            status.className = "success-text";
             btn.disabled = false;
+            resetPreloadState();
+            document.getElementById('orderNo').value = '';
             return;
           }
 

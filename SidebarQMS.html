@@ -89,10 +89,10 @@
         <div id="tab-gestion" class="tab-content active">
           <div class="section-title">Gestión de Documentos</div>
           <button id="btn-load-orders" class="btn-action" onclick="openSubView('carga-ordenes')">
-            <span class="icon">📥</span> Cargar Nuevas Órdenes
+            <span class="icon">📥</span>  Solicitar Nueva Órden
           </button>
           <button id="btn-upload-docs" class="btn-action" onclick="openSubView('subida-documentos')">
-            <span class="icon">📤</span> Subir Documentos
+            <span class="icon">📤</span> Subir Documentos Adjuntos
           </button>
 
           <div class="section-title" style="margin-top: 24px;">Centro de Impresión</div>
@@ -124,7 +124,38 @@
             <button id="btn-init-system" class="btn-action" onclick="google.script.run.inicializarSistemaCompleto(); showToast('Inicializando...', 'success')">
               <span class="icon">🛠️</span> Inicializar Sistema
             </button>
-            <!-- Future config buttons can go here -->
+
+            <!-- Panel: Autoaprobación temporal de solicitudes (requiere GESTIONAR_AUTOAPROBACION) -->
+            <div id="autoaprob-panel" style="display:none; margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Autoaprobación temporal</div>
+              <div id="autoaprob-estado" style="font-size:12px; margin-bottom:10px; color:#64748b;"></div>
+
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#0f172a; margin-bottom:10px;">
+                <input type="checkbox" id="aa_enabled" onchange="autoAprob_toggle()"> Activar autoaprobación
+              </label>
+
+              <div id="aa_fields" style="display:none;">
+                <label style="font-size:12px; font-weight:600;">Vigente hasta</label>
+                <input type="datetime-local" id="aa_expires" style="width:100%; padding:6px; font-size:13px; margin:4px 0 12px; border:1px solid #ccc; border-radius:4px;">
+
+                <label style="font-size:12px; font-weight:600;">Tipos de solicitud</label>
+                <div style="margin:6px 0 12px;">
+                  <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px; margin-right:14px;"><input type="checkbox" id="aa_tipo_reimp"> Reimpresión</label>
+                  <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="aa_tipo_adic"> Adicional</label>
+                </div>
+
+                <label style="font-size:12px; font-weight:600;">Usuarios</label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin:6px 0;"><input type="checkbox" id="aa_users_all" checked onchange="autoAprob_toggleUsers()"> Todos los usuarios</label>
+                <select id="aa_users" multiple size="4" style="width:100%; font-size:13px; margin-bottom:12px; display:none; border:1px solid #ccc; border-radius:4px;"></select>
+
+                <label style="font-size:12px; font-weight:600;">Órdenes / procesos</label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin:6px 0;"><input type="checkbox" id="aa_orders_all" checked onchange="autoAprob_toggleOrders()"> Todas las órdenes</label>
+                <input type="text" id="aa_orders" placeholder="NoOrden o Proceso separados por coma" style="width:100%; padding:6px; font-size:13px; margin-bottom:12px; display:none; border:1px solid #ccc; border-radius:4px;">
+              </div>
+
+              <button id="aa_save" class="btn-primary-small" style="width:100%;" onclick="autoAprob_save()">Guardar configuración</button>
+              <div id="aa_status" style="font-size:12px; margin-top:8px;"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -456,6 +487,126 @@
       // Si no tenemos session email o falla la validación extra, podemos basarnos en un permiso genérico o dejarlo
       // Por seguridad el backend lo rechaza igual si no es ADMIN, pero lo inhabilitamos visualmente
       document.getElementById("btn-init-system").disabled = !esAdmin;
+
+      // Panel de autoaprobación temporal: solo visible con permiso GESTIONAR_AUTOAPROBACION
+      var aaPanel = document.getElementById('autoaprob-panel');
+      if (aaPanel) {
+        var puedeAutoAprob = !!perms["GESTIONAR_AUTOAPROBACION"];
+        aaPanel.style.display = puedeAutoAprob ? 'block' : 'none';
+        if (puedeAutoAprob) autoAprob_init();
+      }
+    }
+
+    /* ========================================================
+       MODULO: AUTOAPROBACIÓN TEMPORAL (Config tab)
+       ======================================================== */
+    function autoAprob_toggle() {
+      document.getElementById('aa_fields').style.display = document.getElementById('aa_enabled').checked ? 'block' : 'none';
+    }
+    function autoAprob_toggleUsers() {
+      document.getElementById('aa_users').style.display = document.getElementById('aa_users_all').checked ? 'none' : 'block';
+    }
+    function autoAprob_toggleOrders() {
+      document.getElementById('aa_orders').style.display = document.getElementById('aa_orders_all').checked ? 'none' : 'block';
+    }
+
+    function autoAprob_init() {
+      var sel = document.getElementById('aa_users');
+      if (sel && sysData && sysData.users) {
+        sel.innerHTML = sysData.users.map(function(u){ return '<option value="' + u.userId + '">' + u.nombreCompleto + '</option>'; }).join('');
+      }
+      google.script.run
+        .withSuccessHandler(function(cfg){ autoAprob_render(cfg); })
+        .withFailureHandler(function(err){ document.getElementById('autoaprob-estado').innerText = 'No se pudo cargar la configuración: ' + err.message; })
+        .getAutoApprovalConfig();
+    }
+
+    function autoAprob_render(cfg) {
+      cfg = cfg || {};
+      var estado = document.getElementById('autoaprob-estado');
+      if (cfg.active) {
+        estado.innerHTML = '🟢 <b>Activa</b> hasta ' + (cfg.expiresAt || '—');
+      } else if (cfg.enabled) {
+        estado.innerHTML = '🟠 Configurada pero <b>expirada</b>.';
+      } else {
+        estado.innerHTML = '⚪ Desactivada.';
+      }
+      document.getElementById('aa_enabled').checked = !!cfg.enabled;
+      autoAprob_toggle();
+      document.getElementById('aa_expires').value = cfg.expiresAt ? String(cfg.expiresAt).slice(0, 16) : '';
+      var tipos = (cfg.tipos || []).map(function(t){ return String(t).toLowerCase(); });
+      document.getElementById('aa_tipo_reimp').checked = tipos.some(function(t){ return t.indexOf('reimp') === 0; });
+      document.getElementById('aa_tipo_adic').checked = tipos.indexOf('adicional') !== -1;
+      var users = cfg.userIds || ['all'];
+      var allU = users.indexOf('all') !== -1 || users.indexOf('ALL') !== -1;
+      document.getElementById('aa_users_all').checked = allU;
+      autoAprob_toggleUsers();
+      if (!allU) {
+        var opts = document.getElementById('aa_users').options;
+        for (var i = 0; i < opts.length; i++) { opts[i].selected = users.indexOf(opts[i].value) !== -1; }
+      }
+      var ordenes = cfg.ordenes || ['all'];
+      var allO = ordenes.indexOf('all') !== -1 || ordenes.indexOf('ALL') !== -1;
+      document.getElementById('aa_orders_all').checked = allO;
+      autoAprob_toggleOrders();
+      document.getElementById('aa_orders').value = allO ? '' : ordenes.join(', ');
+    }
+
+    async function autoAprob_save() {
+      var enabled = document.getElementById('aa_enabled').checked;
+      var expiresAt = document.getElementById('aa_expires').value;
+      var tipos = [];
+      if (document.getElementById('aa_tipo_reimp').checked) tipos.push('Reimpresión');
+      if (document.getElementById('aa_tipo_adic').checked) tipos.push('Adicional');
+
+      var userIds;
+      if (document.getElementById('aa_users_all').checked) {
+        userIds = ['all'];
+      } else {
+        userIds = Array.prototype.slice.call(document.getElementById('aa_users').selectedOptions).map(function(o){ return o.value; });
+        if (!userIds.length) userIds = ['all'];
+      }
+
+      var ordenes;
+      if (document.getElementById('aa_orders_all').checked) {
+        ordenes = ['all'];
+      } else {
+        ordenes = document.getElementById('aa_orders').value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        if (!ordenes.length) ordenes = ['all'];
+      }
+
+      var statusEl = document.getElementById('aa_status');
+      if (enabled) {
+        if (!expiresAt) { statusEl.innerHTML = '❌ Indique la fecha de expiración.'; return; }
+        if (!tipos.length) { statusEl.innerHTML = '❌ Seleccione al menos un tipo de solicitud.'; return; }
+      }
+
+      var pin;
+      try { pin = await promptSecurityPin('Ingrese su PIN para guardar la configuración de autoaprobación:'); }
+      catch (e) { return; }
+      if (!pin) return;
+
+      statusEl.innerHTML = '⏳ Guardando...';
+      try {
+        var res = await fetch(sysData.webAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            operation: 'setAutoApprovalConfig',
+            enabled: enabled, expiresAt: expiresAt, tipos: tipos, userIds: userIds, ordenes: ordenes,
+            pinFirma: pin, userId: sysData.currentUser.userId
+          })
+        }).then(function(r){ return r.json(); });
+
+        if (res.status === 'success') {
+          statusEl.innerHTML = '✅ ' + res.message;
+          autoAprob_render(res.config);
+        } else {
+          statusEl.innerHTML = '❌ ' + (res.message || 'Error al guardar.');
+        }
+      } catch (err) {
+        statusEl.innerHTML = '❌ ' + err.message;
+      }
     }
 
     // Navegación
@@ -1626,18 +1777,16 @@
             status.innerText = "✅ Listo. Abriendo visor...";
             status.style.color = "#0f5132";
             btn.disabled = false;
-            
-            // Log post-guardado y trazabilidad (en paralelo)
-            google.script.run.finalizeFinalPdfForUser(orderNo, res.fileId, res.archivoReemplazado, userId);
-            google.script.run.updateTraceabilityForUser(orderNo, userId, totalPages, printType);
-            
+
+            // La generación del PDF, el contador y la trazabilidad se registraron de forma
+            // atómica en el servidor (processPrintForUser). Aquí solo abrimos el visor.
             // ABRIR EL VISOR PDF EN LA VENTANA PRE-ABIERTA
             if (res.viewerUrl) {
                printWindow.location.href = res.viewerUrl;
             } else {
                printWindow.location.href = 'https://drive.google.com/file/d/' + res.fileId + '/view';
             }
-            
+
             // Limpiar form
             document.getElementById('imp_orderNo').value = '';
             imp_resetPreload();
@@ -1649,7 +1798,7 @@
             btn.disabled = false;
             if (printWindow) printWindow.close();
           })
-          .saveFinalUnifiedPDFForUser(finalBase64, orderNo, userId, printType);
+          .processPrintForUser(finalBase64, orderNo, userId, printType, totalPages);
         
       } catch (err) {
         status.innerText = "❌ Error: " + err.message;
@@ -1684,7 +1833,7 @@
           .withSuccessHandler(res => {
             hideLoading();
             if (res.status === 'success') {
-              showToast("Solicitud enviada a QA", "success");
+              showToast(res.autoAprobada ? "✅ Autoaprobada — ya puede imprimir" : "Solicitud enviada a QA", "success");
               document.getElementById('imp_orderNo').value = '';
               imp_resetPreload();
             } else {

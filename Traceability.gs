@@ -48,42 +48,54 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   if (rowIndex === -1) throw new Error("Row lost during update.");
 
   var consecutivo = Number(sheet.getRange(rowIndex, cols.ConsecutivoImp).getValue()) || 0;
-  
+
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
-  
+
   var newEntry = consecutivo + "-" + nombreCorto + " " + timestamp + " (" + pagesPrinted + ")";
 
-  function sumCsv(csvString) {
-    if (!csvString) return 0;
-    var parts = csvString.toString().split(",");
-    var sum = 0;
-    for (var p = 0; p < parts.length; p++) {
-      sum += Number(parts[p].trim()) || 0;
-    }
-    return sum;
-  }
+  // Capturar STATUS previo para distinguir impresión Inicial vs Adicional en el historial
+  var prevStatus = sheet.getRange(rowIndex, cols.STATUS).getValue();
+  prevStatus = prevStatus ? prevStatus.toString().trim() : "";
 
-  if (printType === "Reimpresion") {
+  // Normalizar el tipo para tolerar variantes de acento/caso ('Reimpresión' vs 'Reimpresion')
+  var esReimpresion = isReimpresionType_(printType);
+
+  var etiquetaEvento;
+
+  if (esReimpresion) {
     sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.REIMPRESO);
-    
+
+    // La reimpresión se registra por separado y NO suma a TotalPags (copias válidas)
     var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
     sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
-    
+
     var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
-    sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
+    sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry);
+
+    etiquetaEvento = "REIMPRESIÓN";
   } else {
     sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.IMPRESO);
-    
+
+    // Impresión inicial y adicional suman a NoPags (copias válidas)
     var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
     sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
-    
+
     var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
-    sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry); 
+    sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry);
+
+    // Si la orden ya estaba Impresa/Reimpresa, es una impresión ADICIONAL; si no, es la INICIAL
+    etiquetaEvento = (prevStatus === VALORES_STATUS.IMPRESO || prevStatus === VALORES_STATUS.REIMPRESO)
+      ? "IMPRESIÓN ADICIONAL"
+      : "IMPRESIÓN INICIAL";
   }
 
+  // TotalPags = copias válidas (Inicial + Adicional). La reimpresión NO suma aquí.
   var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-  var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
-  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
+  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags);
+
+  // Registrar el evento en el historial consolidado legible (columna HistorialImpresion)
+  appendHistorialImpresion_(sheet, rowIndex, headers,
+    etiquetaEvento + " #" + consecutivo + " · " + pagesPrinted + " pág · " + nombreCorto);
 
   // --- CERRAR SOLICITUD APROBADA SI EXISTE ---
   try {

@@ -588,6 +588,25 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     throw new Error("El sistema está procesando otra orden simultánea. Por favor, intente nuevamente en unos segundos.");
   }
   try {
+    return saveFinalUnifiedPDFCore_(base64Data, orderNo);
+  } catch (e) {
+    Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
+    throw new Error("Error al guardar PDF final: " + e.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Núcleo de generación del PDF final. NO adquiere lock (el llamador DEBE tenerlo).
+ * Crea el archivo en Drive ANTES de comprometer el consecutivo, de modo que un fallo
+ * al crear el archivo no deje el contador avanzado sin documento asociado.
+ * Devuelve además el contexto necesario para un rollback transaccional.
+ * @param {string} base64Data - Datos del PDF en base64
+ * @param {string} orderNo - Número de orden
+ * @returns {Object} { fileId, file, drivePreviewUrl, viewerUrl, consecutivo, oldConsecutivo, rowIndex, colConsecutivo, sheet }
+ */
+function saveFinalUnifiedPDFCore_(base64Data, orderNo) {
     var startedAt = new Date().getTime();
     var printConfig = getPrintConfig_();
     var folderId = printConfig.DOC_COMPLETO;
@@ -664,25 +683,26 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
       throw new Error("El consecutivo de impresión es inválido o excede el límite permitido (9999). Valor actual: " + rawConsecutivo + ", siguiente: " + nextConsecutivo);
     }
     
-    // Actualizar consecutivo en la hoja
-    sheet.getRange(rowIndex, colConsecutivo).setValue(nextConsecutivo);
-    SpreadsheetApp.flush(); // Forzar escritura síncrona
-    
     // Construir nombre de archivo
     var targetFileName = 'Orden_' + orderNo + '_' + nextConsecutivo + '.pdf';
-    
+
     Logger.log("Guardando versión #" + nextConsecutivo + ": " + targetFileName);
-    
-    // Decodificar base64 y crear el archivo
+
+    // 1) CREAR EL ARCHIVO PRIMERO (antes de comprometer el consecutivo)
     var decodeStartedAt = new Date().getTime();
     var decodedData = Utilities.base64Decode(base64Data);
     var blob = Utilities.newBlob(decodedData, 'application/pdf', targetFileName);
     Logger.log("saveFinalUnifiedPDF decode/blob ms: " + (new Date().getTime() - decodeStartedAt));
-    
+
     var createStartedAt = new Date().getTime();
     var file = folder.createFile(blob);
     Logger.log("saveFinalUnifiedPDF createFile ms: " + (new Date().getTime() - createStartedAt));
     var fileId = file.getId();
+
+    // 2) COMPROMETER EL CONSECUTIVO SOLO CUANDO EL ARCHIVO YA EXISTE EN DRIVE
+    //    (si createFile hubiera fallado, el contador nunca se habría avanzado)
+    sheet.getRange(rowIndex, colConsecutivo).setValue(nextConsecutivo);
+    SpreadsheetApp.flush(); // Forzar escritura síncrona
     
     var drivePreviewUrl = file.getUrl();
     
@@ -690,21 +710,19 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
     var viewerUrl = webAppUrl + '?action=secure&fileId=' + fileId + '&orderNo=' + orderNo;
     Logger.log("saveFinalUnifiedPDF total ms: " + (new Date().getTime() - startedAt));
     
-    // Retornar URLs y consecutivo
+    // Retornar URLs y consecutivo + contexto para rollback transaccional
     return {
       fileId: fileId,
+      file: file,
       drivePreviewUrl: drivePreviewUrl,
       viewerUrl: viewerUrl,
       archivoReemplazado: false,
-      consecutivo: nextConsecutivo
+      consecutivo: nextConsecutivo,
+      oldConsecutivo: currentConsecutivo,
+      rowIndex: rowIndex,
+      colConsecutivo: colConsecutivo,
+      sheet: sheet
     };
-    
-  } catch (e) {
-    Logger.log("Error en saveFinalUnifiedPDF: " + e.message);
-    throw new Error("Error al guardar PDF final: " + e.message);
-  } finally {
-    lock.releaseLock();
-  }
 }
 
 /**
@@ -779,12 +797,14 @@ function checkPrintAuthorization_(orderNo, printType, userId) {
   }
   
   if (statusValue === "Impreso" || statusValue === "Reimpreso") {
-    // Si ya está impresa, SOLO se puede si el tipo es Adicional o Reimpresión Y existe solicitud Aprobada
-    if (printType !== "Adicional" && printType !== "Reimpresión") {
+    // Si ya está impresa, SOLO se puede si el tipo es Adicional o Reimpresión Y existe solicitud Aprobada.
+    // Se normaliza el tipo para tolerar variantes de acento/caso ('Reimpresión' vs 'Reimpresion').
+    if (normalizePrintType_(printType) !== 'adicional' && !isReimpresionType_(printType)) {
        throw new Error("Violación de seguridad: La orden ya está impresa. Use Adicional o Reimpresión.");
     }
-    
-    // Verificar en SolicitudesImpresion
+
+    // Verificar en SolicitudesImpresion (SOLO validación: la solicitud se consume al registrar
+    // la trazabilidad de forma exitosa, no aquí, para no consumirla si la generación falla).
     var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
     var isApproved = false;
     if (solicitudesSheet) {
@@ -792,24 +812,22 @@ function checkPrintAuthorization_(orderNo, printType, userId) {
       var solData = solicitudesSheet.getDataRange().getValues();
       var colSolNoOrden = getColumnIndexByNameCaseInsensitive(solHeaders, 'NoOrden', false);
       var colSolEstado = getColumnIndexByNameCaseInsensitive(solHeaders, 'Estado', false);
-      
+
       for (var j = 1; j < solData.length; j++) {
         var sOrden = solData[j][colSolNoOrden-1] ? solData[j][colSolNoOrden-1].toString().trim() : "";
         var sEstado = solData[j][colSolEstado-1] ? solData[j][colSolEstado-1].toString().trim() : "";
         if (sOrden === orderNo.toString().trim() && sEstado === 'Aprobada') {
           isApproved = true;
-          // Marcar como utilizada
-          solicitudesSheet.getRange(j + 1, colSolEstado).setValue('Utilizada');
           break;
         }
       }
     }
-    
+
     if (!isApproved) {
       throw new Error("Violación de seguridad: No existe una solicitud QA Aprobada para reimprimir esta orden.");
     }
   }
-  
+
   return true;
 }
 
@@ -827,6 +845,78 @@ function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId, printType) {
   enforcePermission(userId, 'IMPRIMIR_ORDEN');
   checkPrintAuthorization_(orderNo, printType || "Inicial", userId);
   return saveFinalUnifiedPDF(base64Data, orderNo);
+}
+
+/**
+ * TRANSACCIÓN ATÓMICA DE IMPRESIÓN.
+ * Valida autorización, genera el PDF, registra trazabilidad y finaliza, todo bajo un ÚNICO lock.
+ * Reemplaza la antigua orquestación cliente de 3 llamadas (saveFinalUnifiedPDFForUser +
+ * updateTraceabilityForUser + finalizeFinalPdfForUser), que dejaba fugas de integridad:
+ *   - consecutivo avanzado sin archivo si createFile fallaba,
+ *   - trazabilidad "fire-and-forget" (o saltada si el popup se bloqueaba),
+ *   - solicitud aprobada consumida antes de generar el PDF.
+ *
+ * Si algún paso posterior a la creación del archivo falla, revierte: elimina el archivo y
+ * restaura el consecutivo, dejando la orden en un estado consistente.
+ *
+ * La contabilización ocurre al guardar el PDF en Drive (documento controlado emitido),
+ * independientemente de que el visor llegue a abrirse en el navegador del operario.
+ *
+ * @param {string} base64Data - PDF final en base64
+ * @param {string} orderNo - Número de orden
+ * @param {string} userId - UserID del operario
+ * @param {string} printType - 'Inicial' | 'Adicional' | 'Reimpresion'
+ * @param {number} pagesPrinted - Total de páginas del PDF generado
+ * @returns {Object} { fileId, viewerUrl, drivePreviewUrl, consecutivo, archivoReemplazado }
+ * @throws {Error} Si no está autorizado o si la transacción no pudo completarse (revierte).
+ */
+function processPrintForUser(base64Data, orderNo, userId, printType, pagesPrinted) {
+  enforcePermission(userId, 'IMPRIMIR_ORDEN');
+
+  var tipo = printType || "Inicial";
+  var paginas = Number(pagesPrinted) || 0;
+  if (paginas <= 0) {
+    throw new Error("Número de páginas inválido para registrar la impresión.");
+  }
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) {
+    throw new Error("El sistema está procesando otra orden simultánea. Intente nuevamente en unos segundos.");
+  }
+
+  var saveResult = null;
+  try {
+    // 1. Validación de autorización (pura; NO consume la solicitud aprobada)
+    checkPrintAuthorization_(orderNo, tipo, userId);
+
+    // 2. Generación del archivo (crea el archivo y luego compromete el consecutivo)
+    saveResult = saveFinalUnifiedPDFCore_(base64Data, orderNo);
+
+    // 3. Trazabilidad + STATUS + historial + cierre de solicitud aprobada, y finalización
+    try {
+      internalUpdateTraceability(orderNo, userId, paginas, tipo);
+      finalizeFinalPdfPostSave(orderNo, saveResult.fileId, false, userId);
+    } catch (postErr) {
+      // ROLLBACK: eliminar el archivo y restaurar el consecutivo para mantener consistencia
+      try { saveResult.file.setTrashed(true); } catch (ignoredFileErr) {}
+      try {
+        saveResult.sheet.getRange(saveResult.rowIndex, saveResult.colConsecutivo).setValue(saveResult.oldConsecutivo);
+        SpreadsheetApp.flush();
+      } catch (ignoredCounterErr) {}
+      Logger.log("processPrintForUser: rollback ejecutado. Causa: " + postErr.message);
+      throw new Error("Impresión revertida por error al registrar trazabilidad: " + postErr.message);
+    }
+
+    return {
+      fileId: saveResult.fileId,
+      viewerUrl: saveResult.viewerUrl,
+      drivePreviewUrl: saveResult.drivePreviewUrl,
+      consecutivo: saveResult.consecutivo,
+      archivoReemplazado: false
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1084,6 +1174,14 @@ function registrarSolicitudImpresion(params, userId) {
     // Obtener identidad del solicitante
     var userIdentity = getUserIdentityStringByUserId_(userId);
 
+    // --- EVALUAR AUTOAPROBACIÓN TEMPORAL CONFIGURABLE ---
+    // Filtra por ventana de tiempo, tipo de solicitud, usuarios y órdenes/procesos.
+    var colProceso = getColumnIndexByNameCaseInsensitive(headers, 'Proceso', false);
+    var procesoOrden = colProceso ? (ordenesSheet.getRange(targetRowIndex, colProceso).getValue() || '').toString().trim() : '';
+    var autoAprob = evaluateAutoApproval_(params.tipoSolicitud, userId, params.noOrden, procesoOrden);
+    var estadoInicial = autoAprob.approved ? 'Aprobada' : 'Pendiente QA';
+    var firmaInicial = autoAprob.approved ? ('Autoaprobación: ' + autoAprob.reason) : '';
+
     // Insertar fila en SolicitudesImpresion
     var solicitudesHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
     var newRow = [];
@@ -1095,8 +1193,8 @@ function registrarSolicitudImpresion(params, userId) {
       'TipoSolicitud': params.tipoSolicitud,
       'Motivo': params.motivo,
       'Plantillas': params.plantillas,
-      'Estado': 'Pendiente QA',
-      'FirmaQA': ''
+      'Estado': estadoInicial,
+      'FirmaQA': firmaInicial
     };
 
     for (var i = 0; i < solicitudesHeaders.length; i++) {
@@ -1106,12 +1204,21 @@ function registrarSolicitudImpresion(params, userId) {
 
     solicitudesSheet.appendRow(newRow);
 
-    // Registrar en Logs
+    // Registrar en Logs, historial de la orden y responder según autoaprobación
+    var histSolicitud = "SOLICITUD " + params.tipoSolicitud + " (" + idSolicitud + ")"
+      + (autoAprob.approved ? " AUTOAPROBADA" : " → Pendiente QA")
+      + (params.motivo ? " · " + params.motivo : "") + " · " + userIdentity;
+    appendHistorialImpresion_(ordenesSheet, targetRowIndex, headers, histSolicitud);
+
+    if (autoAprob.approved) {
+      logChange('AUTOAPROBACION_IMPRESION', 'Solicitud ' + idSolicitud + ' para orden ' + params.noOrden + ' AUTOAPROBADA (' + autoAprob.reason + ')', userIdentity);
+      Logger.log("Solicitud autoaprobada: " + idSolicitud + " (" + autoAprob.reason + ")");
+      return { status: 'success', message: 'Solicitud autoaprobada por configuración vigente. Ya puede imprimir.', idSolicitud: idSolicitud, autoAprobada: true };
+    }
+
     logChange('SOLICITUD_IMPRESION', 'Solicitud ' + idSolicitud + ' creada para orden ' + params.noOrden + ' (Tipo: ' + params.tipoSolicitud + ')', userIdentity);
-
     Logger.log("Solicitud de impresión registrada: " + idSolicitud + " para orden " + params.noOrden);
-
-    return { status: 'success', message: 'Solicitud enviada a QA exitosamente.', idSolicitud: idSolicitud };
+    return { status: 'success', message: 'Solicitud enviada a QA exitosamente.', idSolicitud: idSolicitud, autoAprobada: false };
 
   } catch (e) {
     Logger.log("Error en registrarSolicitudImpresion: " + e.message);
@@ -1177,9 +1284,10 @@ function procesarAprobacionImpresionQA(params, userId) {
         solicitudesSheet.getRange(i + 1, colFirmaQA).setValue(firmaQA);
         procesadas++;
 
-        // Registrar en Logs
+        // Registrar en Logs y en el historial consolidado de la orden
         var noOrden = colNoOrden ? (data[i][colNoOrden - 1] || '').toString() : '';
         logChange('APROBACION_IMPRESION_QA', 'Solicitud ' + idSolicitud + ' para orden ' + noOrden + ' fue ' + accion.toLowerCase(), userIdentity);
+        appendHistorialByOrderNo_(noOrden, "QA " + accion + " solicitud " + idSolicitud + " · " + userIdentity);
       }
     }
 

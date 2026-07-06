@@ -191,11 +191,18 @@ function handlePrivilegedOperation_(params) {
     return procesarAprobacionImpresionQA(params, callingUserId);
   }
 
+  if (operation === 'setAutoApprovalConfig') {
+    if (!hasPermission(callingUserId, PERMISOS.GESTIONAR_AUTOAPROBACION)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    return procesarSetAutoApproval(params, callingUserId);
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA', 'solicitarImpresion', 'procesarAprobacionImpresionQA']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA', 'solicitarImpresion', 'procesarAprobacionImpresionQA', 'setAutoApprovalConfig']
   };
 }
 
