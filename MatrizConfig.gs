@@ -26,11 +26,27 @@ function ensureMatricesConfigSheet_() {
     sheet = ss.insertSheet(SYS_MATRICES_SHEET_NAME);
 
     // Escribir encabezados
-    sheet.getRange(1, 1, 1, MATRICES_CONFIG_HEADERS.length)
+    var headerRange = sheet.getRange(1, 1, 1, MATRICES_CONFIG_HEADERS.length);
+    headerRange
       .setValues([MATRICES_CONFIG_HEADERS])
       .setFontWeight('bold')
       .setBackground('#263238')
       .setFontColor('#FFFFFF');
+      
+    // Notas explicativas en el encabezado
+    var notes = [
+      "Nombre descriptivo para identificar esta Matriz (Ej. 'Matriz 2026')",
+      "ID del archivo de Google Sheets (la cadena larga en la URL entre /d/ y /edit)",
+      "Nombre exacto de la pestaña/hoja interna donde están los datos (Ej. 'Hoja 1')",
+      "Nombre exacto de la columna que contiene el No Análisis K (Ej. 'No Análisis')",
+      "Nombre exacto de la columna que contiene el Lote (Ej. 'Lote')",
+      "Nombre exacto de la columna que contiene la Cantidad Disponible (Ej. 'Cant. Disp.')",
+      "Nombre exacto de la columna que contiene la Fecha de Vencimiento (Ej. 'Exp')",
+      "Nombre exacto de la columna que contiene el Fabricante (Ej. 'Fabricante')",
+      "Orden de prioridad (1 = primera en buscar). Seleccione un número del dropdown.",
+      "Seleccione 'Si' para activarla o 'No' para ignorar esta matriz."
+    ];
+    headerRange.setNotes([notes]);
 
     // Ajustar anchos de columna para legibilidad
     sheet.setColumnWidth(1, 160);  // Nombre Matriz
@@ -46,18 +62,28 @@ function ensureMatricesConfigSheet_() {
 
     // Forzar encabezado de fila
     sheet.setFrozenRows(1);
+    
+    // --- Data Validations para primeras 20 filas (Prioridad y Activa) ---
+    var prioridadRules = [];
+    for (var i = 1; i <= 20; i++) prioridadRules.push(i.toString());
+    
+    var valPrioridad = SpreadsheetApp.newDataValidation().requireValueInList(prioridadRules, true).build();
+    var valActiva = SpreadsheetApp.newDataValidation().requireValueInList(['Si', 'No'], true).build();
+    
+    sheet.getRange(2, 9, 20, 1).setDataValidation(valPrioridad);
+    sheet.getRange(2, 10, 20, 1).setDataValidation(valActiva);
 
     // Proteger la hoja para que solo el propietario la edite directamente
-    // (Los cambios se harán a través del panel de configuración)
     try {
       var protection = sheet.protect().setDescription('Configuración de Matrices K - Solo sistema');
-      protection.setWarningOnly(true); // Warning, no bloqueo duro
+      protection.setWarningOnly(true);
     } catch (e) {
       Logger.log('MatrizConfig: No se pudo aplicar protección: ' + e.message);
     }
 
     // Ocultar la hoja (es de sistema, no visible para el usuario final)
     sheet.hideSheet();
+
 
     Logger.log('✓ MatrizConfig: Hoja ' + SYS_MATRICES_SHEET_NAME + ' creada.');
   } else {
