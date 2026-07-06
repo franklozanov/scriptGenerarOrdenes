@@ -178,6 +178,26 @@ function onEditInstalled(e) {
     // Las ediciones manuales del propietario SÍ deben registrarse
     if (!e || !e.range) return;
 
+    // --- DEFENSA EN PROFUNDIDAD: revertir ediciones MANUALES a hojas/columnas de sistema ---
+    // Las escrituras de la app son programáticas y NO disparan onEdit; aquí solo llega una edición
+    // manual. La protección ACL ya bloquea a los colaboradores; esto además revierte ediciones
+    // manuales del propietario, que por diseño solo debe modificar estos datos vía la aplicación.
+    var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad'];
+    if (HOJAS_BLOQUEADAS_.indexOf(sheetName) !== -1) {
+      revertManualEdit_(editedRange, e, sheetName, 'hoja bloqueada');
+      return;
+    }
+    if (sheetName === 'Ordenes') {
+      var ORDENES_COLS_SISTEMA_ = ['STATUS', 'NoPags', 'Reimpresion', 'TotalPags', 'ConsecutivoImp', 'ImpresoPor', 'Reimpreso', 'ReimpresoPor', 'HistorialImpresion', 'Decision', 'Fabricante'];
+      var hdrsSis = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var colEditadaNombre = hdrsSis[eCol - 1] ? hdrsSis[eCol - 1].toString().trim() : '';
+      if (ORDENES_COLS_SISTEMA_.indexOf(colEditadaNombre) !== -1) {
+        revertManualEdit_(editedRange, e, sheetName, 'columna de sistema: ' + colEditadaNombre);
+        return;
+      }
+    }
+    // --- FIN DEFENSA EN PROFUNDIDAD ---
+
     for (var j = 0; j < allRangeProtections.length; j++) {
       var pRange = allRangeProtections[j].getRange();
       if (eRow >= pRange.getRow() && eRow <= pRange.getLastRow() &&
@@ -372,7 +392,38 @@ function logChange(tipoCambio, descripcion, userIdentity) {
   
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
   var user = userIdentity || "Sistema";
-  
+
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
   Logger.log("✓ " + tipoCambio + " registrado en Logs");
+}
+
+/**
+ * Revierte una edición manual (defensa en profundidad) restaurando el valor previo y registrándola.
+ * Solo restaura celdas individuales (e.oldValue existe); en ediciones múltiples/pegado registra sin
+ * restaurar por celda. Las escrituras de la app son programáticas y no llegan aquí.
+ * @param {Range} range - Rango editado manualmente
+ * @param {Object} e - Objeto de evento onEdit
+ * @param {string} sheetName - Nombre de la hoja
+ * @param {string} motivo - Motivo de la reversión (para el log)
+ */
+function revertManualEdit_(range, e, sheetName, motivo) {
+  try {
+    if (e && e.oldValue !== undefined) {
+      range.setValue(e.oldValue);
+    } else {
+      Logger.log("revertManualEdit_: edición múltiple en " + sheetName + " (" + motivo + "), no se pudo restaurar el valor previo por celda.");
+    }
+  } catch (err) {
+    Logger.log("revertManualEdit_ error al restaurar: " + err.message);
+  }
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      "Edición revertida (" + motivo + "). Estos datos solo se modifican vía la aplicación.",
+      "⛔ Modificación no permitida",
+      6
+    );
+  } catch (err) {}
+  try {
+    logChange('REVERSION_EDICION_MANUAL', 'Edición manual revertida en ' + range.getA1Notation() + ' de ' + sheetName + ' (' + motivo + ')', 'Sistema (onEdit)');
+  } catch (err) {}
 }

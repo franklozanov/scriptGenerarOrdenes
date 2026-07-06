@@ -138,6 +138,29 @@ function initializeCompleteSystem(ui) {
   ui.alert("✅ Sistema inicializado completamente:\n\n" + summary.join("\n"));
 }
 
+/**
+ * Wrapper invocable desde el sidebar (google.script.run) para inicializar el sistema completo.
+ * El menú de la hoja usa promptInitializeApp; el botón del panel lateral usa esta función.
+ * Verifica que el llamador sea administrador y reutiliza initializeCompleteSystem.
+ * @returns {string} Mensaje de resultado para mostrar en el sidebar.
+ * @throws {Error} Si el usuario no es administrador.
+ */
+function inicializarSistemaCompleto() {
+  var email = "";
+  try { email = Session.getActiveUser().getEmail(); } catch (e) {}
+  var user = email ? getUserRecordByEmail_(email) : null;
+  var rolUpper = user && user.rol ? user.rol.toString().toUpperCase() : "";
+  var esAdmin = (rolUpper === 'ADMIN' || rolUpper === 'ADMINISTRADOR' || rolUpper === 'ADMINISTRADOR DE SISTEMA')
+    || (user && hasPermissionByRol(user.rol, PERMISOS.MENU_ADMIN));
+
+  if (!esAdmin) {
+    throw new Error("ACCESO DENEGADO: Solo un administrador puede inicializar el sistema.");
+  }
+
+  initializeCompleteSystem(SpreadsheetApp.getUi());
+  return "✅ Sistema inicializado: hojas, columnas, permisos, protecciones y validaciones aplicadas.";
+}
+
 // --- FUNCIONES AUXILIARES DE INICIALIZACIÓN ---
 
 /**

@@ -198,11 +198,24 @@ function handlePrivilegedOperation_(params) {
     return procesarSetAutoApproval(params, callingUserId);
   }
 
+  if (operation === 'processPrint') {
+    if (!hasPermission(callingUserId, PERMISOS.IMPRIMIR_ORDEN)) {
+      return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.base64Data || !params.orderNo || !params.pagesPrinted) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para procesar la impresión.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    // Corre como el propietario (identidad de la Web App), por lo que puede escribir en las
+    // columnas/hojas protegidas de Ordenes. La transacción es atómica con rollback.
+    var printResult = processPrintForUser(params.base64Data, params.orderNo, callingUserId, params.printType || 'Inicial', params.pagesPrinted);
+    return { status: 'success', message: 'Impresión registrada para orden ' + params.orderNo, data: printResult };
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA', 'solicitarImpresion', 'procesarAprobacionImpresionQA', 'setAutoApprovalConfig']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'cargarOrdenesMasivas', 'autorizarOrdenesQA', 'solicitarImpresion', 'procesarAprobacionImpresionQA', 'setAutoApprovalConfig', 'processPrint']
   };
 }
 

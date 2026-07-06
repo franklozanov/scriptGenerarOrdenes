@@ -121,7 +121,7 @@
           <div class="section-title">Configuración del Sistema</div>
           <div id="config-content" style="font-size: 13px; color: #64748b; padding: 10px 0;">
             <p>Opciones de configuración exclusivas para administradores.</p>
-            <button id="btn-init-system" class="btn-action" onclick="google.script.run.inicializarSistemaCompleto(); showToast('Inicializando...', 'success')">
+            <button id="btn-init-system" class="btn-action" onclick="ejecutarInicializacion()">
               <span class="icon">🛠️</span> Inicializar Sistema
             </button>
 
@@ -495,6 +495,29 @@
         aaPanel.style.display = puedeAutoAprob ? 'block' : 'none';
         if (puedeAutoAprob) autoAprob_init();
       }
+    }
+
+    // Envía una operación privilegiada a la Web App (corre como propietario). Se usa para
+    // todas las escrituras a hojas/columnas protegidas: impresión, solicitud, aprobación y
+    // autorización QA. Devuelve el JSON de respuesta del servidor.
+    async function postWebApp(payload) {
+      const res = await fetch(sysData.webAppUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+      return res.json();
+    }
+
+    function ejecutarInicializacion() {
+      if (!confirm('¿Inicializar el sistema? Se validarán hojas, columnas, permisos y protecciones. Puede aparecer un resumen sobre la hoja de cálculo.')) return;
+      var btn = document.getElementById('btn-init-system');
+      if (btn) btn.disabled = true;
+      showToast('Inicializando sistema...', 'success');
+      google.script.run
+        .withSuccessHandler(function(msg){ if (btn) btn.disabled = false; showToast(msg || 'Sistema inicializado', 'success'); })
+        .withFailureHandler(function(err){ if (btn) btn.disabled = false; showError('Error al inicializar: ' + (err && err.message ? err.message : err)); })
+        .inicializarSistemaCompleto();
     }
 
     /* ========================================================
@@ -1327,21 +1350,19 @@
       }
       
       showLoading('Autorizando órdenes...');
-      google.script.run
-        .withSuccessHandler(function(data) {
-          hideLoading();
-          if (data.status === 'success') {
-            showToast(data.message || 'Órdenes autorizadas.', 'success');
-            qa_initView(); // Recargar
-          } else {
-            showAlert(data.message || 'Error al autorizar.', 'error');
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideLoading();
-          showError('Error: ' + error.message);
-        })
-        .procesarAutorizacionQA({ targetIds: selectedIds, pinFirma: pinFirma }, sysData.currentUser.userId);
+      try {
+        const data = await postWebApp({ operation: 'autorizarOrdenesQA', targetIds: selectedIds, pinFirma: pinFirma, userId: sysData.currentUser.userId });
+        hideLoading();
+        if (data.status === 'success') {
+          showToast(data.message || 'Órdenes autorizadas.', 'success');
+          qa_initView(); // Recargar
+        } else {
+          showAlert(data.message || 'Error al autorizar.', 'error');
+        }
+      } catch (error) {
+        hideLoading();
+        showError('Error: ' + error.message);
+      }
     }
 
     /* ========================================================
@@ -1434,21 +1455,19 @@
       }
       
       showLoading(accion === 'Aprobada' ? 'Aprobando...' : 'Rechazando...');
-      google.script.run
-        .withSuccessHandler(function(data) {
-          hideLoading();
-          if (data.status === 'success') {
-            showToast(data.message || 'Solicitudes procesadas.', 'success');
-            qai_initView(); // Recargar
-          } else {
-            showAlert(data.message || 'Error al procesar.', 'error');
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideLoading();
-          showError('Error de comunicación: ' + error.message);
-        })
-        .procesarAprobacionImpresionQA({ targetIds: selectedIds, accion: accion, pinFirma: pinFirma }, sysData.currentUser.userId);
+      try {
+        const data = await postWebApp({ operation: 'procesarAprobacionImpresionQA', targetIds: selectedIds, accion: accion, pinFirma: pinFirma, userId: sysData.currentUser.userId });
+        hideLoading();
+        if (data.status === 'success') {
+          showToast(data.message || 'Solicitudes procesadas.', 'success');
+          qai_initView(); // Recargar
+        } else {
+          showAlert(data.message || 'Error al procesar.', 'error');
+        }
+      } catch (error) {
+        hideLoading();
+        showError('Error de comunicación: ' + error.message);
+      }
     }
     
     /* ========================================================
@@ -1690,7 +1709,18 @@
           status.innerText = "Error: Ventana emergente bloqueada.";
           return;
         }
-        
+
+        // Firma electrónica (21 CFR Part 11) requerida antes de emitir el documento controlado.
+        let pinFirma;
+        try {
+          pinFirma = await promptSecurityPin('Ingrese su PIN para firmar y emitir la impresión:');
+        } catch (e) {
+          if (printWindow) printWindow.close();
+          btn.disabled = false;
+          status.innerText = 'Impresión cancelada.';
+          return;
+        }
+
         const { PDFDocument, rgb, degrees } = PDFLib;
         const finalPdf = await PDFDocument.create();
         let totalPages = 0;
@@ -1770,36 +1800,52 @@
         }
         const finalBase64 = btoa(binary);
         
-        status.innerText = "☁️ Subiendo a Drive...";
-        
-        google.script.run
-          .withSuccessHandler(res => {
+        status.innerText = "☁️ Registrando impresión (firma electrónica)...";
+
+        // Se enruta por la Web App (corre como propietario) para poder escribir en las columnas
+        // protegidas de Ordenes. La generación del PDF, el contador y la trazabilidad se registran
+        // de forma atómica en el servidor, con rollback si algo falla.
+        try {
+          const res = await postWebApp({
+            operation: 'processPrint',
+            base64Data: finalBase64,
+            orderNo: orderNo,
+            printType: printType,
+            pagesPrinted: totalPages,
+            pinFirma: pinFirma,
+            userId: userId
+          });
+
+          if (res.status === 'success') {
+            const data = res.data || {};
             status.innerText = "✅ Listo. Abriendo visor...";
             status.style.color = "#0f5132";
             btn.disabled = false;
 
-            // La generación del PDF, el contador y la trazabilidad se registraron de forma
-            // atómica en el servidor (processPrintForUser). Aquí solo abrimos el visor.
             // ABRIR EL VISOR PDF EN LA VENTANA PRE-ABIERTA
-            if (res.viewerUrl) {
-               printWindow.location.href = res.viewerUrl;
-            } else {
-               printWindow.location.href = 'https://drive.google.com/file/d/' + res.fileId + '/view';
+            if (data.viewerUrl) {
+               printWindow.location.href = data.viewerUrl;
+            } else if (data.fileId) {
+               printWindow.location.href = 'https://drive.google.com/file/d/' + data.fileId + '/view';
             }
 
             // Limpiar form
             document.getElementById('imp_orderNo').value = '';
             imp_resetPreload();
             imp_setBanner('', '');
-          })
-          .withFailureHandler(err => {
-            status.innerText = "❌ Error: " + err.message;
+          } else {
+            status.innerText = "❌ Error: " + (res.message || 'No se pudo registrar la impresión.');
             status.style.color = "#dc2626";
             btn.disabled = false;
             if (printWindow) printWindow.close();
-          })
-          .processPrintForUser(finalBase64, orderNo, userId, printType, totalPages);
-        
+          }
+        } catch (postErr) {
+          status.innerText = "❌ Error de comunicación: " + postErr.message;
+          status.style.color = "#dc2626";
+          btn.disabled = false;
+          if (printWindow) printWindow.close();
+        }
+
       } catch (err) {
         status.innerText = "❌ Error: " + err.message;
         status.style.color = "#dc2626";
@@ -1829,28 +1875,27 @@
       try {
         const pin = await promptSecurityPin("PIN para solicitar reimpresión:");
         showLoading("Enviando solicitud a QA...");
-        google.script.run
-          .withSuccessHandler(res => {
-            hideLoading();
-            if (res.status === 'success') {
-              showToast(res.autoAprobada ? "✅ Autoaprobada — ya puede imprimir" : "Solicitud enviada a QA", "success");
-              document.getElementById('imp_orderNo').value = '';
-              imp_resetPreload();
-            } else {
-              showError(res.message);
-            }
-          })
-          .withFailureHandler(e => { hideLoading(); showError(e.message); })
-          .registrarSolicitudImpresion({
-            noOrden: orderNo,
-            solicitadoPor: userObj.nombreCompleto,
-            tipoSolicitud: tipo,
-            motivo: motivo,
-            plantillasJSON: JSON.stringify(config),
-            plantillas: config.map(c => `${c.copies}x ${c.name}`).join(', '),
-            pinFirma: pin
-          }, userObj.userId);
+        const res = await postWebApp({
+          operation: 'solicitarImpresion',
+          noOrden: orderNo,
+          solicitadoPor: userObj.nombreCompleto,
+          tipoSolicitud: tipo,
+          motivo: motivo,
+          plantillasJSON: JSON.stringify(config),
+          plantillas: config.map(c => `${c.copies}x ${c.name}`).join(', '),
+          pinFirma: pin,
+          userId: userObj.userId
+        });
+        hideLoading();
+        if (res.status === 'success') {
+          showToast(res.autoAprobada ? "✅ Autoaprobada — ya puede imprimir" : "Solicitud enviada a QA", "success");
+          document.getElementById('imp_orderNo').value = '';
+          imp_resetPreload();
+        } else {
+          showError(res.message);
+        }
       } catch (e) {
+        hideLoading();
         showToast(e.message, 'warning');
       }
     }

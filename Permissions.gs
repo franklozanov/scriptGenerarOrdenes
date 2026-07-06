@@ -209,7 +209,19 @@ function applyNewProtectionScheme() {
   if (sheetRegistroNovedad) {
     protectSheetFully(sheetRegistroNovedad, 'Proteccion_RegistroNovedad');
   }
-  
+
+  // Proteger hoja PermisosRoles (crítica: define el control de acceso)
+  var sheetPermisosRoles = ss.getSheetByName('PermisosRoles');
+  if (sheetPermisosRoles) {
+    protectSheetFully(sheetPermisosRoles, 'Proteccion_PermisosRoles');
+  }
+
+  // Proteger hoja SolicitudesImpresion (las escrituras van por la Web App como propietario)
+  var sheetSolicitudes = ss.getSheetByName('SolicitudesImpresion');
+  if (sheetSolicitudes) {
+    protectSheetFully(sheetSolicitudes, 'Proteccion_SolicitudesImpresion');
+  }
+
   // Configurar protección mixta para Ordenes
   configureOrdenesProtection();
   
@@ -264,9 +276,9 @@ function configureOrdenesProtection() {
   // Se agregan STATUS y columnas de trazabilidad para evitar alteraciones manuales.
   var colsToProtect = [
     "VerifLote", "VerifCant. Disponible", "VerifExp",
-    "Fabricante", "Decision", "STATUS", "NoPags", 
-    "Reimpresion", "TotalPags", "ConsecutivoImp", 
-    "ImpresoPor", "Reimpreso", "ReimpresoPor"
+    "Fabricante", "Decision", "STATUS", "NoPags",
+    "Reimpresion", "TotalPags", "ConsecutivoImp",
+    "ImpresoPor", "Reimpreso", "ReimpresoPor", "HistorialImpresion"
   ];
   
   var filaEncabezados = 1;
