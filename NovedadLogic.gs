@@ -157,37 +157,43 @@ function getOrdenesSolicitadasParaQA() {
 
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-    var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-    var colCodigoCol = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', true);
-    var colDescripcionCol = getColumnIndexByNameCaseInsensitive(headers, 'Descripcion', false);
-    var colLoteCol = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
-    var colEstadoCargaCol = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
-    var colStatusCol = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+    var colNoOrdenCol      = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colCodigoCol       = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', true);
+    var colDescripcionCol  = getColumnIndexByNameCaseInsensitive(headers, 'Descripcion', false);
+    var colLoteCol         = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
+    var colEstadoCargaCol  = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    var colStatusCol       = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+    var colDecisionCol     = getColumnIndexByNameCaseInsensitive(headers, 'Decision', false);
+    var colNoAnalisisCol   = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
 
     var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     var values = dataRange.getValues();
     var ordenesSolicitadas = [];
 
     for (var i = 0; i < values.length; i++) {
-      var noOrden = values[i][colNoOrdenCol - 1];
-      var codigo = values[i][colCodigoCol - 1];
+      var noOrden    = values[i][colNoOrdenCol - 1];
+      var codigo     = values[i][colCodigoCol - 1];
       var descripcion = colDescripcionCol ? values[i][colDescripcionCol - 1] : "";
-      var lote = colLoteCol ? values[i][colLoteCol - 1] : "";
+      var lote       = colLoteCol  ? values[i][colLoteCol - 1]  : "";
       var estadoCarga = colEstadoCargaCol ? values[i][colEstadoCargaCol - 1] : "";
-      var status = colStatusCol ? values[i][colStatusCol - 1] : "";
+      var status     = colStatusCol ? values[i][colStatusCol - 1] : "";
+      var decision   = colDecisionCol  ? values[i][colDecisionCol - 1]  : "";
+      var noAnalisis = colNoAnalisisCol ? values[i][colNoAnalisisCol - 1] : "";
 
-      var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
-      var codigoStr = codigo ? codigo.toString().trim() : "";
-      var statusStr = status ? status.toString().trim() : "";
+      var noOrdenStr  = noOrden  ? noOrden.toString().trim()  : "";
+      var codigoStr   = codigo   ? codigo.toString().trim()   : "";
+      var statusStr   = status   ? status.toString().trim()   : "";
 
       // Filtrar: solo STATUS === 'Solicitada'
       if (noOrdenStr && codigoStr && statusStr === 'Solicitada') {
         ordenesSolicitadas.push({
-          noOrden: noOrdenStr,
-          codigo: codigoStr,
+          noOrden:    noOrdenStr,
+          codigo:     codigoStr,
           descripcion: descripcion ? descripcion.toString().trim() : "",
-          lote: lote ? lote.toString().trim() : "",
-          estadoCarga: estadoCarga ? estadoCarga.toString().trim() : ""
+          lote:       lote       ? lote.toString().trim()       : "",
+          estadoCarga: estadoCarga ? estadoCarga.toString().trim() : "",
+          decision:   decision   ? decision.toString().trim()   : "",
+          noAnalisis: noAnalisis ? noAnalisis.toString().trim() : ""
         });
       }
     }

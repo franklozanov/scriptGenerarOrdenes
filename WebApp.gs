@@ -213,6 +213,21 @@ function handlePrivilegedOperation_(params) {
     return eliminarMatrizConfig(params.rowIndex);
   }
 
+  if (operation === 'actualizarCampoOrden') {
+    if (!hasPermission(callingUserId, PERMISOS.AUTORIZAR_QA) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
+      return { status: 'error', message: 'No tiene permisos para editar campos de órdenes.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.noOrden || !params.campo || params.nuevoValor === undefined) {
+      return { status: 'error', message: 'Faltan parámetros: noOrden, campo, nuevoValor.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    // Solo se permiten editar campos no-críticos de sistema
+    var CAMPOS_EDITABLES = ['NoAnalisis', 'Lote', 'Exp', 'Cantidad', 'Codigo', 'Descripcion'];
+    if (CAMPOS_EDITABLES.indexOf(params.campo) === -1) {
+      return { status: 'error', message: 'El campo "' + params.campo + '" no es editable desde el UI.', diagnostic: 'INVALID_FIELD' };
+    }
+    return actualizarCampoOrden_(params.noOrden, params.campo, params.nuevoValor, callingUserId);
+  }
+
   if (operation === 'autorizarOrdenesQA') {
     if (!hasPermission(callingUserId, PERMISOS.AUTORIZAR_QA)) {
       return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };

@@ -402,3 +402,56 @@ function escribirResultadoValidacion_(sheet, headers, filaIdx, resultado) {
     }
   });
 }
+
+/**
+ * Actualiza un campo específico de una orden en la hoja Ordenes y registra el cambio.
+ * Usada por el modal de edición in situ de la Fase 4.
+ *
+ * @param {string} noOrden    - Número de orden
+ * @param {string} campo      - Nombre de la columna a actualizar (ej. 'NoAnalisis')
+ * @param {any}    nuevoValor - Nuevo valor
+ * @param {string} userId     - UserID del usuario que realiza el cambio
+ * @returns {Object} { ok: boolean, error?: string }
+ */
+function actualizarCampoOrden_(noOrden, campo, nuevoValor, userId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    if (!sheet) throw new Error('Hoja Ordenes no encontrada.');
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colCampo   = getColumnIndexByNameCaseInsensitive(headers, campo, false);
+
+    if (!colCampo) throw new Error('Columna "' + campo + '" no encontrada en Ordenes.');
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) throw new Error('No hay órdenes en la hoja.');
+
+    var colData = sheet.getRange(2, colNoOrden, lastRow - 1, 1).getValues();
+    var filaOrden = -1;
+    for (var r = 0; r < colData.length; r++) {
+      if ((colData[r][0] || '').toString().trim() === noOrden.toString().trim()) {
+        filaOrden = r + 2;
+        break;
+      }
+    }
+    if (filaOrden === -1) throw new Error('Orden "' + noOrden + '" no encontrada.');
+
+    var valorAnterior = sheet.getRange(filaOrden, colCampo).getValue();
+    sheet.getRange(filaOrden, colCampo).setValue(nuevoValor);
+
+    var userEmail = '';
+    try { userEmail = Session.getActiveUser().getEmail(); } catch(e) {}
+    logChange(
+      'EDICION_CAMPO_ORDEN',
+      'Orden "' + noOrden + '" - Campo "' + campo + '" actualizado de "' + valorAnterior + '" a "' + nuevoValor + '" por ' + (userEmail || userId),
+      userEmail || userId
+    );
+
+    return { ok: true };
+  } catch (e) {
+    Logger.log('actualizarCampoOrden_: ' + e.message);
+    return { ok: false, error: e.message };
+  }
+}
