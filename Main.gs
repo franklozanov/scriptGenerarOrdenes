@@ -13,25 +13,34 @@
  * crea menú de autorización nativa OAuth.
  */
 function onOpen() {
-  // 1. Capturar el correo
-  var activeEmail = Session.getActiveUser().getEmail();
-  
-  if (!activeEmail || activeEmail === "") {
-    Logger.log("onOpen: Correo no detectado. Creando menú de autorización nativa.");
-    SpreadsheetApp.getUi().createMenu('🔐 Iniciar Sesión')
-      .addItem('Autorizar Acceso', 'autorizarUsuarioExterno')
-      .addToUi();
-      
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Por favor, haz clic en "🔐 Iniciar Sesión" en el menú superior para cargar los permisos de la aplicación.', 
-      'Autorización Requerida', 
-      10
-    );
-    return;
+  try {
+    Logger.log("--- INICIO DE CARGA DE APLICACIÓN (onOpen) ---");
+    // 1. Capturar el correo
+    var activeEmail = Session.getActiveUser().getEmail();
+    Logger.log("Email detectado inicialmente: '" + activeEmail + "'");
+    
+    if (!activeEmail || activeEmail === "") {
+      Logger.log("onOpen: Correo no detectado. Creando menú de autorización nativa.");
+      SpreadsheetApp.getUi().createMenu('🔐 Iniciar Sesión')
+        .addItem('Autorizar Acceso', 'autorizarUsuarioExterno')
+        .addToUi();
+        
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Por favor, haz clic en "🔐 Iniciar Sesión" en el menú superior para cargar los permisos de la aplicación.', 
+        'Autorización Requerida', 
+        10
+      );
+      return;
+    }
+    
+    // 3. Cargar el menú de opciones (ya con el correo válido)
+    onOpenMain(activeEmail);
+  } catch (e) {
+    Logger.log("❌ ERROR CRÍTICO en onOpen: " + e.message + "\n" + e.stack);
+    try {
+      SpreadsheetApp.getUi().alert("Error Crítico de Carga", "El sistema no pudo iniciar.\n" + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (err) {}
   }
-  
-  // 3. Cargar el menú de opciones (ya con el correo válido)
-  onOpenMain(activeEmail);
 }
 
 /**
@@ -39,19 +48,27 @@ function onOpen() {
  * Fuerza a Google a validar los permisos OAuth y captura el correo real.
  */
 function autorizarUsuarioExterno() {
-  var activeEmail = Session.getActiveUser().getEmail();
-  
-  if (!activeEmail || activeEmail === "") {
-    SpreadsheetApp.getUi().alert(
-      '❌ Error de Autorización', 
-      'No se pudo obtener la autorización de Google. El sistema no puede identificar su cuenta de correo de forma segura.', 
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
+  try {
+    Logger.log("Iniciando autorizarUsuarioExterno...");
+    var activeEmail = Session.getActiveUser().getEmail();
+    
+    if (!activeEmail || activeEmail === "") {
+      Logger.log("❌ Falla en autorizarUsuarioExterno: No se pudo capturar el correo.");
+      SpreadsheetApp.getUi().alert(
+        '❌ Error de Autorización', 
+        'No se pudo obtener la autorización de Google. El sistema no puede identificar su cuenta de correo de forma segura.', 
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      return;
+    }
+    
+    Logger.log("Identidad verificada manualmente: " + activeEmail);
+    SpreadsheetApp.getActiveSpreadsheet().toast('Identidad verificada: ' + activeEmail + '. Cargando sistema...', 'Éxito', 3);
+    onOpenMain(activeEmail);
+  } catch (e) {
+    Logger.log("❌ ERROR en autorizarUsuarioExterno: " + e.message);
+    SpreadsheetApp.getUi().alert("Error", "Fallo al autorizar: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
-  
-  SpreadsheetApp.getActiveSpreadsheet().toast('Identidad verificada: ' + activeEmail + '. Cargando sistema...', 'Éxito', 3);
-  onOpenMain(activeEmail);
 }
 
 /**
@@ -59,10 +76,12 @@ function autorizarUsuarioExterno() {
  * @param {string} email - Correo del usuario ya detectado y validado.
  */
 function onOpenMain(email) {
+  Logger.log("Iniciando onOpenMain con email: " + email);
   var activeEmail = email;
   var validUser = getUserRecordByEmail_(activeEmail);
   
   if (!validUser) {
+    Logger.log("⛔ Acceso denegado. Usuario no autorizado: " + activeEmail);
     SpreadsheetApp.getUi().alert(
       '⛔ ACCESO DENEGADO', 
       'El usuario ' + (activeEmail || 'desconocido') + ' no está autorizado para visualizar o interactuar con este documento.\n\nPor favor contacte al Administrador de QA.', 
@@ -76,6 +95,7 @@ function onOpenMain(email) {
   Logger.log("Diagnóstico Menú - Rol: " + validUser.rol + " | Permisos obtenidos: " + JSON.stringify(userPermissions));
   
   if (Object.keys(userPermissions).length === 0) {
+    Logger.log("⚠️ Atención: Rol '" + validUser.rol + "' sin permisos configurados.");
     SpreadsheetApp.getUi().toast('⚠️ Atención: Tu rol "' + validUser.rol + '" no tiene permisos configurados. Verifica la hoja PermisosRoles.', 'Sistema de Permisos', 10);
   }
 
@@ -122,16 +142,21 @@ function onOpenMain(email) {
   }
   
   mainMenu.addToUi();
+  Logger.log("Menús de UI creados exitosamente.");
   
   // Operaciones de UI secundarias
   try {
+    Logger.log("Iniciando operaciones secundarias (hideUnauthorizedSheets)...");
     hideUnauthorizedSheets_();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Abriendo Panel Principal...', 'Sistema QMS', 3);
     
+    Logger.log("Llamando a abrirSidebarQMS automáticamente...");
     // Abrir Sidebar automáticamente al iniciar la hoja
     abrirSidebarQMS();
+    Logger.log("Finalizó la llamada a abrirSidebarQMS.");
   } catch (e) {
-    Logger.log("Error en operaciones secundarias o al abrir el panel: " + e.message);
+    Logger.log("❌ Error en operaciones secundarias o al abrir el panel: " + e.message + "\n" + e.stack);
+    SpreadsheetApp.getUi().alert("Error de Carga", "Ocurrió un error al cargar la interfaz del panel.\n\n" + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
