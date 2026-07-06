@@ -360,6 +360,7 @@ function clearInitialDataCache() {
         }
       } catch (e) {
         Logger.log("Error limpiando caché estático " + STATIC_TEMPLATE_KEYS_[i] + ": " + e.message);
+      }
     }
     cache.remove(prefix + 'meta');
   }

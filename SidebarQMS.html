@@ -1314,7 +1314,7 @@
       
       // Users list
       if (sysData && sysData.users) {
-        document.getElementById('imp_usersList').innerHTML = sysData.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
+        document.getElementById('imp_usersList').innerHTML = sysData.users.map(u => `<option value="${u.nombreCompleto}"></option>`).join('');
       }
 
       // Listeners
