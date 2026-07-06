@@ -252,20 +252,22 @@ function configureOrdenesProtection() {
   var sheetOrdenes = ss.getSheetByName('Ordenes');
   if (!sheetOrdenes) return;
   
-  // 1. Eliminar todas las protecciones de rango existentes en la hoja "Ordenes"
+  // 1. Eliminar todas las protecciones de rango y de hoja completas existentes en la hoja "Ordenes"
   var proteccionesActuales = sheetOrdenes.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  proteccionesActuales.forEach(function(p) {
-    p.remove();
-    Logger.log("✓ Eliminada protección: " + p.getDescription());
-  });
+  proteccionesActuales.forEach(function(p) { p.remove(); });
   
-  // 2. Columnas que SOLO el administrador/propietario puede editar directamente en la hoja.
+  var proteccionHoja = sheetOrdenes.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  proteccionHoja.forEach(function(p) { p.remove(); });
+  Logger.log("✓ Protecciones previas eliminadas de la hoja Ordenes.");
+  
+  // 2. Columnas que SOLO el administrador/propietario o el sistema pueden editar.
+  // Se agregan STATUS y columnas de trazabilidad para evitar alteraciones manuales.
   var colsToProtect = [
     "VerifLote", "VerifCant. Disponible", "VerifExp",
-    "Fabricante", "Decision"
+    "Fabricante", "Decision", "STATUS", "NoPags", 
+    "Reimpresion", "TotalPags", "ConsecutivoImp", 
+    "ImpresoPor", "Reimpreso", "ReimpresoPor"
   ];
-  // 2. Proteger la hoja completa para cumplir con 21 CFR Part 11 (Cero acceso manual)
-  protectSheetFully(sheetOrdenes, 'Proteccion_Ordenes');
   
   var filaEncabezados = 1;
   var headers = sheetOrdenes.getRange(filaEncabezados, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
@@ -273,7 +275,7 @@ function configureOrdenesProtection() {
   // 3. Aplicar protección solo a las columnas en colsToProtect
   for (var i = 0; i < headers.length; i++) {
     var header = headers[i] ? headers[i].toString().trim() : "";
-    if (colsToProtect.indexOf(header) !== -1) {
+    if (colsToProtect.indexOf(header) !== -1 || colsToProtect.indexOf(header.replace('Por', '')) !== -1) {
       var columna = i + 1;
       // Protege toda la columna excepto el encabezado
       var rangoAProteger = sheetOrdenes.getRange(filaEncabezados + 1, columna, sheetOrdenes.getMaxRows() - filaEncabezados);
@@ -294,8 +296,7 @@ function configureOrdenesProtection() {
     }
   }
   
-  Logger.log("✓ Protección por columna configurada para Ordenes");
-  Logger.log("✓ Protección total configurada para la hoja Ordenes");
+  Logger.log("✓ Protección por columna configurada para Ordenes (se permiten ediciones en columnas no protegidas)");
 }
 
 /**

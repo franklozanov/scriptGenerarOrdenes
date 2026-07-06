@@ -1610,7 +1610,7 @@
             status.style.color = "#dc2626";
             btn.disabled = false;
           })
-          .saveFinalUnifiedPDFForUser(finalBase64, orderNo, userId);
+          .saveFinalUnifiedPDFForUser(finalBase64, orderNo, userId, printType);
         
       } catch (err) {
         status.innerText = "❌ Error: " + err.message;

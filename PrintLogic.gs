@@ -742,6 +742,78 @@ function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUse
 // --- WRAPPERS DE AUTENTICACIÓN PARA google.script.run ---
 
 /**
+ * Valida estrictamente en el servidor si una orden puede ser impresa.
+ * Evita que usuarios malintencionados bypasseen el UI.
+ */
+function checkPrintAuthorization_(orderNo, printType, userId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ordenesSheet = ss.getSheetByName('Ordenes');
+  var headers = ordenesSheet.getRange(1, 1, 1, ordenesSheet.getLastColumn()).getValues()[0];
+  
+  var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+  var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+  
+  var orderValues = ordenesSheet.getRange(1, colNoOrden, ordenesSheet.getLastRow(), 1).getValues();
+  var targetRowIndex = -1;
+  var normalizedOrderNo = orderNo.toString().trim().toLowerCase();
+  
+  for (var i = 1; i < orderValues.length; i++) {
+    if (orderValues[i][0] && orderValues[i][0].toString().trim().toLowerCase() === normalizedOrderNo) {
+      targetRowIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (targetRowIndex === -1) throw new Error("Orden no encontrada para validación de impresión.");
+  
+  var statusValue = ordenesSheet.getRange(targetRowIndex, colStatus).getValue();
+  statusValue = statusValue ? statusValue.toString().trim() : "";
+  
+  var userRecord = getUserRecordByUserId_(userId);
+  if (userRecord && userRecord.rol === 'ADMIN') {
+    return true; // ADMIN bypass
+  }
+  
+  if (statusValue === "Solicitada" || statusValue === "RecibidaQA" || statusValue === "DevueltaQA" || statusValue === "Cerrada" || statusValue === "") {
+    throw new Error("Violación de seguridad: El estado actual (" + statusValue + ") no permite impresión.");
+  }
+  
+  if (statusValue === "Impreso" || statusValue === "Reimpreso") {
+    // Si ya está impresa, SOLO se puede si el tipo es Adicional o Reimpresión Y existe solicitud Aprobada
+    if (printType !== "Adicional" && printType !== "Reimpresión") {
+       throw new Error("Violación de seguridad: La orden ya está impresa. Use Adicional o Reimpresión.");
+    }
+    
+    // Verificar en SolicitudesImpresion
+    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
+    var isApproved = false;
+    if (solicitudesSheet) {
+      var solHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
+      var solData = solicitudesSheet.getDataRange().getValues();
+      var colSolNoOrden = getColumnIndexByNameCaseInsensitive(solHeaders, 'NoOrden', false);
+      var colSolEstado = getColumnIndexByNameCaseInsensitive(solHeaders, 'Estado', false);
+      
+      for (var j = 1; j < solData.length; j++) {
+        var sOrden = solData[j][colSolNoOrden-1] ? solData[j][colSolNoOrden-1].toString().trim() : "";
+        var sEstado = solData[j][colSolEstado-1] ? solData[j][colSolEstado-1].toString().trim() : "";
+        if (sOrden === orderNo.toString().trim() && sEstado === 'Aprobada') {
+          isApproved = true;
+          // Marcar como utilizada
+          solicitudesSheet.getRange(j + 1, colSolEstado).setValue('Utilizada');
+          break;
+        }
+      }
+    }
+    
+    if (!isApproved) {
+      throw new Error("Violación de seguridad: No existe una solicitud QA Aprobada para reimprimir esta orden.");
+    }
+  }
+  
+  return true;
+}
+
+/**
  * Wrapper con autenticación para saveFinalUnifiedPDF.
  * Llamado desde Index.html vía google.script.run.
  * 
@@ -751,8 +823,9 @@ function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUse
  * @returns {Object} Resultado de saveFinalUnifiedPDF
  * @throws {Error} Si el usuario no está autorizado
  */
-function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId) {
+function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId, printType) {
   enforcePermission(userId, 'IMPRIMIR_ORDEN');
+  checkPrintAuthorization_(orderNo, printType || "Inicial", userId);
   return saveFinalUnifiedPDF(base64Data, orderNo);
 }
 
@@ -785,6 +858,8 @@ function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
  */
 function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
   enforcePermission(userId, 'IMPRIMIR_ORDEN');
+  // checkPrintAuthorization_ already consumes the 'Aprobada' status, 
+  // so we shouldn't run it twice. The validation was done in saveFinalUnifiedPDFForUser.
   return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
 
