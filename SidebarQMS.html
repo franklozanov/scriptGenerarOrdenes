@@ -1529,6 +1529,17 @@
         });
         payload.pdfs = finalPdfs;
 
+        // Abrimos la ventana sincrónicamente AQUI, antes de cualquier await (para evitar bloqueadores de popups)
+        const printWindow = window.open('about:blank', '_blank');
+        if (printWindow) {
+          printWindow.document.write("<h3 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Procesando y Asegurando Documento...</h3>");
+        } else {
+          imp_setBanner('error', 'Por favor habilite las ventanas emergentes (pop-ups) para este sitio.');
+          btn.disabled = false;
+          status.innerText = "Error: Ventana emergente bloqueada.";
+          return;
+        }
+        
         const { PDFDocument, rgb, degrees } = PDFLib;
         const finalPdf = await PDFDocument.create();
         let totalPages = 0;
@@ -1620,11 +1631,11 @@
             google.script.run.finalizeFinalPdfForUser(orderNo, res.fileId, res.archivoReemplazado, userId);
             google.script.run.updateTraceabilityForUser(orderNo, userId, totalPages, printType);
             
-            // ABRIR EL VISOR PDF EN EL MISMO NAVEGADOR!
+            // ABRIR EL VISOR PDF EN LA VENTANA PRE-ABIERTA
             if (res.viewerUrl) {
-               window.open(res.viewerUrl, '_blank');
+               printWindow.location.href = res.viewerUrl;
             } else {
-               window.open('https://drive.google.com/file/d/' + res.fileId + '/view', '_blank');
+               printWindow.location.href = 'https://drive.google.com/file/d/' + res.fileId + '/view';
             }
             
             // Limpiar form
@@ -1636,6 +1647,7 @@
             status.innerText = "❌ Error: " + err.message;
             status.style.color = "#dc2626";
             btn.disabled = false;
+            if (printWindow) printWindow.close();
           })
           .saveFinalUnifiedPDFForUser(finalBase64, orderNo, userId, printType);
         
@@ -1643,6 +1655,7 @@
         status.innerText = "❌ Error: " + err.message;
         status.style.color = "#dc2626";
         btn.disabled = false;
+        if (printWindow) printWindow.close();
       }
     }
 
