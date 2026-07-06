@@ -24,7 +24,7 @@ function withAdminAuth(title, action) {
 /**
  * Obtiene el registro completo de un usuario desde la hoja Usuarios.
  * @param {string} userId - UserID a buscar
- * @returns {Object|null} Objeto con userId, nombreCompleto, nombreCorto, email, rol
+ * @returns {Object|null} Objeto con userId, nombreCompleto, nombreCorto, email, rol, pin, estado, intentosFallidos
  */
 function getUserRecordByUserId_(userId) {
   if (!userId) return null;
@@ -43,6 +43,7 @@ function getUserRecordByUserId_(userId) {
   var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
   var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
   var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
+  var colIntentosIdx = getColumnIndexByNameCaseInsensitive(headers, 'IntentosFallidos', false);
 
   if (!colUserIdIdx) return null;
 
@@ -53,6 +54,7 @@ function getUserRecordByUserId_(userId) {
   colRolIdx = colRolIdx ? colRolIdx - 1 : null;
   colClaveIdx = colClaveIdx ? colClaveIdx - 1 : null;
   colEstadoIdx = colEstadoIdx ? colEstadoIdx - 1 : null;
+  colIntentosIdx = colIntentosIdx ? colIntentosIdx - 1 : null;
 
   var targetUserId = userId.toString().trim();
   for (var i = 1; i < data.length; i++) {
@@ -65,7 +67,8 @@ function getUserRecordByUserId_(userId) {
         email: colEmailIdx !== null && data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim() : "",
         rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : "",
         pin: colClaveIdx !== null && data[i][colClaveIdx] !== undefined ? data[i][colClaveIdx].toString().trim() : "",
-        estado: colEstadoIdx !== null && data[i][colEstadoIdx] !== undefined ? data[i][colEstadoIdx].toString().trim() : ""
+        estado: colEstadoIdx !== null && data[i][colEstadoIdx] !== undefined ? data[i][colEstadoIdx].toString().trim() : "",
+        intentosFallidos: colIntentosIdx !== null && data[i][colIntentosIdx] !== undefined ? parseInt(data[i][colIntentosIdx]) || 0 : 0
       };
     }
   }
@@ -110,4 +113,57 @@ function requireAuthorizedUser_(params) {
     throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + callingUserId + '.');
   }
   return callingUserId;
+}
+
+/**
+ * Encripta un PIN (Firma Electrónica) utilizando SHA-256.
+ * @param {string|number} pin - PIN a encriptar
+ * @returns {string} Cadena Hexadecimal de 64 caracteres.
+ */
+function hashPin_(pin) {
+  if (pin === undefined || pin === null) return "";
+  var signature = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pin.toString().trim());
+  var hexString = signature.map(function(byte) {
+      var v = (byte < 0) ? 256 + byte : byte;
+      return ("0" + v.toString(16)).slice(-2);
+  }).join("");
+  return hexString;
+}
+
+/**
+ * Actualiza el estado de seguridad de un usuario (Intentos Fallidos y Estado).
+ * @param {string} userId - UserID del usuario
+ * @param {number} intentos - Número de intentos fallidos
+ * @param {string} estado - Estado ("Activo", "Bloqueado", etc.)
+ * @param {string} [nuevaClave] - Opcional. Nuevo PIN hasheado o "PENDIENTE".
+ */
+function updateUserSecurityState_(userId, intentos, estado, nuevaClave) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) return;
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+
+  var headers = data[0];
+  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
+  var colIntentosIdx = getColumnIndexByNameCaseInsensitive(headers, 'IntentosFallidos', false);
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+
+  if (!colUserIdIdx || !colIntentosIdx || !colEstadoIdx) return;
+
+  var targetUserId = userId.toString().trim();
+  for (var i = 1; i < data.length; i++) {
+    var rowUserId = data[i][colUserIdIdx - 1] ? data[i][colUserIdIdx - 1].toString().trim() : "";
+    if (rowUserId === targetUserId) {
+      sheet.getRange(i + 1, colIntentosIdx).setValue(intentos);
+      sheet.getRange(i + 1, colEstadoIdx).setValue(estado);
+      
+      if (nuevaClave !== undefined) {
+        sheet.getRange(i + 1, colClaveIdx).setValue(nuevaClave);
+      }
+      return;
+    }
+  }
 }

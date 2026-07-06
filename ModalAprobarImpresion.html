@@ -321,7 +321,7 @@
       
       let pinFirma;
       try {
-        pinFirma = await promptSecurityPin('Ingrese su PIN para ' + accionTexto + ' las solicitudes seleccionadas:');
+        pinFirma = await getSecurityPinOrSetup('Ingrese su PIN para ' + accionTexto + ' las solicitudes seleccionadas:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;

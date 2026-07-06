@@ -104,11 +104,56 @@ function jsonResponse_(payload) {
  * @private
  */
 function handlePrivilegedOperation_(params) {
-  // La validación ahora debe ser independiente de lo que envíe el cliente.
-  var callingUserId = requireAuthorizedUserStrict_(params);
   var operation = params.operation || '';
   Logger.log("WebApp - Operación solicitada: " + operation);
+
+  var callingUserId;
+  // La validación estricta (PIN) se requiere para casi todo, excepto para la creación inicial del PIN.
+  if (operation === 'configurarNuevoPin') {
+    callingUserId = requireAuthorizedUser_(params);
+  } else {
+    callingUserId = requireAuthorizedUserStrict_(params);
+  }
+  
   Logger.log("WebApp - UserID validado: " + callingUserId);
+
+  if (operation === 'configurarNuevoPin') {
+    var userRecord = getUserRecordByUserId_(callingUserId);
+    if (userRecord.pin && userRecord.pin !== "PENDIENTE") {
+      return { status: 'error', message: 'El usuario ya tiene un PIN configurado.', diagnostic: 'PIN_ALREADY_EXISTS' };
+    }
+    if (!params.nuevoPin || params.nuevoPin.toString().length !== 4) {
+      return { status: 'error', message: 'El nuevo PIN debe tener exactamente 4 dígitos.', diagnostic: 'INVALID_PIN_FORMAT' };
+    }
+    
+    var hash = hashPin_(params.nuevoPin);
+    updateUserSecurityState_(callingUserId, 0, "Activo", hash);
+    return { status: 'success', message: 'PIN configurado exitosamente.' };
+  }
+
+  if (operation === 'gestionarUsuarioSeguridad') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
+      return { status: 'error', message: 'No tiene permisos de administrador para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.targetUserId || !params.accionSeguridad) {
+      return { status: 'error', message: 'Faltan parámetros requeridos.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    
+    var targetUser = getUserRecordByUserId_(params.targetUserId);
+    if (!targetUser) {
+      return { status: 'error', message: 'Usuario objetivo no encontrado.', diagnostic: 'USER_NOT_FOUND' };
+    }
+
+    if (params.accionSeguridad === 'desbloquear') {
+      updateUserSecurityState_(targetUser.userId, 0, "Activo");
+      return { status: 'success', message: 'Usuario desbloqueado exitosamente.' };
+    } else if (params.accionSeguridad === 'resetear_pin') {
+      updateUserSecurityState_(targetUser.userId, 0, "Activo", "PENDIENTE");
+      return { status: 'success', message: 'PIN reseteado. El usuario deberá crear uno nuevo en su próximo acceso.' };
+    } else {
+      return { status: 'error', message: 'Acción desconocida.', diagnostic: 'UNKNOWN_ACTION' };
+    }
+  }
 
   if (operation === 'uploadDocument') {
     if (!hasPermission(callingUserId, PERMISOS.SUBIR_DOCUMENTOS)) {
@@ -370,13 +415,32 @@ function requireAuthorizedUserStrict_(params) {
     throw new Error("ACCESO DENEGADO: El usuario con ID " + userId + " no está registrado en el sistema.");
   }
 
+  if (validUser.estado === "Bloqueado") {
+    throw new Error("ACCESO DENEGADO: Usuario bloqueado por superar límite de intentos de PIN fallidos. Contacte al administrador.");
+  }
+
   if (validUser.estado !== "Activo") {
-    throw new Error("ACCESO DENEGADO: Su usuario se encuentra inactivo o no tiene un estado definido. Por favor contacte al administrador para que verifique y configure su Estado como 'Activo' en la hoja Usuarios.");
+    throw new Error("ACCESO DENEGADO: Su usuario se encuentra inactivo. Contacte al administrador.");
   }
 
   // 2. Validar Firma Electrónica (PIN)
-  if (!pinRecibido || pinRecibido.toString() !== validUser.pin.toString()) {
-    throw new Error("FIRMA INVÁLIDA: El PIN ingresado es incorrecto.");
+  var pinHash = hashPin_(pinRecibido);
+  if (!pinRecibido || pinHash !== validUser.pin.toString()) {
+    // Incrementar intentos fallidos
+    var intentosActuales = (validUser.intentosFallidos || 0) + 1;
+    var nuevoEstado = intentosActuales >= 5 ? "Bloqueado" : "Activo";
+    updateUserSecurityState_(validUser.userId, intentosActuales, nuevoEstado);
+    
+    if (nuevoEstado === "Bloqueado") {
+      throw new Error("ACCESO DENEGADO: Ha ingresado un PIN incorrecto demasiadas veces. Su usuario ha sido bloqueado.");
+    } else {
+      throw new Error("FIRMA INVÁLIDA: El PIN ingresado es incorrecto. Intento " + intentosActuales + " de 5.");
+    }
+  }
+
+  // Si el PIN es correcto, resetear intentos fallidos (si los hubiera)
+  if (validUser.intentosFallidos > 0) {
+    updateUserSecurityState_(validUser.userId, 0, "Activo");
   }
 
   // Loguear inconsistencias de sesión si existen (Auditoría)

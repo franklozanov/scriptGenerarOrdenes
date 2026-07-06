@@ -268,13 +268,14 @@ function getUserRecordByEmail_(email) {
     
     var headers = data[0];
     
-    // Usar la función utilitaria existente para buscar columnas, o por defecto A (0) y B (1)
     var userIdCol = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
     var emailCol = getColumnIndexByNameCaseInsensitive(headers, 'Correo', false) || getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
     var rolCol = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
     var estadoCol = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
     var nombreCol = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Completo', false);
     var cortoCol = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
+    var claveCol = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+    var intentosCol = getColumnIndexByNameCaseInsensitive(headers, 'IntentosFallidos', false);
     
     var userIdIdx = userIdCol ? userIdCol - 1 : 0;
     var emailIdx = emailCol ? emailCol - 1 : 0;
@@ -282,6 +283,8 @@ function getUserRecordByEmail_(email) {
     var estadoIdx = estadoCol ? estadoCol - 1 : 2; // Asumir col C si no se encuentra
     var nombreIdx = nombreCol ? nombreCol - 1 : null;
     var cortoIdx = cortoCol ? cortoCol - 1 : null;
+    var claveIdx = claveCol ? claveCol - 1 : null;
+    var intentosIdx = intentosCol ? intentosCol - 1 : null;
     
     for (var i = 1; i < data.length; i++) {
       var rowEmail = data[i][emailIdx] ? data[i][emailIdx].toString().trim().toLowerCase() : '';
@@ -292,7 +295,9 @@ function getUserRecordByEmail_(email) {
           rol: data[i][rolIdx].toString().trim(),
           estado: data[i][estadoIdx] ? data[i][estadoIdx].toString().trim() : 'Activo', // Por defecto Activo si no hay columna
           nombreCompleto: nombreIdx !== null && data[i][nombreIdx] ? data[i][nombreIdx].toString().trim() : '',
-          nombreCorto: cortoIdx !== null && data[i][cortoIdx] ? data[i][cortoIdx].toString().trim() : ''
+          nombreCorto: cortoIdx !== null && data[i][cortoIdx] ? data[i][cortoIdx].toString().trim() : '',
+          pin: claveIdx !== null && data[i][claveIdx] !== undefined ? data[i][claveIdx].toString().trim() : "",
+          intentosFallidos: intentosIdx !== null && data[i][intentosIdx] !== undefined ? parseInt(data[i][intentosIdx]) || 0 : 0
         };
       }
     }

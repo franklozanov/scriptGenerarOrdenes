@@ -1347,7 +1347,7 @@
         let pin = window.QMSContext.userPin || '';
         if (!pin) {
           try {
-            pin = await promptSecurityPin("Por favor, ingrese su PIN de autorización para enviar esta solicitud:");
+            pin = await getSecurityPinOrSetup("Por favor, ingrese su PIN de autorización para enviar esta solicitud:");
           } catch (e) {
             showToast(e.message, 'warning');
             return;

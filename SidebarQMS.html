@@ -164,6 +164,18 @@
               <button id="aa_save" class="btn-primary-small" style="width:100%;" onclick="autoAprob_save()">Guardar configuración</button>
               <div id="aa_status" style="font-size:12px; margin-top:8px;"></div>
             </div>
+
+            <!-- Panel: Gestión de Seguridad de Usuarios (requiere GESTIONAR_SEGURIDAD / MENU_ADMIN) -->
+            <div id="security-admin-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Seguridad de Usuarios (Admin)</div>
+              <label style="font-size:12px; font-weight:600;">Seleccionar Usuario:</label>
+              <select id="sec_userSelect" style="width:100%; padding:6px; font-size:13px; margin:4px 0 12px; border:1px solid #ccc; border-radius:4px;"></select>
+              
+              <div style="display:flex; gap:10px;">
+                <button class="btn-secondary-small" style="flex:1;" onclick="adminSecurityAction('desbloquear')">Desbloquear</button>
+                <button class="btn-secondary-small" style="flex:1; color:#c5221f;" onclick="adminSecurityAction('resetear_pin')">Resetear PIN</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -503,6 +515,24 @@
       // Por seguridad el backend lo rechaza igual si no es ADMIN, pero lo inhabilitamos visualmente
       document.getElementById("btn-init-system").disabled = !esAdmin;
 
+      var secAdminPanel = document.getElementById('security-admin-panel');
+      if (secAdminPanel) {
+        secAdminPanel.style.display = esAdmin ? 'block' : 'none';
+        if (esAdmin) {
+          // Llenar selector
+          const sel = document.getElementById('sec_userSelect');
+          if (sel && sel.options.length === 0 && sysData && sysData.users) {
+            sel.innerHTML = '<option value="">Seleccione usuario...</option>';
+            sysData.users.forEach(u => {
+              let opt = document.createElement('option');
+              opt.value = u.userId;
+              opt.text = u.nombreCompleto;
+              sel.appendChild(opt);
+            });
+          }
+        }
+      }
+
       // Panel de autoaprobación temporal: solo visible con permiso GESTIONAR_AUTOAPROBACION
       var aaPanel = document.getElementById('autoaprob-panel');
       if (aaPanel) {
@@ -624,7 +654,7 @@
       }
 
       var pin;
-      try { pin = await promptSecurityPin('Ingrese su PIN para guardar la configuración de autoaprobación:'); }
+      try { pin = await getSecurityPinOrSetup('Ingrese su PIN para guardar la configuración de autoaprobación:'); }
       catch (e) { return; }
       if (!pin) return;
 
@@ -659,7 +689,7 @@
       if (isChecked) {
         let pin;
         try {
-          pin = await promptSecurityPin('Ingrese su PIN para habilitar la edición de sistema:');
+          pin = await getSecurityPinOrSetup('Ingrese su PIN para habilitar la edición de sistema:');
         } catch(e) {
           document.getElementById('cfg_unlock').checked = false;
           return;
@@ -958,7 +988,7 @@
       
       let pin;
       try {
-        pin = await promptSecurityPin('Ingrese su PIN para autorizar la carga masiva:');
+        pin = await getSecurityPinOrSetup('Ingrese su PIN para autorizar la carga masiva:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;
@@ -1373,7 +1403,7 @@
 
       let pin;
       try {
-        pin = await promptSecurityPin('Ingrese su PIN para autorizar el registro:');
+        pin = await getSecurityPinOrSetup('Ingrese su PIN para autorizar el registro:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;
@@ -1569,7 +1599,7 @@
 
       let pinFirma;
       try {
-        pinFirma = await promptSecurityPin('Ingrese PIN para autorizar:');
+        pinFirma = await getSecurityPinOrSetup('Ingrese PIN para autorizar:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;
@@ -1731,7 +1761,7 @@
       const accionTexto = accion === 'Aprobada' ? 'aprobar' : 'rechazar';
       let pinFirma;
       try {
-        pinFirma = await promptSecurityPin('Ingrese su PIN para ' + accionTexto + ' las solicitudes:');
+        pinFirma = await getSecurityPinOrSetup('Ingrese su PIN para ' + accionTexto + ' las solicitudes:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;
@@ -2033,7 +2063,7 @@
         // Firma electrónica (21 CFR Part 11) requerida antes de emitir el documento controlado.
         let pinFirma;
         try {
-          pinFirma = await promptSecurityPin('Ingrese su PIN para firmar y emitir la impresión:');
+          pinFirma = await getSecurityPinOrSetup('Ingrese su PIN para firmar y emitir la impresión:');
         } catch (e) {
           window.removeEventListener('message', onViewerMessage);
           if (printWindow) printWindow.close();
@@ -2202,7 +2232,7 @@
       if (!userObj) return showToast("Usuario no válido.", 'error');
       
       try {
-        const pin = await promptSecurityPin("PIN para solicitar reimpresión:");
+        const pin = await getSecurityPinOrSetup("PIN para solicitar reimpresión:");
         showLoading("Enviando solicitud a QA...");
         const res = await postWebApp({
           operation: 'solicitarImpresion',
@@ -2226,6 +2256,39 @@
       } catch (e) {
         hideLoading();
         showToast(e.message, 'warning');
+      }
+    }
+
+    async function adminSecurityAction(action) {
+      const sel = document.getElementById('sec_userSelect');
+      if (!sel || !sel.value) {
+        showToast("Seleccione un usuario primero.", "warning");
+        return;
+      }
+
+      let actionDesc = action === 'desbloquear' ? 'desbloquear al usuario' : 'resetear el PIN del usuario';
+      
+      try {
+        const pin = await promptSecurityPin(`Ingrese su PIN de Admin para ${actionDesc}:`);
+        showLoading("Procesando...");
+        const res = await postWebApp({
+          operation: 'gestionarUsuarioSeguridad',
+          userId: sysData.currentUser.userId,
+          targetUserId: sel.value,
+          accionSeguridad: action,
+          pinFirma: pin
+        });
+        hideLoading();
+        if (res.status === 'success') {
+          showToast(res.message, "success");
+        } else {
+          showError(res.message);
+        }
+      } catch (e) {
+        hideLoading();
+        if (e.message !== "PIN cancelado por el usuario") {
+          showToast(e.message, 'warning');
+        }
       }
     }
   </script>

@@ -277,7 +277,7 @@
 
       let pin;
       try {
-        pin = await promptSecurityPin('Ingrese su PIN para autorizar el registro de esta novedad:');
+        pin = await getSecurityPinOrSetup('Ingrese su PIN para autorizar el registro de esta novedad:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;

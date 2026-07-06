@@ -298,7 +298,7 @@
       
       let pinFirma;
       try {
-        pinFirma = await promptSecurityPin('Ingrese su PIN para autorizar las órdenes seleccionadas:');
+        pinFirma = await getSecurityPinOrSetup('Ingrese su PIN para autorizar las órdenes seleccionadas:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;

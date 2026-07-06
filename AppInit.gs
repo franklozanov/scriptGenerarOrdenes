@@ -137,6 +137,14 @@ function initializeCompleteSystem(ui) {
     summary.push("⚠️ Diagnóstico ConsecutivoImp: " + e.message);
   }
 
+  // Migración de Seguridad de PIN y Bloqueo
+  try {
+    migrarSeguridadPIN();
+    summary.push("✓ Seguridad PIN encriptado migrada");
+  } catch (e) {
+    summary.push("⚠️ Migración Seguridad PIN: " + e.message);
+  }
+
   // Migración de datos históricos (Fase 5): congelar IMPORTRANGE obsoletos
   try {
     var migracionResult = migrarFormulasAValoresEstaticos_();

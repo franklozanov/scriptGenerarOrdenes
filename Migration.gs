@@ -37,6 +37,10 @@
 //   - Estado: Pendiente de ejecución en producción
 //   - Ejecutado por: [PENDIENTE - Registrar aquí después de ejecutar]
 //   - Resultado: [PENDIENTE - Registrar resultado aquí]
+// [2026-07-06] migrarSeguridadPIN()
+//   - Propósito: Limpiar contraseñas planas y preparar la hoja Usuarios para
+//                el nuevo sistema de PIN encriptado y bloqueo.
+//   - Estado: Pendiente
 //
 // ============================================================
 
@@ -272,5 +276,66 @@ function verificarEstadoMigracion(silent) {
   } catch (e) {
     Logger.log("ERROR en verificación: " + e.message);
     throw e;
+  }
+}
+
+/**
+ * Migra la hoja Usuarios al nuevo sistema de Seguridad PIN Encriptado.
+ * 1. Verifica/Limpiará la columna 'Clave' para que el usuario deba crear su PIN.
+ * 2. Verifica/Inicializa la columna 'IntentosFallidos' a 0.
+ * 
+ * Se puede ejecutar de manera segura múltiples veces (si el PIN ya parece un Hash SHA-256 no lo borra).
+ */
+function migrarSeguridadPIN() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+  var colIntentosIdx = getColumnIndexByNameCaseInsensitive(headers, 'IntentosFallidos', false);
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
+
+  if (!colClaveIdx || !colIntentosIdx || !colEstadoIdx) {
+    Logger.log("migrarSeguridadPIN: Faltan columnas clave (Clave, Estado o IntentosFallidos). Ejecute fixHeaders primero.");
+    return;
+  }
+
+  var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+  var data = dataRange.getValues();
+  var needsUpdate = false;
+
+  for (var i = 0; i < data.length; i++) {
+    var clave = data[i][colClaveIdx - 1] ? data[i][colClaveIdx - 1].toString().trim() : "";
+    var intentos = data[i][colIntentosIdx - 1];
+    var estado = data[i][colEstadoIdx - 1] ? data[i][colEstadoIdx - 1].toString().trim() : "";
+    
+    // Si la clave no está vacía y no tiene pinta de ser un hash de 64 caracteres hex, la limpiamos
+    if (clave !== "" && clave !== "PENDIENTE" && clave.length !== 64) {
+      data[i][colClaveIdx - 1] = "PENDIENTE";
+      needsUpdate = true;
+    }
+
+    // Inicializar IntentosFallidos a 0 si está vacío o no es número
+    if (intentos === "" || isNaN(intentos)) {
+      data[i][colIntentosIdx - 1] = 0;
+      needsUpdate = true;
+    }
+    
+    // Si no tiene estado, poner Activo
+    if (estado === "") {
+        data[i][colEstadoIdx - 1] = "Activo";
+        needsUpdate = true;
+    }
+  }
+
+  if (needsUpdate) {
+    dataRange.setValues(data);
+    Logger.log("✓ Migración de Seguridad PIN completada: Se limpiaron contraseñas antiguas y se inicializaron intentos.");
+  } else {
+    Logger.log("✓ Migración de Seguridad PIN verificada: No se requirieron cambios.");
   }
 }
