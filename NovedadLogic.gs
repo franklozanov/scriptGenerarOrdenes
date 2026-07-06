@@ -627,7 +627,12 @@ function procesarAutorizacionQA(params, userId) {
     var colSolicitadaPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'SolicitadaPor', false);
     
     if (!colNoOrden || !colStatus || !colEstadoCarga || !colSolicitadaPor) {
-      return { status: 'error', message: 'No se encontraron las columnas requeridas en Ordenes.' };
+      var faltantes = [];
+      if (!colNoOrden) faltantes.push('NoOrden');
+      if (!colStatus) faltantes.push('STATUS');
+      if (!colEstadoCarga) faltantes.push('EstadoCarga');
+      if (!colSolicitadaPor) faltantes.push('SolicitadaPor');
+      return { status: 'error', message: 'No se encontraron las siguientes columnas requeridas en la fila 1 de Ordenes (buscando por nombre exacto): ' + faltantes.join(', ') };
     }
     
     // Generar timestamp

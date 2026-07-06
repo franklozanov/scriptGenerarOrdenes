@@ -2,6 +2,7 @@
 <html>
 <head>
   <base target="_top">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
   <style>
     body { padding: 0; margin: 0; font-family: 'Inter', sans-serif; background-color: #f8f9fa; overflow-x: hidden; }
@@ -191,27 +192,36 @@
           <h2 class="sub-title">Cargar Órdenes</h2>
         </div>
         
-        <div class="view-body" style="flex:1;">
-          <div class="paste-instruction">
-            <strong>Tip:</strong> Pega directamente desde Excel (8 columnas) en esta pantalla para auto-generar las órdenes.
-          </div>
-          
+        <div class="view-body" style="flex:1; display:flex; flex-direction:column;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div id="tableInfo" style="font-size:12px; color:#5f6368; font-weight:500;">0 fila(s) agregada(s).</div>
             <div style="display:flex; gap:8px;">
-              <button class="btn-secondary-small" onclick="co_addCard()">+ Nueva Orden</button>
+              <button class="btn-secondary-small" onclick="co_addCard()" style="min-width: 90px; text-align: center;">+ Nueva</button>
+              <button class="btn-secondary-small" onclick="co_clearCards()" style="color: #c5221f; min-width: 90px; text-align: center;">Limpiar</button>
             </div>
-            <button class="btn-secondary-small" onclick="co_clearCards()" style="color: #c5221f;">Limpiar</button>
           </div>
           
-          
-          <div id="cardsContainer">
+          <div id="cardsContainer" style="flex:1; overflow-y:auto; margin-bottom:10px;">
             <!-- Las órdenes se generan aquí -->
+          </div>
+          
+          <!-- Zona interactiva inferior para Excel -->
+          <div class="excel-drop-zone" id="excelDropZone" style="border: 2px dashed #dadce0; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 12px; background-color: #f8f9fa; transition: background-color 0.2s;">
+            <div style="font-size: 11.5px; color: #3c4043; margin-bottom: 10px;">
+              <strong>💡 Tip:</strong> Pega los datos (Ctrl+V) o arrastra tu plantilla Excel aquí.
+            </div>
+            
+            <div style="display:flex; gap:8px; justify-content: center;">
+              <button class="btn-secondary-small" onclick="descargarPlantillaExcel()">📥 Plantilla</button>
+              <button class="btn-secondary-small" onclick="document.getElementById('excelFileInput').click()">📂 Subir Archivo</button>
+            </div>
+            
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display:none;" onchange="procesarArchivoExcel(event)">
           </div>
         </div>
         
         <div class="bottom-actions">
-          <button class="btn-primary-small" onclick="co_guardarDatos()">Guardar Órdenes</button>
+          <button class="btn-primary-small" onclick="co_guardarDatos()" style="width:100%;">Guardar Órdenes</button>
         </div>
       </div>
       
@@ -459,6 +469,39 @@
           document.getElementById(btn.dataset.target).classList.add('active');
         });
       });
+
+      // Configurar Drag and Drop para carga masiva Excel
+      const dropZone = document.getElementById('excelDropZone');
+      if (dropZone) {
+        dropZone.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          dropZone.style.backgroundColor = '#e8f0fe';
+          dropZone.style.borderColor = '#1a73e8';
+        });
+        
+        dropZone.addEventListener('dragleave', function(e) {
+          e.preventDefault();
+          dropZone.style.backgroundColor = '#f8f9fa';
+          dropZone.style.borderColor = '#dadce0';
+        });
+        
+        dropZone.addEventListener('drop', function(e) {
+          e.preventDefault();
+          dropZone.style.backgroundColor = '#f8f9fa';
+          dropZone.style.borderColor = '#dadce0';
+          
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const input = document.getElementById('excelFileInput');
+            input.files = dt.files;
+            
+            const eventObj = new Event('change');
+            input.dispatchEvent(eventObj);
+          }
+        });
+      }
 
       // Precalentar pdf-lib desde el arranque (no esperar a que se abra la vista Imprimir),
       // para que ya esté cargado o en caché del navegador cuando el usuario imprima.
@@ -796,6 +839,77 @@
        MODULO: CARGA DE ÓRDENES (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     let co_cardCount = 0;
+
+    // --- NUEVAS FUNCIONES PARA CARGA DE ÓRDENES (EXCEL) ---
+    function descargarPlantillaExcel() {
+      if (typeof XLSX === 'undefined') {
+        showAlert('La librería Excel no se ha cargado correctamente.', 'error');
+        return;
+      }
+      const header = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden"];
+      const ws = XLSX.utils.aoa_to_sheet([header]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Ordenes");
+      XLSX.writeFile(wb, "Plantilla_Carga_Masiva_QMS.xlsx");
+    }
+
+    function procesarArchivoExcel(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      if (typeof XLSX === 'undefined') {
+        showAlert('La librería Excel no se ha cargado correctamente.', 'error');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+          
+          if (rows.length <= 1) {
+            showAlert('El archivo está vacío o solo contiene encabezados.', 'warning');
+            return;
+          }
+          
+          let agregadas = 0;
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0 || row.every(cell => !cell || cell.toString().trim() === '')) continue;
+            
+            const obj = {
+              Proceso: row[0] ? row[0].toString().trim() : '',
+              Codigo: row[1] ? row[1].toString().trim() : '',
+              Descripcion: row[2] ? row[2].toString().trim() : '',
+              Lote: row[3] ? row[3].toString().trim() : '',
+              Exp: row[4] ? row[4].toString().trim() : '',
+              Cantidad: row[5] ? row[5].toString().trim() : '',
+              NoAnalisis: row[6] ? row[6].toString().trim() : '',
+              NoOrden: row[7] ? row[7].toString().trim() : ''
+            };
+            
+            co_addCard(obj);
+            agregadas++;
+          }
+          
+          if (agregadas > 0) {
+            showToast(agregadas + ' órdenes cargadas desde el archivo.', 'success');
+          } else {
+            showAlert('No se encontraron datos válidos en el archivo.', 'warning');
+          }
+          
+        } catch (err) {
+          showError('Error al leer el archivo Excel: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      event.target.value = ''; // Reset
+    }
 
     function co_addCard(data = {}) {
       co_cardCount++;
