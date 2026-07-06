@@ -56,10 +56,45 @@ var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 // Estructura requerida de hojas y columnas
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder', 'FileFolderLink'],
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'NoPags', 'Reimpresion', 'TotalPags', 'ImpresoPor', 'Reimpreso', 'HistorialImpresion', 'STATUS'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'NoPags', 'Reimpresion', 'TotalPags', 'ImpresoPor', 'Reimpreso', 'HistorialImpresion', 'STATUS', 'VerifLote', 'VerifCant. Disponible', 'VerifExp', 'CantDispAFecha', 'Decision'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
   'PermisosRoles': ['Rol', 'MENU_ADMIN', 'MENU_CONFIG', 'CARGAR_ORDENES', 'SUBIR_DOCUMENTOS', 'REGISTRAR_NOVEDAD', 'IMPRIMIR_ORDEN', 'SOLICITAR_REIMPRESION', 'APROBAR_REIMPRESION', 'AUTORIZAR_QA', 'GESTIONAR_AUTOAPROBACION'],
   'SolicitudesImpresion': ['ID_Solicitud', 'Fecha', 'NoOrden', 'SolicitadoPor', 'TipoSolicitud', 'Motivo', 'Plantillas', 'Estado', 'FirmaQA']
+};
+
+// --- CONFIGURACIÓN DE MATRICES DE VALIDACIÓN ---
+
+/**
+ * Nombre de la hoja de sistema que almacena la configuración de matrices K.
+ * Esta hoja es creada automáticamente al inicializar el sistema y permanece oculta.
+ */
+var SYS_MATRICES_SHEET_NAME = 'Sys_MatricesConfig';
+
+/**
+ * Encabezados canónicos de la hoja Sys_MatricesConfig.
+ * El orden de este array define el orden físico de columnas en la hoja.
+ */
+var MATRICES_CONFIG_HEADERS = [
+  'Nombre Matriz',      // Nombre descriptivo (ej. "Matriz K 2026")
+  'ID Archivo',         // ID extraído del link de Google Sheets externo
+  'Nombre de Pestaña', // Nombre exacto del tab interno a consultar
+  'Columna Llave',     // Nombre del encabezado con el No Análisis K
+  'Columna Lote',      // Nombre del encabezado de Lote
+  'Columna Cantidad',  // Nombre del encabezado de Cantidad Disponible
+  'Columna Vencimiento', // Nombre del encabezado de Fecha de Vencimiento
+  'Columna Fabricante', // Nombre del encabezado de Fabricante
+  'Prioridad',         // Número entero (1 = primera en consultar)
+  'Activa'             // "Si" / "No" — permite desactivar sin eliminar
+];
+
+/**
+ * Valores posibles para la columna Decision de la hoja Ordenes.
+ */
+var VALORES_DECISION = {
+  OK: 'OK, Generar orden',
+  CANTIDAD_NO_DISPONIBLE: 'Cantidad no disponible en inventario',
+  NO_ENCONTRADO: 'No encontrado en ninguna Matriz',
+  ERROR_PREFIX: 'Error en: '   // Se concatena con los campos fallidos (ej. "Error en: Lote")
 };

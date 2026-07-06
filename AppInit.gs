@@ -83,6 +83,14 @@ function initializeCompleteSystem(ui) {
   }
 
   try {
+    ensureMatricesConfigSheet_();
+    summary.push("✓ Hoja de configuración de Matrices K verificada/creada");
+  } catch (e) {
+    summary.push("✗ Error en hoja Matrices K: " + e.message);
+    // No se lanza: es no-crítico para el resto del sistema
+  }
+
+  try {
     ensureWebAppUrlConfigured_(ui);
     summary.push("✓ URL de Web App configurada");
   } catch (e) {
@@ -127,6 +135,18 @@ function initializeCompleteSystem(ui) {
     summary.push("✓ " + diagnosticResult);
   } catch (e) {
     summary.push("⚠️ Diagnóstico ConsecutivoImp: " + e.message);
+  }
+
+  // Migración de datos históricos (Fase 5): congelar IMPORTRANGE obsoletos
+  try {
+    var migracionResult = migrarFormulasAValoresEstaticos_();
+    if (migracionResult.filasMigradas > 0) {
+      summary.push("✓ Migración histórica: " + migracionResult.filasMigradas + " fila(s) con fórmulas congeladas a valores estáticos");
+    } else {
+      summary.push("✓ Migración histórica: Sin pendientes (datos ya estáticos)");
+    }
+  } catch (e) {
+    summary.push("⚠️ Migración histórica: " + e.message);
   }
 
   try {
@@ -554,4 +574,97 @@ function logInitialization() {
   
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
   Logger.log("✓ Inicialización registrada en Logs");
+}
+
+// --- MIGRACIÓN HISTÓRICA ---
+
+/**
+ * Congela las fórmulas IMPORTRANGE históricas de las columnas de validación
+ * (VerifLote, VerifCant. Disponible, VerifExp, Fabricante, Decision, CantDispAFecha)
+ * pasándolas a valores estáticos inmutables.
+ *
+ * Es IDEMPOTENTE: las filas que ya tienen valores estáticos (o que ya fueron migradas)
+ * son detectadas y omitidas. Se puede llamar múltiples veces sin riesgo.
+ *
+ * @returns {{ filasMigradas: number, filasOmitidas: number }}
+ * @private
+ */
+function migrarFormulasAValoresEstaticos_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ordenes');
+  if (!sheet) return { filasMigradas: 0, filasOmitidas: 0 };
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { filasMigradas: 0, filasOmitidas: 0 };
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Columnas que se deben congelar (si tienen fórmula IMPORTRANGE o similar)
+  var colsACongelar = [
+    'VerifLote',
+    'VerifCant. Disponible',
+    'VerifExp',
+    'Fabricante',
+    'Decision',
+    'CantDispAFecha'
+  ];
+
+  // Resolver índices de columna (base-1). Omitir las que no existan aún.
+  var colIndices = {};
+  colsACongelar.forEach(function(nombre) {
+    var idx = getColumnIndexByNameCaseInsensitive(headers, nombre, false);
+    if (idx) colIndices[nombre] = idx;
+  });
+
+  if (Object.keys(colIndices).length === 0) {
+    Logger.log('migrarFormulasAValoresEstaticos_: Ninguna columna de validación encontrada. Sin acción.');
+    return { filasMigradas: 0, filasOmitidas: 0 };
+  }
+
+  var filasMigradas = 0;
+  var filasOmitidas = 0;
+
+  // Leer formulas y valores en bloque (una sola llamada a la API por columna)
+  var colNombres = Object.keys(colIndices);
+  for (var c = 0; c < colNombres.length; c++) {
+    var nombre = colNombres[c];
+    var colIdx = colIndices[nombre];
+
+    var rangeData = sheet.getRange(2, colIdx, lastRow - 1, 1);
+    var formulas  = rangeData.getFormulas();   // Fórmula cruda si la hay, "" si es valor
+    var values    = rangeData.getValues();     // Valor evaluado actual
+
+    var updates = []; // { row: Number, value: any }
+
+    for (var r = 0; r < formulas.length; r++) {
+      var formula = formulas[r][0];
+      var value   = values[r][0];
+
+      // Solo actuar si la celda TIENE una fórmula (es decir, está usando IMPORTRANGE u otra)
+      if (formula && formula.toString().trim().length > 0) {
+        updates.push({ row: r + 2, value: value }); // +2: fila real (header en fila 1)
+      }
+    }
+
+    // Escribir en batch las celdas que tenían fórmula
+    if (updates.length > 0) {
+      updates.forEach(function(u) {
+        sheet.getRange(u.row, colIdx).setValue(u.value);
+      });
+      filasMigradas = Math.max(filasMigradas, updates.length);
+      Logger.log('migrarFormulasAValoresEstaticos_: ' + updates.length + ' celda(s) congeladas en columna "' + nombre + '"');
+    } else {
+      filasOmitidas++;
+    }
+  }
+
+  if (filasMigradas > 0) {
+    logChange(
+      'MIGRACION_FORMULAS',
+      'Fórmulas históricas congeladas como valores estáticos. Columnas: ' + colNombres.join(', ') + '. Filas afectadas: ~' + filasMigradas,
+      'Sistema'
+    );
+  }
+
+  return { filasMigradas: filasMigradas, filasOmitidas: filasOmitidas };
 }
