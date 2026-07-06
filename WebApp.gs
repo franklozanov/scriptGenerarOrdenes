@@ -358,7 +358,7 @@ function requireAuthorizedUserStrict_(params) {
   }
 
   if (validUser.estado !== "Activo") {
-    throw new Error("ACCESO DENEGADO: Su usuario se encuentra inactivo.");
+    throw new Error("ACCESO DENEGADO: Su usuario se encuentra inactivo o no tiene un estado definido. Por favor contacte al administrador para que verifique y configure su Estado como 'Activo' en la hoja Usuarios.");
   }
 
   // 2. Validar Firma Electrónica (PIN)

@@ -65,7 +65,7 @@ function getUserRecordByUserId_(userId) {
         email: colEmailIdx !== null && data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim() : "",
         rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : "",
         pin: colClaveIdx !== null && data[i][colClaveIdx] !== undefined ? data[i][colClaveIdx].toString().trim() : "",
-        estado: colEstadoIdx !== null && data[i][colEstadoIdx] !== undefined && data[i][colEstadoIdx].toString().trim() !== "" ? data[i][colEstadoIdx].toString().trim() : "Activo"
+        estado: colEstadoIdx !== null && data[i][colEstadoIdx] !== undefined ? data[i][colEstadoIdx].toString().trim() : ""
       };
     }
   }
