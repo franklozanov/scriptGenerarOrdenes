@@ -1653,12 +1653,12 @@
           })
           .withFailureHandler(e => { hideLoading(); showError(e.message); })
           .registrarSolicitudImpresion({
-            orderNo: orderNo,
+            noOrden: orderNo,
             solicitadoPor: userObj.nombreCompleto,
             tipoSolicitud: tipo,
             motivo: motivo,
             plantillasJSON: JSON.stringify(config),
-            plantillasResumen: config.map(c => `${c.copies}x ${c.name}`).join(', '),
+            plantillas: config.map(c => `${c.copies}x ${c.name}`).join(', '),
             pinFirma: pin
           }, userObj.userId);
       } catch (e) {
