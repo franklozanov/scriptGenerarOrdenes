@@ -101,40 +101,9 @@ function onOpenMain(email) {
   
   var hasMainMenuItems = false;
 
-  if (hasPermissionByRol(validUser.rol, PERMISOS.CARGAR_ORDENES)) {
-    mainMenu.addItem('📥 Cargar Nuevas Órdenes', 'abrirModalCargaOrdenes');
-    hasMainMenuItems = true;
-  }
-  
-  if (hasPermissionByRol(validUser.rol, PERMISOS.SUBIR_DOCUMENTOS)) {
-    mainMenu.addItem('📤 Subir documentos', 'abrirModalSubidaGeneral');
-    hasMainMenuItems = true;
-  }
-  
-  if (hasPermissionByRol(validUser.rol, PERMISOS.IMPRIMIR_ORDEN)) {
-    mainMenu.addItem('🖨️ Imprimir Orden', 'openPrintDialog');
-    hasMainMenuItems = true;
-  }
-  
-  if (hasPermissionByRol(validUser.rol, PERMISOS.SOLICITAR_REIMPRESION)) {
-    mainMenu.addItem('📋 Solicitar Reimpresión', 'abrirModalSolicitarReimpresion');
-    hasMainMenuItems = true;
-  }
-  
-  if (hasPermissionByRol(validUser.rol, PERMISOS.REGISTRAR_NOVEDAD)) {
-    mainMenu.addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad');
-    hasMainMenuItems = true;
-  }
-  
-  if (hasPermissionByRol(validUser.rol, PERMISOS.AUTORIZAR_QA)) {
-    mainMenu.addItem('✅ Autorizar Órdenes (QA)', 'abrirModalAutorizarQA');
-    hasMainMenuItems = true;
-  }
-
-  if (hasPermissionByRol(validUser.rol, PERMISOS.APROBAR_REIMPRESION)) {
-    mainMenu.addItem('📋 Aprobar Solicitudes de Impresión', 'abrirModalAprobarImpresion');
-    hasMainMenuItems = true;
-  }
+  // Fase 3: Migración a Sidebar SPA
+  mainMenu.addItem('🎛️ Abrir Panel Principal QMS', 'abrirSidebarQMS');
+  hasMainMenuItems = true;
 
   if (configMenu) {
     mainMenu.addSeparator().addSubMenu(configMenu);

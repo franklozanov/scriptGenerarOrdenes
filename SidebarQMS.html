@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  <style>
+    body { padding: 0; margin: 0; font-family: 'Inter', sans-serif; background-color: #f8f9fa; overflow-x: hidden; }
+    
+    /* Navigation System */
+    .view-container { display: flex; width: 200vw; transition: transform 0.3s ease-in-out; }
+    .view-panel { width: 100vw; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+    .show-main { transform: translateX(0); }
+    .show-sub { transform: translateX(-100vw); }
+    
+    /* Header del Sub-view */
+    .sub-header { background: #fff; padding: 12px 15px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .btn-back { background: none; border: none; font-size: 16px; cursor: pointer; color: #5f6368; padding: 5px; margin-right: 10px; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+    .btn-back:hover { background: #f1f3f4; color: #202124; }
+    .sub-title { font-size: 15px; font-weight: 600; color: #202124; margin: 0; }
+
+    /* Estilos del Main View (Tabs) */
+    .tabs { display: flex; flex-direction: column; width: 100%; height: 100%; }
+    .tab-header { display: flex; background: #fff; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 10; }
+    .tab-btn { flex: 1; min-width: 50%; padding: 12px 4px; cursor: pointer; text-align: center; border: none; background: none; font-weight: 500; font-size: 13px; color: #5f6368; border-bottom: 2px solid transparent; transition: all 0.2s ease; }
+    .tab-btn:hover { background: #f1f3f4; color: #202124; }
+    .tab-btn.active { color: #1a73e8; border-bottom: 2px solid #1a73e8; }
+    .tab-content { flex: 1; padding: 15px; display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    .section-title { font-size: 12px; font-weight: 600; color: #80868b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; margin-top: 5px; }
+    
+    .btn-action { width: 100%; padding: 12px 15px; text-align: left; background: #fff; border: 1px solid #dadce0; border-radius: 6px; cursor: pointer; margin-bottom: 10px; font-size: 14px; color: #3c4043; font-weight: 500; display: flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: all 0.2s ease; }
+    .btn-action:hover { background: #f4f8fe; border-color: #d2e3fc; color: #174ea6; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .icon { margin-right: 12px; font-size: 18px; width: 24px; text-align: center; }
+    
+    /* Overlay global compatible con GlobalScripts */
+    #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: #5f6368; font-size: 14px; font-weight: 500; }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #1a73e8; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin-bottom: 10px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+
+    /* Estilos para Carga de Órdenes (Cards) */
+    .view-body { padding: 15px; }
+    .paste-instruction { background-color: #e8f0fe; padding: 10px; margin-bottom: 15px; font-size: 12px; color: #1967d2; border-radius: 6px; }
+    
+    .order-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden; }
+    .card-header { background: #f8f9fa; padding: 8px 12px; border-bottom: 1px solid #dadce0; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #3c4043; }
+    .btn-delete-card { background: #fce8e6; color: #c5221f; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: 500; cursor: pointer; }
+    .btn-delete-card:hover { background: #fad2cf; }
+    
+    .card-body { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .card-body input.form-input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
+    .card-body .full-width { grid-column: span 2; }
+    
+    .file-upload-box { border: 1px dashed #ccc; padding: 8px; border-radius: 4px; text-align: center; font-size: 11px; margin-top: 5px; background: #fafafa; }
+    .file-upload-box input { max-width: 100%; font-size: 10px; }
+    
+    .bottom-actions { position: sticky; bottom: 0; background: #fff; padding: 10px 15px; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-between; gap: 10px; }
+    .btn-primary-small { background: #1a73e8; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; flex: 1; }
+    .btn-secondary-small { background: #fff; color: #5f6368; border: 1px solid #dadce0; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    
+    #tableInfo { font-size: 12px; color: #5f6368; margin-bottom: 10px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">Cargando Panel...</div>
+  </div>
+
+  <div class="view-container show-main" id="viewContainer">
+    
+    <!-- MAIN VIEW: Tabs y Menús -->
+    <div class="view-panel" id="mainView">
+      <div class="tabs">
+        <div class="tab-header">
+          <button class="tab-btn active" data-target="tab-orders">📑 Órdenes</button>
+          <button class="tab-btn" data-target="tab-print">🖨️ Impresión</button>
+          <button class="tab-btn" data-target="tab-floor">📦 Piso</button>
+          <button class="tab-btn hidden" id="tabQA-btn" data-target="tab-qa">🛡️ QA</button>
+        </div>
+        
+        <div id="tab-orders" class="tab-content active">
+          <div class="section-title">Gestión de Documentos</div>
+          <!-- FASE 3: Enrutado a vista interna -->
+          <div id="btn-load-orders" class="btn-action hidden" onclick="openSubView('carga-ordenes')">
+            <span class="icon">📥</span> Cargar Nuevas Órdenes
+          </div>
+          <div id="btn-upload-docs" class="btn-action hidden" onclick="openSubView('subida-documentos')">
+            <span class="icon">📤</span> Subir Documentos
+          </div>
+        </div>
+        
+        <div id="tab-print" class="tab-content">
+          <div class="section-title">Centro de Impresión</div>
+          <div id="btn-print-order" class="btn-action hidden" onclick="openModal('openPrintDialog')">
+            <span class="icon">🖨️</span> Imprimir Orden
+          </div>
+          <div id="btn-request-reprint" class="btn-action hidden" onclick="openModal('abrirModalSolicitarReimpresion')">
+            <span class="icon">📋</span> Solicitar Reimpresión
+          </div>
+        </div>
+        
+        <div id="tab-floor" class="tab-content">
+          <div class="section-title">Gestión de Piso</div>
+          <div id="btn-register-novelty" class="btn-action hidden" onclick="openModal('abrirModalRegistroNovedad')">
+            <span class="icon">📝</span> Registrar Novedad / Entrega
+          </div>
+        </div>
+        
+        <div id="tab-qa" class="tab-content">
+          <div class="section-title">Aprobaciones QA</div>
+          <div id="btn-auth-qa" class="btn-action hidden" onclick="openModal('abrirModalAutorizarQA')">
+            <span class="icon">✅</span> Autorizar Órdenes
+          </div>
+          <div id="btn-approve-print" class="btn-action hidden" onclick="openModal('abrirModalAprobarImpresion')">
+            <span class="icon">🛡️</span> Aprobar Reimpresión
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUB VIEW: Secciones Dinámicas -->
+    <div class="view-panel" id="subView">
+      
+      <!-- Vista: Carga de Órdenes -->
+      <div id="view-carga-ordenes" class="hidden h-100" style="display:flex; flex-direction:column; height:100%;">
+        <div class="sub-header">
+          <button class="btn-back" onclick="goBackToMain()">🔙</button>
+          <h2 class="sub-title">Cargar Órdenes</h2>
+        </div>
+        
+        <div class="view-body" style="flex:1;">
+          <div class="paste-instruction">
+            <strong>Tip:</strong> Pega directamente desde Excel (8 columnas) en esta pantalla para auto-generar las tarjetas.
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; margin-bottom: 12px;">
+            <button class="btn-secondary-small" onclick="co_addCard()">+ Nueva Tarjeta</button>
+            <button class="btn-secondary-small" onclick="co_clearCards()" style="color: #c5221f;">Limpiar</button>
+          </div>
+          
+          <div id="tableInfo">0 filas agregadas.</div>
+          
+          <div id="cardsContainer">
+            <!-- Las tarjetas se generan aquí -->
+          </div>
+        </div>
+        
+        <div class="bottom-actions">
+          <button class="btn-primary-small" onclick="co_guardarDatos()">Guardar Órdenes</button>
+        </div>
+      </div>
+      
+      <!-- Vista: Subida de Documentos -->
+      <div id="view-subida-documentos" class="hidden h-100" style="display:flex; flex-direction:column; height:100%;">
+        <div class="sub-header">
+          <button class="btn-back" onclick="goBackToMain()">🔙</button>
+          <h2 class="sub-title">Subir Documentos</h2>
+        </div>
+        
+        <div class="view-body" style="flex:1;">
+          <div class="paste-instruction">
+            <strong>Instrucciones:</strong> Selecciona una Orden y carga su OA y/o COA simultáneamente.
+          </div>
+          
+          <div style="margin-bottom:12px;">
+             <label style="font-size:12px; font-weight:bold;">Usuario responsable:</label>
+             <select id="up_userSelect" class="form-input" style="width:100%; padding:6px; font-size:13px;"></select>
+          </div>
+          
+          <button class="btn-secondary-small" onclick="up_addCard()" style="width:100%; margin-bottom:12px;">+ Agregar Orden</button>
+          
+          <div id="up_cardsContainer">
+            <!-- Las tarjetas de subida se generan aquí -->
+          </div>
+          
+          <div id="up_noOrdersMsg" class="hidden" style="text-align:center; padding:20px; font-size:13px; color:#666;">
+            No hay documentos pendientes de subida.
+          </div>
+        </div>
+        
+        <div class="bottom-actions" style="flex-direction:column; gap:5px;">
+           <div id="up_progressText" style="font-size:11px; text-align:center; color:#1a73e8;" class="hidden">Procesando...</div>
+           <button id="up_btnUpload" class="btn-primary-small" onclick="up_uploadAll()" disabled>📤 Subir Todo</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+  
+  <script>
+    var sysData = null;
+    var base64Data = {};
+
+    document.addEventListener("DOMContentLoaded", function() {
+      // Configurar tabs
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.target).classList.add('active');
+        });
+      });
+
+      // Cargar datos iniciales
+      google.script.run
+        .withSuccessHandler(function(data) {
+          sysData = data;
+          applyPermissions(data.userPermissions);
+          document.getElementById("loading-overlay").classList.add("hidden");
+          
+          // Lazy load base64
+          google.script.run
+            .withSuccessHandler(function(b64) {
+              base64Data = b64;
+              console.log("Plantillas Base64 cargadas en segundo plano.");
+            })
+            .getTemplatesBase64Async();
+        })
+        .withFailureHandler(function(err) {
+          alert("Error: " + err.message);
+          document.getElementById("loading-overlay").classList.add("hidden");
+        })
+        .getInitialData(false);
+
+      // Event Listener Global para Pegar (para Carga Órdenes)
+      document.addEventListener('paste', co_handlePaste);
+    });
+
+    function applyPermissions(perms) {
+      if(!perms) return;
+      if(perms["CARGAR_ORDENES"]) document.getElementById("btn-load-orders").classList.remove("hidden");
+      if(perms["SUBIR_DOCUMENTOS"]) document.getElementById("btn-upload-docs").classList.remove("hidden");
+      if(perms["IMPRIMIR_ORDEN"]) document.getElementById("btn-print-order").classList.remove("hidden");
+      if(perms["SOLICITAR_REIMPRESION"]) document.getElementById("btn-request-reprint").classList.remove("hidden");
+      if(perms["REGISTRAR_NOVEDAD"]) document.getElementById("btn-register-novelty").classList.remove("hidden");
+      
+      var hasQA = false;
+      if(perms["AUTORIZAR_QA"]) { document.getElementById("btn-auth-qa").classList.remove("hidden"); hasQA = true; }
+      if(perms["APROBAR_REIMPRESION"]) { document.getElementById("btn-approve-print").classList.remove("hidden"); hasQA = true; }
+      
+      if(hasQA) document.getElementById("tabQA-btn").classList.remove("hidden");
+    }
+
+    // Navegación
+    function openSubView(viewId) {
+      // Ocultar todas las vistas internas
+      document.getElementById('view-carga-ordenes').classList.add('hidden');
+      document.getElementById('view-subida-documentos').classList.add('hidden');
+      
+      // Mostrar la solicitada
+      document.getElementById('view-' + viewId).classList.remove('hidden');
+      
+      // Deslizar
+      const container = document.getElementById('viewContainer');
+      container.classList.remove('show-main');
+      container.classList.add('show-sub');
+      
+      // Lógica específica al abrir
+      if(viewId === 'subida-documentos') {
+        up_initView();
+      }
+    }
+
+    function goBackToMain() {
+      const container = document.getElementById('viewContainer');
+      container.classList.remove('show-sub');
+      container.classList.add('show-main');
+    }
+
+    // Modal Flotante (Temporales para los que no se han migrado)
+    function openModal(actionName) {
+      document.getElementById("loading-overlay").classList.remove("hidden");
+      google.script.run
+        .withSuccessHandler(function() { document.getElementById("loading-overlay").classList.add("hidden"); })
+        .withFailureHandler(function(err) {
+          document.getElementById("loading-overlay").classList.add("hidden");
+          alert("Error al abrir: " + err.message);
+        })[actionName]();
+    }
+
+
+    /* ========================================================
+       MODULO: CARGA DE ÓRDENES (MIGRADO A SIDEBAR SPA)
+       ======================================================== */
+    let co_cardCount = 0;
+
+    function co_addCard(data = {}) {
+      co_cardCount++;
+      const container = document.getElementById('cardsContainer');
+      const card = document.createElement('div');
+      card.className = 'order-card';
+      
+      card.innerHTML = `
+        <div class="card-header">
+          <span>Orden #${co_cardCount}</span>
+          <button class="btn-delete-card" onclick="co_deleteCard(this)">Eliminar</button>
+        </div>
+        <div class="card-body">
+          <input type="text" class="form-input" data-field="Proceso" placeholder="Proceso" value="${data.Proceso || ''}">
+          <input type="text" class="form-input" data-field="Codigo" placeholder="Código" value="${data.Codigo || ''}">
+          <input type="text" class="form-input full-width" data-field="Descripcion" placeholder="Descripción" value="${data.Descripcion || ''}">
+          <input type="text" class="form-input" data-field="Lote" placeholder="Lote" value="${data.Lote || ''}">
+          <input type="text" class="form-input" data-field="Exp" placeholder="Exp" value="${data.Exp || ''}">
+          <input type="number" class="form-input" data-field="Cantidad" placeholder="Cantidad" value="${data.Cantidad || ''}">
+          <input type="text" class="form-input" data-field="NoAnalisis" placeholder="NoAnálisis" value="${data.NoAnalisis || ''}">
+          <input type="text" class="form-input full-width" data-field="NoOrden" placeholder="NoOrden" value="${data.NoOrden || ''}">
+          <div class="file-upload-box full-width">
+            <div>📄 OA: <input type="file" accept="application/pdf" data-field="FileOA"></div>
+            <div style="margin-top:4px;">📄 COA: <input type="file" accept="application/pdf" data-field="FileCOA"></div>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+      co_updateInfo();
+    }
+
+    function co_deleteCard(btn) {
+      btn.closest('.order-card').remove();
+      co_updateInfo();
+    }
+
+    function co_clearCards() {
+      document.getElementById('cardsContainer').innerHTML = '';
+      co_cardCount = 0;
+      co_updateInfo();
+    }
+
+    function co_updateInfo() {
+      const count = document.getElementById('cardsContainer').children.length;
+      document.getElementById('tableInfo').innerText = `${count} fila(s) agregada(s).`;
+    }
+
+    function co_handlePaste(e) {
+      // Si no estamos en la vista de carga de órdenes, o estamos en un input file, ignorar.
+      if (!document.getElementById('viewContainer').classList.contains('show-sub')) return;
+      if (document.getElementById('view-carga-ordenes').classList.contains('hidden')) return;
+      
+      // Si pegamos dentro de un input que ya tiene el foco, el navegador se encarga,
+      // PERO como queremos interceptar el pegado de un excel (texto con tabulaciones), revisamos el texto.
+      var pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      if (!pastedText || pastedText.indexOf('\t') === -1) {
+        return; // No parece una tabla copiada
+      }
+
+      e.preventDefault();
+      var rows = pastedText.split('\n');
+      
+      rows.forEach(function(rowText) {
+        var columns = rowText.split('\t');
+        if (columns.length >= 1 && columns[0].trim() !== '') {
+          co_addCard({
+            Proceso: columns[0] ? columns[0].trim() : '',
+            Codigo: columns[1] ? columns[1].trim() : '',
+            Descripcion: columns[2] ? columns[2].trim() : '',
+            Lote: columns[3] ? columns[3].trim() : '',
+            Exp: columns[4] ? columns[4].trim() : '',
+            Cantidad: columns[5] ? columns[5].trim() : '',
+            NoAnalisis: columns[6] ? columns[6].trim() : '',
+            NoOrden: columns[7] ? columns[7].trim() : ''
+          });
+        }
+      });
+      showAlert('Datos pegados exitosamente desde Excel.', 'success');
+    }
+
+    function co_collectData() {
+      const cards = document.querySelectorAll('#cardsContainer .order-card');
+      const records = [];
+      
+      cards.forEach(card => {
+        const textInputs = card.querySelectorAll('input.form-input:not([type="file"])');
+        const fileInputs = card.querySelectorAll('input[type="file"]');
+        const record = {};
+        
+        textInputs.forEach(input => {
+          record[input.dataset.field] = input.value.trim();
+        });
+        
+        if (Object.values(record).some(val => val !== '')) {
+          record._fileOA = fileInputs[0] && fileInputs[0].files.length > 0 ? fileInputs[0].files[0] : null;
+          record._fileCOA = fileInputs[1] && fileInputs[1].files.length > 0 ? fileInputs[1].files[0] : null;
+          records.push(record);
+        }
+      });
+      return records;
+    }
+
+    function co_fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        var reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function co_guardarDatos() {
+      var records = co_collectData();
+      if (records.length === 0) {
+        showError('No hay datos para cargar. Agregue tarjetas.');
+        return;
+      }
+      
+      let pin;
+      try {
+        pin = await promptSecurityPin('Ingrese su PIN para autorizar la carga masiva:');
+      } catch (e) {
+        showToast(e.message, 'warning');
+        return;
+      }
+
+      showLoading('Convirtiendo archivos...');
+      
+      var filePromises = [];
+      records.forEach(record => {
+        var promises = [];
+        if (record._fileOA) {
+          promises.push(co_fileToBase64(record._fileOA).then(b64 => { record.fileOABase64 = b64; record.fileOAName = record._fileOA.name; }));
+        }
+        if (record._fileCOA) {
+          promises.push(co_fileToBase64(record._fileCOA).then(b64 => { record.fileCOABase64 = b64; record.fileCOAName = record._fileCOA.name; }));
+        }
+        filePromises.push(Promise.all(promises));
+      });
+
+      Promise.all(filePromises).then(() => {
+        records.forEach(r => { delete r._fileOA; delete r._fileCOA; });
+        
+        var currentUserId = sysData.currentUser.userId;
+        var params = { operation: 'cargarOrdenesMasivas', records: records, pinFirma: pin, userId: currentUserId };
+
+        showLoading('Cargando órdenes en la hoja...');
+        google.script.run
+          .withSuccessHandler(function(result) {
+            hideLoading();
+            if (result.status === 'success') {
+              showAlert(result.message || 'Órdenes cargadas.', 'success');
+              co_clearCards();
+              goBackToMain();
+            } else {
+              showError(result.message || 'Error al guardar.');
+            }
+          })
+          .withFailureHandler(function(error) {
+            hideLoading();
+            showError('Error de comunicación: ' + error.message);
+          })
+          .procesarCargaOrdenesMasivas(params, currentUserId);
+                }).catch(err => {
+        hideLoading();
+        showError('Error al procesar archivos: ' + err.message);
+      });
+    }
+
+    /* ========================================================
+       MODULO: SUBIDA DE DOCUMENTOS (MIGRADO A SIDEBAR SPA)
+       ======================================================== */
+    let up_pendingOrders = null;
+    let up_fileCache = {}; // { cardId_docType: { base64, name, type } }
+    let up_cardCount = 0;
+
+    function up_initView() {
+      // Llenar select de usuarios si no está
+      const sel = document.getElementById('up_userSelect');
+      if (sel.options.length === 0 && sysData && sysData.users) {
+        sel.innerHTML = '<option value="">Seleccione usuario...</option>';
+        sysData.users.forEach(u => {
+          let opt = document.createElement('option');
+          opt.value = u.userId;
+          opt.text = u.nombreCompleto;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', up_validate);
+      }
+
+      showLoading('Cargando órdenes pendientes...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          up_pendingOrders = data;
+          hideLoading();
+          
+          let hasOA = data.ordenesPendientesOA && data.ordenesPendientesOA.length > 0;
+          let hasCOA = data.ordenesPendientesCOA && data.ordenesPendientesCOA.length > 0;
+          
+          if (!hasOA && !hasCOA) {
+            document.getElementById('up_noOrdersMsg').classList.remove('hidden');
+            document.getElementById('up_cardsContainer').innerHTML = '';
+          } else {
+            document.getElementById('up_noOrdersMsg').classList.add('hidden');
+            if(document.getElementById('up_cardsContainer').children.length === 0) {
+               up_addCard();
+            }
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error: ' + error.message);
+        })
+        .getPendingOrdersList();
+    }
+
+    function up_getUniqueOrders() {
+      if(!up_pendingOrders) return [];
+      let set = new Set();
+      (up_pendingOrders.ordenesPendientesOA || []).forEach(o => set.add(o));
+      (up_pendingOrders.ordenesPendientesCOA || []).forEach(o => set.add(o));
+      return Array.from(set).sort();
+    }
+
+    function up_addCard() {
+      up_cardCount++;
+      const cardId = 'up_card_' + up_cardCount;
+      const container = document.getElementById('up_cardsContainer');
+      const card = document.createElement('div');
+      card.className = 'order-card';
+      card.id = cardId;
+      
+      let orders = up_getUniqueOrders();
+      let optionsHtml = '<option value="">Seleccione orden...</option>';
+      orders.forEach(o => { optionsHtml += `<option value="${o}">${o}</option>`; });
+
+      card.innerHTML = `
+        <div class="card-header">
+          <span>Subida a Orden</span>
+          <button class="btn-delete-card" onclick="up_deleteCard('${cardId}')">X</button>
+        </div>
+        <div class="card-body" style="display:flex; flex-direction:column; gap:8px;">
+          <select class="form-input up-order-select" onchange="up_orderChanged('${cardId}')">
+             ${optionsHtml}
+          </select>
+          <div class="file-upload-box" style="text-align:left;">
+             <div style="font-weight:bold; margin-bottom:4px;">📄 Orden Acond. (OA)</div>
+             <input type="file" accept="application/pdf" data-doctype="Orden de Acondicionamiento" onchange="up_handleFile(this, '${cardId}')">
+             <div id="${cardId}_oa_status" style="font-size:10px; color:#c5221f;"></div>
+          </div>
+          <div class="file-upload-box" style="text-align:left;">
+             <div style="font-weight:bold; margin-bottom:4px;">📄 Certificado (COA)</div>
+             <input type="file" accept="application/pdf" data-doctype="Certificado de Analisis" onchange="up_handleFile(this, '${cardId}')">
+             <div id="${cardId}_coa_status" style="font-size:10px; color:#c5221f;"></div>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+      up_validate();
+    }
+
+    function up_deleteCard(cardId) {
+      document.getElementById(cardId).remove();
+      // Clear cache
+      delete up_fileCache[cardId + '_OA'];
+      delete up_fileCache[cardId + '_COA'];
+      up_validate();
+    }
+
+    function up_orderChanged(cardId) {
+      up_validate();
+    }
+
+    function up_handleFile(input, cardId) {
+      const docType = input.getAttribute('data-doctype');
+      const isOA = docType === 'Orden de Acondicionamiento';
+      const statusId = isOA ? `${cardId}_oa_status` : `${cardId}_coa_status`;
+      const cacheKey = isOA ? `${cardId}_OA` : `${cardId}_COA`;
+      
+      const statusEl = document.getElementById(statusId);
+      const file = input.files[0];
+      
+      if (!file) {
+        delete up_fileCache[cacheKey];
+        statusEl.innerText = '';
+        up_validate();
+        return;
+      }
+
+      if (file.type !== 'application/pdf') {
+        statusEl.innerText = '❌ Solo PDF';
+        delete up_fileCache[cacheKey];
+        up_validate();
+        return;
+      }
+      
+      if (file.size > 10 * 1024 * 1024) {
+        statusEl.innerText = '❌ >10MB';
+        delete up_fileCache[cacheKey];
+        up_validate();
+        return;
+      }
+
+      statusEl.innerText = '⏳ Convirtiendo...';
+      statusEl.style.color = '#f57c00';
+      
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        up_fileCache[cacheKey] = {
+           base64: e.target.result.split(',')[1],
+           name: file.name,
+           type: file.type,
+           docType: docType
+        };
+        statusEl.innerText = '✅ Listo (' + (file.size/1024).toFixed(1) + 'KB)';
+        statusEl.style.color = '#2e7d32';
+        up_validate();
+      };
+      reader.onerror = function() {
+        statusEl.innerText = '❌ Error lectura';
+        statusEl.style.color = '#c5221f';
+        delete up_fileCache[cacheKey];
+        up_validate();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function up_validate() {
+      let userId = document.getElementById('up_userSelect').value;
+      let btn = document.getElementById('up_btnUpload');
+      if (!userId) { btn.disabled = true; return; }
+      
+      let cards = document.querySelectorAll('#up_cardsContainer .order-card');
+      if (cards.length === 0) { btn.disabled = true; return; }
+      
+      let allValid = true;
+      let hasAtLeastOneFile = false;
+
+      cards.forEach(card => {
+        let orderNo = card.querySelector('.up-order-select').value;
+        let cardId = card.id;
+        
+        let hasOA = !!up_fileCache[cardId + '_OA'];
+        let hasCOA = !!up_fileCache[cardId + '_COA'];
+        
+        // Si la tarjeta tiene un archivo pero no orden
+        if ((hasOA || hasCOA) && !orderNo) {
+           allValid = false;
+        }
+        
+        if (hasOA || hasCOA) hasAtLeastOneFile = true;
+      });
+
+      btn.disabled = !(allValid && hasAtLeastOneFile);
+    }
+
+    async function up_uploadAll() {
+      let userId = document.getElementById('up_userSelect').value;
+      let cards = document.querySelectorAll('#up_cardsContainer .order-card');
+      let tasks = [];
+      
+      cards.forEach(card => {
+        let orderNo = card.querySelector('.up-order-select').value;
+        let cardId = card.id;
+        if(orderNo) {
+           if(up_fileCache[cardId + '_OA']) tasks.push({orderNo, file: up_fileCache[cardId + '_OA'], cardId, isOA: true});
+           if(up_fileCache[cardId + '_COA']) tasks.push({orderNo, file: up_fileCache[cardId + '_COA'], cardId, isOA: false});
+        }
+      });
+      
+      if(tasks.length === 0) return;
+      
+      // UI Lock
+      document.getElementById('up_btnUpload').disabled = true;
+      let progressText = document.getElementById('up_progressText');
+      progressText.classList.remove('hidden');
+      
+      for(let i=0; i<tasks.length; i++) {
+         let t = tasks[i];
+         progressText.innerText = `Subiendo ${i+1}/${tasks.length}...`;
+         let statusId = t.isOA ? `${t.cardId}_oa_status` : `${t.cardId}_coa_status`;
+         let statusEl = document.getElementById(statusId);
+         statusEl.innerText = '⏳ Subiendo...';
+         
+         try {
+           let res = await up_doUploadRequest(t, userId, false);
+           if(res.status === 'exists') {
+              if(confirm(`El archivo ${res.fileName} ya existe. ¿Deseas sobreescribirlo?`)) {
+                 res = await up_doUploadRequest(t, userId, true);
+              } else {
+                 res = await up_doUploadRequest(t, userId, 'skipUpload');
+              }
+           }
+           
+           if(res.status === 'success' || res.status === 'skipped') {
+              statusEl.innerText = '✅ ' + (res.status === 'skipped' ? 'Ya existe' : 'Subido');
+           } else {
+              statusEl.innerText = '❌ Error';
+           }
+         } catch(e) {
+           statusEl.innerText = '❌ Error';
+         }
+      }
+      progressText.innerText = 'Finalizado';
+      setTimeout(() => { progressText.classList.add('hidden'); }, 3000);
+      up_validate();
+    }
+    
+    function up_doUploadRequest(task, userId, overwriteConfirmed) {
+      return new Promise((resolve, reject) => {
+         fetch(sysData.webAppUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              operation: 'uploadDocument',
+              base64Data: task.file.base64,
+              mimeType: task.file.type,
+              fileName: task.file.name,
+              referenceNo: task.orderNo,
+              docType: task.file.docType,
+              overwriteConfirmed: overwriteConfirmed,
+              userId: userId
+            })
+         })
+         .then(response => response.json())
+         .then(result => resolve(result))
+         .catch(err => reject(err));
+      });
+    }  </script>
+</body>
+</html>

@@ -70,8 +70,11 @@ function getStaticTemplateBase64_(key, fileId) {
 /**
  * Obtiene datos iniciales (usuarios y plantillas) para los modales.
  * Usa caché de 10 minutos para optimizar performance.
+ * @param {boolean} includeBase64 - Opcional. Si es false, no precarga los base64 (útil para el nuevo Sidebar SPA). Por defecto es true.
  */
-function getInitialData() {
+function getInitialData(includeBase64) {
+  if (includeBase64 === undefined) includeBase64 = true;
+  
   try {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v2');
@@ -89,7 +92,7 @@ function getInitialData() {
         var parsedData = JSON.parse(cached);
         for (var i = 0; i < parsedData.templates.length; i++) {
           var t = parsedData.templates[i];
-          if (STATIC_TEMPLATE_KEYS_.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
+          if (includeBase64 && STATIC_TEMPLATE_KEYS_.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
             t.base64 = getStaticTemplateBase64_(t.key, t.fileId);
           } else {
             t.base64 = null;
@@ -215,8 +218,12 @@ function getInitialData() {
               }
               
               if (STATIC_TEMPLATE_KEYS_.indexOf(key) !== -1) {
-                base64 = getStaticTemplateBase64_(key, value);
-                Logger.log("✓ Precargando base64 para " + key);
+                if (includeBase64) {
+                  base64 = getStaticTemplateBase64_(key, value);
+                  Logger.log("✓ Precargando base64 para " + key);
+                } else {
+                  Logger.log("✓ Plantilla estática reconocida (carga asíncrona pendiente): " + key);
+                }
               }
             } catch (e) { 
               Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
@@ -353,8 +360,33 @@ function clearInitialDataCache() {
         }
       } catch (e) {
         Logger.log("Error limpiando caché estático " + STATIC_TEMPLATE_KEYS_[i] + ": " + e.message);
-      }
     }
     cache.remove(prefix + 'meta');
+  }
+}
+
+/**
+ * Obtiene el base64 de las plantillas de forma asíncrona para no bloquear la UI.
+ * Llamado desde el frontend (Sidebar) después de renderizar.
+ */
+function getTemplatesBase64Async() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get('initialData_v2');
+    if (!cached) return {}; // Si no hay caché, la UI debería recargar
+    
+    var parsedData = JSON.parse(cached);
+    var base64Data = {};
+    
+    for (var i = 0; i < parsedData.templates.length; i++) {
+      var t = parsedData.templates[i];
+      if (STATIC_TEMPLATE_KEYS_.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
+        base64Data[t.key] = getStaticTemplateBase64_(t.key, t.fileId);
+      }
+    }
+    return base64Data;
+  } catch (e) {
+    Logger.log("Error en getTemplatesBase64Async: " + e.message);
+    return {};
   }
 }
