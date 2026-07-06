@@ -218,37 +218,23 @@ function getInitialData(includeBase64) {
           }
           
           if (value) {
-            try { 
-              var file = DriveApp.getFileById(value);
-              if (displayName === key) {
-                displayName = file.getName();
-              }
-              
-              if (STATIC_TEMPLATE_KEYS_.indexOf(key) !== -1) {
-                if (includeBase64) {
+            // OPTIMIZACIÓN: Se eliminó DriveApp.getFileById() por cada iteración.
+            // Esto provocaba "Excedió el tiempo máximo de ejecución" (Timeout de 6 mins) al cargar el Sidebar.
+            if (STATIC_TEMPLATE_KEYS_.indexOf(key) !== -1) {
+              if (includeBase64) {
+                try {
                   base64 = getStaticTemplateBase64_(key, value);
                   Logger.log("✓ Precargando base64 para " + key);
-                } else {
-                  Logger.log("✓ Plantilla estática reconocida (carga asíncrona pendiente): " + key);
+                } catch (e) {
+                  Logger.log("ERROR: No se puede acceder al archivo estático de Drive para " + key);
                 }
-              }
-            } catch (e) { 
-              Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
-              Logger.log("  - ID del archivo: " + value);
-              Logger.log("  - Error: " + e.message);
-              
-              if (STATIC_TEMPLATE_KEYS_.indexOf(key) === -1) {
-                displayName = displayName + " (Sin acceso)";
-                hasAccess = false;
-                accessErrors.push({
-                  key: key,
-                  fileId: value,
-                  error: e.message
-                });
               } else {
-                Logger.log("  - Plantilla estática, manteniendo hasAccess = true");
+                Logger.log("✓ Plantilla estática reconocida (carga asíncrona pendiente): " + key);
               }
             }
+            // Para plantillas dinámicas, asumimos hasAccess = true.
+            // Si el archivo no es accesible, fallará al momento de imprimir/generar, 
+            // lo cual es mejor que bloquear el inicio de la aplicación.
           }
           templates.push({ key: key, fileId: value, name: displayName, description: description, hasAccess: hasAccess, base64: base64 });
         }

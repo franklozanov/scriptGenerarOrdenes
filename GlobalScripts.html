@@ -265,11 +265,11 @@
       const pin2 = await promptSecurityPin("Reingrese su nuevo PIN para confirmar:");
       
       if (pin1 !== pin2) {
-        showNotification("Los PIN no coinciden. Intente de nuevo.", "error");
+        showToast("Los PIN no coinciden. Intente de nuevo.", "error");
         throw new Error("PIN mismatch");
       }
 
-      showNotification("Configurando nuevo PIN...", "info");
+      showToast("Configurando nuevo PIN...", "info");
       
       const uId = targetUser ? targetUser.userId : sysData.currentUser.userId;
 
@@ -286,7 +286,7 @@
       const data = await response.json();
       
       if (data.status === 'success') {
-        showNotification(data.message, "success");
+        showToast(data.message, "success");
         // Actualizar el estado local para que no vuelva a pedirlo en la misma sesión
         if (targetUser && targetUser.pinStatus) {
             targetUser.pinStatus = "CONFIGURADO";
@@ -295,7 +295,7 @@
         }
         return pin1;
       } else {
-        showNotification(data.message, "error");
+        showToast(data.message, "error");
         throw new Error(data.message);
       }
     } catch (error) {

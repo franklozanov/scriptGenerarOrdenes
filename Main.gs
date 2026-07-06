@@ -148,15 +148,19 @@ function onOpenMain(email) {
   try {
     Logger.log("Iniciando operaciones secundarias (hideUnauthorizedSheets)...");
     hideUnauthorizedSheets_();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Abriendo Panel Principal...', 'Sistema QMS', 3);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Por favor, abre el Panel Principal desde el menú "Gestionar OA".', 'Sistema QMS', 5);
     
-    Logger.log("Llamando a abrirSidebarQMS automáticamente...");
-    // Abrir Sidebar automáticamente al iniciar la hoja
-    abrirSidebarQMS();
-    Logger.log("Finalizó la llamada a abrirSidebarQMS.");
+    // NOTA DE SEGURIDAD DE GOOGLE APPS SCRIPT:
+    // Los disparadores simples como onOpen() (AuthMode.LIMITED) NO tienen permiso 
+    // para ejecutar Ui.showSidebar() automáticamente sin interacción explícita del usuario.
+    // Esto siempre arrojará el error de "script.container.ui".
+    // El usuario DEBE hacer clic en el menú para abrir el sidebar.
+    
+    // abrirSidebarQMS(); // <-- COMENTADO PARA EVITAR EL ERROR DE PERMISOS
+    
   } catch (e) {
-    Logger.log("❌ Error en operaciones secundarias o al abrir el panel: " + e.message + "\n" + e.stack);
-    SpreadsheetApp.getUi().alert("Error de Carga", "Ocurrió un error al cargar la interfaz del panel.\n\n" + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    Logger.log("❌ Error en operaciones secundarias: " + e.message + "\n" + e.stack);
+    SpreadsheetApp.getUi().alert("Error", "Ocurrió un error en la configuración inicial.\n\n" + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
