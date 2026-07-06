@@ -841,14 +841,30 @@
             `;
           }).join('');
 
-          // Guardar usuarios globalmente para acceder después
-          window.QMSContext.users = data.users;
-          
+          // Filtrar usuarios por el email logueado (activeEmail)
+          let activeEmail = data.activeEmail ? data.activeEmail.toLowerCase() : "";
+          let validUsers = data.users.filter(u => u.email && u.email.toLowerCase() === activeEmail);
+          // Si el usuario es ADMIN, tal vez queremos permitir todos? El requerimiento dice "solo debe leerse el email que esta logueado", así que lo restringimos para todos, a menos que se solicite lo contrario.
+          // Para evitar bloquear si por algún error activeEmail no llegó, si es vacío, no filtramos (fallback).
+          if (activeEmail !== "") {
+            window.QMSContext.users = validUsers;
+          } else {
+            window.QMSContext.users = data.users;
+          }
+
           // Inicializar URL de la WebApp para peticiones Fetch
           if (data && data.webAppUrl) {
             window.QMSContext.webAppUrl = data.webAppUrl;
           }
-          document.getElementById('usersList').innerHTML = data.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
+          document.getElementById('usersList').innerHTML = window.QMSContext.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
+          
+          if (window.QMSContext.users.length === 1) {
+            let input = document.getElementById('userName');
+            input.value = window.QMSContext.users[0].nombreCompleto;
+            input.readOnly = true; // Evitar que escriba otro
+            input.style.backgroundColor = "#e8eaed";
+          }
+          
           document.getElementById('userName').addEventListener('input', updateGoButtonState);
 
           const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;

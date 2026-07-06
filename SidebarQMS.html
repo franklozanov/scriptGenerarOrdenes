@@ -1833,7 +1833,18 @@
       
       // Users list
       if (sysData && sysData.users) {
-        document.getElementById('imp_usersList').innerHTML = sysData.users.map(u => `<option value="${u.nombreCompleto}"></option>`).join('');
+        let activeEmail = sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
+        let validUsers = sysData.users;
+        if (activeEmail !== "") {
+          validUsers = sysData.users.filter(u => u.email && u.email.toLowerCase() === activeEmail);
+        }
+        document.getElementById('imp_usersList').innerHTML = validUsers.map(u => `<option value="${u.nombreCompleto}"></option>`).join('');
+        if (validUsers.length === 1) {
+          let inp = document.getElementById('imp_userName');
+          inp.value = validUsers[0].nombreCompleto;
+          inp.readOnly = true;
+          inp.style.backgroundColor = "#e8eaed";
+        }
       }
 
       // Listeners
@@ -1914,7 +1925,8 @@
       const user = document.getElementById('imp_userName').value.trim();
       
       const isReady = (imp_preloadState.orderNo === order && imp_preloadState.status === 'ready');
-      const isValidUser = sysData && sysData.users && sysData.users.some(u => u.nombreCompleto === user);
+      let activeEmail = sysData && sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
+      const isValidUser = sysData && sysData.users && sysData.users.some(u => u.nombreCompleto === user && (activeEmail === "" || (u.email && u.email.toLowerCase() === activeEmail)));
       
       let hasCopies = false;
       imp_globalTemplates.forEach(t => {
@@ -1996,7 +2008,8 @@
         copies: parseInt(document.getElementById('imp_val_' + t.key).value) || 0
       })).filter(c => c.copies > 0);
 
-      const userObj = sysData.users.find(u => u.nombreCompleto === userName);
+      let activeEmail = sysData && sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
+      const userObj = sysData.users.find(u => u.nombreCompleto === userName && (activeEmail === "" || (u.email && u.email.toLowerCase() === activeEmail)));
       const userId = userObj ? userObj.userId : null;
 
       if (!userId) return showError("Usuario no válido.");
@@ -2228,7 +2241,8 @@
       
       if (config.length === 0) return showToast("Seleccione al menos 1 copia.", 'error');
       
-      const userObj = sysData.users.find(u => u.nombreCompleto === userName);
+      let activeEmail = sysData && sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
+      const userObj = sysData.users.find(u => u.nombreCompleto === userName && (activeEmail === "" || (u.email && u.email.toLowerCase() === activeEmail)));
       if (!userObj) return showToast("Usuario no válido.", 'error');
       
       try {

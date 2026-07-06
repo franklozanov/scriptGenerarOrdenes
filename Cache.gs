@@ -104,6 +104,7 @@ function getInitialData(includeBase64) {
         // Agregar permisos del usuario actual dinámicamente (NO desde caché)
         parsedData.userPermissions = userPermissions;
         parsedData.currentUser = validUser;
+        parsedData.activeEmail = activeEmail;
         return parsedData;
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
@@ -294,7 +295,7 @@ function getInitialData(includeBase64) {
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
     
     // Los permisos ya se calcularon al inicio de la función
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions, currentUser: validUser };
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions, currentUser: validUser, activeEmail: activeEmail };
     
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
