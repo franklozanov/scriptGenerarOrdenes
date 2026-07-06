@@ -176,6 +176,44 @@ function handlePrivilegedOperation_(params) {
     return procesarCargaOrdenesMasivas(params, callingUserId);
   }
 
+  if (operation === 'validarMatrizKEnLinea') {
+    if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) {
+      return { status: 'error', message: 'No tiene permisos.' };
+    }
+    if (!params.noAnalisis) return { status: 'error', message: 'Falta NoAnalisis.' };
+    
+    var val = validarNoAnalisisContraMatrices(params.noAnalisis, {
+      lote: params.lote || '',
+      cantidad: parseFloat(params.cantidad) || 0,
+      exp: params.exp || ''
+    });
+    
+    return { status: 'success', data: val };
+  }
+
+  if (operation === 'validarTarjetasMasivo') {
+    if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) {
+      return { status: 'error', message: 'No tiene permisos.' };
+    }
+    if (!params.records || !Array.isArray(params.records)) {
+      return { status: 'error', message: 'Faltan records.' };
+    }
+    var resultados = [];
+    params.records.forEach(function(r, index) {
+      if (!r.NoAnalisis) {
+        resultados.push({ index: index, decision: '' });
+      } else {
+        var val = validarNoAnalisisContraMatrices(r.NoAnalisis, {
+          lote: r.Lote || '',
+          cantidad: parseFloat(r.Cantidad) || 0,
+          exp: r.Exp || ''
+        });
+        resultados.push({ index: index, decision: val.decision });
+      }
+    });
+    return { status: 'success', data: resultados };
+  }
+
   if (operation === 'revalidarOrden') {
     if (!hasPermission(callingUserId, PERMISOS.AUTORIZAR_QA) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
       return { status: 'error', message: 'No tiene permisos para re-validar órdenes.', diagnostic: 'PERMISSION_DENIED' };

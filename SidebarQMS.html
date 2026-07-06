@@ -176,8 +176,11 @@
             <strong>Tip:</strong> Pega directamente desde Excel (8 columnas) en esta pantalla para auto-generar las tarjetas.
           </div>
           
-          <div style="display:flex; justify-content:space-between; margin-bottom: 12px;">
-            <button class="btn-secondary-small" onclick="co_addCard()">+ Nueva Tarjeta</button>
+          <div style="display:flex; justify-content:space-between; margin-bottom: 12px; align-items:center;">
+            <div>
+              <button class="btn-secondary-small" onclick="co_addCard()">+ Nueva Tarjeta</button>
+              <button class="btn-secondary-small" onclick="co_validarMatrizK()" style="margin-left:8px; border-color:#d97706; color:#d97706;">\u26A0\uFE0F Pre-validar Matriz K</button>
+            </div>
             <button class="btn-secondary-small" onclick="co_clearCards()" style="color: #c5221f;">Limpiar</button>
           </div>
           
@@ -691,11 +694,14 @@
       const container = document.getElementById('cardsContainer');
       const card = document.createElement('div');
       card.className = 'order-card';
-      
+      card.id = 'card_' + co_cardCount;
       card.innerHTML = `
-        <div class="card-header">
-          <span>Orden #${co_cardCount}</span>
-          <button class="btn-delete-card" onclick="co_deleteCard(this)">Eliminar</button>
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>Tarjeta #${co_cardCount}</span>
+            <div id="badge_${co_cardCount}"></div>
+          </div>
+          <button class="btn-icon" onclick="co_deleteCard(this)">\u274C</button>
         </div>
         <div class="card-body">
           <input type="text" class="form-input" data-field="Proceso" placeholder="Proceso" value="${data.Proceso || ''}">
@@ -794,6 +800,54 @@
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
+    }
+
+    async function co_validarMatrizK() {
+      var records = co_collectData();
+      if (records.length === 0) {
+        showToast('No hay datos para validar.', 'warning');
+        return;
+      }
+      
+      showLoading('Validando contra Matriz K...');
+      try {
+        const res = await postWebApp({
+          operation: 'validarTarjetasMasivo',
+          records: records,
+          userId: sysData.currentUser.userId
+        });
+        hideLoading();
+        
+        if (res.status === 'success' && res.data) {
+          res.data.forEach(item => {
+            const card = document.getElementById('card_' + (item.index + 1));
+            if (!card) return;
+            const badgeContainer = card.querySelector('#badge_' + (item.index + 1));
+            if (!badgeContainer) return;
+            
+            const decision = (item.decision || '').trim();
+            const esOk = (decision === 'OK, Generar orden' || decision === '');
+            const esNoEncontrado = decision.indexOf('No encontrado') > -1;
+            
+            if (esOk) {
+              badgeContainer.innerHTML = '<span style="font-size:11px; padding:2px 6px; background:#dcfce7; color:#166534; border-radius:10px;">\u2705 OK Matriz K</span>';
+            } else {
+              const badgeColor = esNoEncontrado
+                ? 'background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;'
+                : 'background:#fef3c7; color:#92400e; border:1px solid #fcd34d;';
+              const badgeIcon = esNoEncontrado ? '\uD83D\uDD34' : '\u26A0\uFE0F';
+              const tooltipText = decision.replace(/"/g, '&quot;');
+              badgeContainer.innerHTML = `<span style="font-size:11px; padding:2px 6px; cursor:help; border-radius:10px; ${badgeColor}" title="${tooltipText}">${badgeIcon} ${decision}</span>`;
+            }
+          });
+          showToast('Validación completada. Revise las alertas en las tarjetas.', 'success');
+        } else {
+          showError(res.message || 'Error en validación masiva.');
+        }
+      } catch (e) {
+        hideLoading();
+        showError('Error: ' + e.message);
+      }
     }
 
     async function co_guardarDatos() {

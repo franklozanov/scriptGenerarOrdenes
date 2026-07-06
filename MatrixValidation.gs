@@ -240,18 +240,29 @@ function evaluarDecision_(validados, datosOrden, alertas) {
 
   // La cantidad tiene prioridad sobre los otros errores (según fórmula original)
   if (!cantidadOk) {
-    alertas.push('Cantidad solicitada (' + cantSolicitada + ') supera la disponible en Matriz (' + cantDisp + ').');
-    return VALORES_DECISION.CANTIDAD_NO_DISPONIBLE;
+    var detalleCant = 'Cant. sol (' + cantSolicitada + ') > disp (' + cantDisp + ')';
+    alertas.push(detalleCant);
+    return VALORES_DECISION.CANTIDAD_NO_DISPONIBLE + ' | ' + detalleCant;
   }
 
   if (errores.length > 0) {
-    var msg = VALORES_DECISION.ERROR_PREFIX + errores.join(', ');
+    var descErrores = [];
     errores.forEach(function(e) {
-      if (e === 'Lote')  alertas.push('Lote en la orden (' + (datosOrden.lote || '-') + ') difiere del Lote en Matriz K (' + validados.verifLote + ').');
-      if (e === 'Fecha') alertas.push('Fecha Vencimiento en la orden (' + expOrden + ') difiere de la Fecha en Matriz K (' + expMatriz + ').');
+      if (e === 'Lote') {
+        var lDet = 'Lote orden (' + (datosOrden.lote || '-') + ') != Matriz (' + validados.verifLote + ')';
+        alertas.push(lDet);
+        descErrores.push(lDet);
+      }
+      if (e === 'Fecha') {
+        var fDet = 'Exp orden (' + (expOrden || '-') + ') != Matriz (' + (expMatriz || '-') + ')';
+        alertas.push(fDet);
+        descErrores.push(fDet);
+      }
     });
+    var msg = VALORES_DECISION.ERROR_PREFIX + errores.join(', ') + ' | ' + descErrores.join('; ');
     return msg;
   }
+
 
   return VALORES_DECISION.OK;
 }
