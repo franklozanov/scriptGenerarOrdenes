@@ -126,7 +126,7 @@ function onOpenMain(email) {
     getInitialData();
     syncVerifCantDisponible();
     hideUnauthorizedSheets_();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Use "Gestionar OA → 📝 Registrar Entrega / Novedad" para registrar novedades.', 'Sistema QMS', 7);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Use "Gestionar OA → 🎛️ Abrir Panel Principal QMS" para gestionar las órdenes.', 'Sistema QMS', 7);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
   }
