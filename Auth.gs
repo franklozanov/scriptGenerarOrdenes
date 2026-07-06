@@ -41,6 +41,8 @@ function getUserRecordByUserId_(userId) {
   var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
   var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
   var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
 
   if (!colUserIdIdx) return null;
 
@@ -49,6 +51,8 @@ function getUserRecordByUserId_(userId) {
   colNombreCortoIdx = colNombreCortoIdx ? colNombreCortoIdx - 1 : null;
   colEmailIdx = colEmailIdx ? colEmailIdx - 1 : null;
   colRolIdx = colRolIdx ? colRolIdx - 1 : null;
+  colClaveIdx = colClaveIdx ? colClaveIdx - 1 : null;
+  colEstadoIdx = colEstadoIdx ? colEstadoIdx - 1 : null;
 
   var targetUserId = userId.toString().trim();
   for (var i = 1; i < data.length; i++) {
@@ -59,7 +63,9 @@ function getUserRecordByUserId_(userId) {
         nombreCompleto: colNombreCompletoIdx !== null && data[i][colNombreCompletoIdx] ? data[i][colNombreCompletoIdx].toString().trim() : "",
         nombreCorto: colNombreCortoIdx !== null && data[i][colNombreCortoIdx] ? data[i][colNombreCortoIdx].toString().trim() : "",
         email: colEmailIdx !== null && data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim() : "",
-        rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : ""
+        rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : "",
+        pin: colClaveIdx !== null && data[i][colClaveIdx] !== undefined ? data[i][colClaveIdx].toString().trim() : "",
+        estado: colEstadoIdx !== null && data[i][colEstadoIdx] !== undefined && data[i][colEstadoIdx].toString().trim() !== "" ? data[i][colEstadoIdx].toString().trim() : "Activo"
       };
     }
   }
