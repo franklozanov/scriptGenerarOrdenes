@@ -17,12 +17,9 @@ function doGet(e) {
   var fileId = e.parameter.fileId;
   var action = e.parameter.action;
   
-  // Autenticación estricta en el entrypoint
-  var activeEmail = Session.getActiveUser().getEmail();
-  var userRecord = getUserRecordByEmail_(activeEmail);
-  if (!userRecord || userRecord.estado !== "Activo") {
-    return HtmlService.createHtmlOutput('<h1>Acceso Denegado</h1><p>Usuario no registrado o inactivo.</p>');
-  }
+  // Validacion de sesion deshabilitada para visores publicos (Security by Obscurity via fileId)
+  // var activeEmail = Session.getActiveUser().getEmail();
+  // var userRecord = getUserRecordByEmail_(activeEmail);
   
   // Si action=secure, mostrar visor seguro con PDF.js
   if (action === 'secure' && fileId) {

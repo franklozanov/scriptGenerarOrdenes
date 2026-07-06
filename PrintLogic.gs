@@ -896,6 +896,14 @@ function getSolicitudesPendientesQA() {
       var estado = colEstado ? (data[i][colEstado - 1] || '').toString().trim() : '';
       if (estado === 'Pendiente QA') {
         var row = data[i];
+        var fechaVal = colFecha ? row[colFecha - 1] : '';
+        var fechaStr = '';
+        if (fechaVal instanceof Date) {
+          fechaStr = Utilities.formatDate(fechaVal, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+        } else if (fechaVal) {
+          fechaStr = fechaVal.toString();
+        }
+
         var solicitud = {
           idSolicitud: colIdSolicitud ? (row[colIdSolicitud - 1] || '').toString() : '',
           noOrden: colNoOrden ? (row[colNoOrden - 1] || '').toString() : '',
@@ -903,7 +911,7 @@ function getSolicitudesPendientesQA() {
           solicitadoPor: colSolicitadoPor ? (row[colSolicitadoPor - 1] || '').toString() : '',
           motivo: colMotivo ? (row[colMotivo - 1] || '').toString() : '',
           plantillas: colPlantillas ? (row[colPlantillas - 1] || '').toString() : '',
-          fecha: colFecha ? (row[colFecha - 1] || '') : ''
+          fecha: fechaStr
         };
         solicitudesPendientes.push(solicitud);
       }
@@ -1200,13 +1208,12 @@ function procesarAprobacionImpresionQA(params, userId) {
  */
 function getPdfSeguroBase64(fileId) {
   try {
-    var activeEmail = Session.getActiveUser().getEmail();
-    var userRecord = getUserRecordByEmail_(activeEmail);
-    
-    // Se requiere tener al menos permiso general de impresión o permiso de visor nativo
-    if (!userRecord || (!hasPermissionByRol(userRecord.rol, 'IMPRIMIR_ORDEN') && !hasPermissionByRol(userRecord.rol, 'VER_NATIVO_DRIVE'))) {
-      throw new Error("Acceso denegado. No tiene los permisos requeridos para visualizar este documento.");
-    }
+    // Validacion de sesion deshabilitada para visores publicos (Security by Obscurity via fileId)
+    // var activeEmail = Session.getActiveUser().getEmail();
+    // var userRecord = getUserRecordByEmail_(activeEmail);
+    // if (!userRecord || (!hasPermissionByRol(userRecord.rol, 'IMPRIMIR_ORDEN') && !hasPermissionByRol(userRecord.rol, 'VER_NATIVO_DRIVE'))) {
+    //   throw new Error("Acceso denegado. No tiene los permisos requeridos para visualizar este documento.");
+    // }
     
     var file = DriveApp.getFileById(fileId);
     var blob = file.getBlob();
@@ -1223,16 +1230,9 @@ function getPdfSeguroBase64(fileId) {
  * Si NO tiene permiso -> Ejecuta rollback de impresión y retorna error.
  */
 function handleViewerFallback(fileId, orderNo) {
-  var activeEmail = Session.getActiveUser().getEmail();
-  var userRecord = getUserRecordByEmail_(activeEmail);
-  
-  if (!userRecord) {
-    return { action: 'error', message: 'Usuario no encontrado para ejecutar recuperación.' };
-  }
-  
-  // Evaluamos usando el sistema de permisos (RBAC) centralizado.
-  // Requiere que la columna 'VER_NATIVO_DRIVE' exista en la hoja PermisosRoles.
-  var tienePermiso = hasPermissionByRol(userRecord.rol, 'VER_NATIVO_DRIVE');
+  // Se remueve la restriccion por email por incompatibilidad con cuentas externas
+  // Solo se retorna el link nativo de Google Drive como fallback.
+  var tienePermiso = true;
   
   if (tienePermiso) {
     return { 

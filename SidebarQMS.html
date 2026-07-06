@@ -99,7 +99,7 @@
           <button id="btn-print-order" class="btn-action" onclick="openSubView('imprimir-orden')">
             <span class="icon">🖨️</span> Imprimir Orden
           </button>
-          <button id="btn-request-reprint" class="btn-action" onclick="openModal('abrirModalSolicitarReimpresion')">
+          <button id="btn-request-reprint" class="btn-action" onclick="openSubView('imprimir-orden')">
             <span class="icon">📋</span> Solicitar Reimpresión
           </button>
 
@@ -358,7 +358,10 @@
           </div>
 
           <div style="margin-bottom: 15px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
-            <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px; flex-shrink: 0;">Selección de Plantillas</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-shrink: 0;">
+              <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 0;">Selección de Plantillas</label>
+              <button type="button" onclick="imp_zeroAll()" style="padding: 4px 8px; font-size: 10px; border-radius: 4px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">0️⃣ Limpiar Todo</button>
+            </div>
             <div id="imp_tplList" style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px; flex: 1; overflow-y: auto;"></div>
           </div>
 
@@ -1396,6 +1399,16 @@
       const input = document.getElementById('imp_val_' + key);
       let val = parseInt(input.value) || 0;
       if(val < 99) input.value = val + 1;
+      imp_updateBtnState();
+    }
+
+    function imp_zeroAll() {
+      const inputs = document.querySelectorAll('#imp_tplList input[type="text"]');
+      inputs.forEach(input => {
+        if (!input.disabled) {
+          input.value = "0";
+        }
+      });
       imp_updateBtnState();
     }
 

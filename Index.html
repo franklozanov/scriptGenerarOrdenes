@@ -388,8 +388,13 @@
       <div class="section">
         <div class="section-title">Selección de Plantillas</div>
         <div class="field">
-          <label>Cantidad de Copias</label>
-          <div class="hint">Ajuste el número de copias para cada plantilla</div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div>
+              <label style="margin-bottom: 0;">Cantidad de Copias</label>
+              <div class="hint" style="margin-top: 2px; margin-bottom: 0;">Ajuste el número de copias para cada plantilla</div>
+            </div>
+            <button type="button" onclick="zeroAllCopies()" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">0️⃣ Limpiar Todo</button>
+          </div>
           <div id="tplList" class="tpl-container"></div>
         </div>
       </div>
@@ -682,6 +687,16 @@
         if (value < 999) {
           input.value = value + 1;
         }
+        updateGoButtonState();
+      }
+
+      function zeroAllCopies() {
+        const inputs = document.querySelectorAll('#tplList .counter-input');
+        inputs.forEach(input => {
+          if (!input.disabled) {
+            input.value = "0";
+          }
+        });
         updateGoButtonState();
       }
 
