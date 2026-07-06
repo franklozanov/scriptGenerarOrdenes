@@ -13,16 +13,7 @@
  * crea menú de autorización nativa OAuth.
  */
 function onOpen() {
-  // 1. Prioridad Máxima: Abrir el sidebar inmediatamente para que el usuario pueda trabajar.
-  // El frontend (SPA) se encargará de pedir los datos vía google.script.run,
-  // evadiendo las restricciones de AuthMode.LIMITED del trigger onOpen.
-  try {
-    abrirSidebarQMS();
-  } catch (e) {
-    Logger.log("Error al abrir Sidebar temprano: " + e.message);
-  }
-
-  // 2. Capturar el correo
+  // 1. Capturar el correo
   var activeEmail = Session.getActiveUser().getEmail();
   
   if (!activeEmail || activeEmail === "") {
@@ -135,9 +126,12 @@ function onOpenMain(email) {
   // Operaciones de UI secundarias
   try {
     hideUnauthorizedSheets_();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Cargando menús...', 'Sistema QMS', 3);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Abriendo Panel Principal...', 'Sistema QMS', 3);
+    
+    // Abrir Sidebar automáticamente al iniciar la hoja
+    abrirSidebarQMS();
   } catch (e) {
-    Logger.log("Error en operaciones secundarias: " + e.message);
+    Logger.log("Error en operaciones secundarias o al abrir el panel: " + e.message);
   }
 }
 
