@@ -126,6 +126,14 @@
             </button>
 
             <!-- Panel: Autoaprobación temporal de solicitudes (requiere GESTIONAR_AUTOAPROBACION) -->
+            <div id="unlock-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Desbloqueo de Sistema (Edición Manual)</div>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#0f172a; margin-bottom:10px;">
+                <input type="checkbox" id="cfg_unlock" onchange="cfg_toggleUnlock()"> Habilitar edición de celdas bloqueadas (Requiere PIN)
+              </label>
+              <div id="cfg_unlock_status" style="font-size:12px; margin-bottom:10px; color:#64748b;">(Cuando está activo, el sistema no revertirá ediciones manuales, pero auditará los cambios)</div>
+            </div>
+
             <div id="autoaprob-panel" style="display:none; margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
               <div class="section-title" style="margin-top:0;">Autoaprobación temporal</div>
               <div id="autoaprob-estado" style="font-size:12px; margin-bottom:10px; color:#64748b;"></div>
@@ -636,6 +644,50 @@
         }
       } catch (err) {
         statusEl.innerHTML = '❌ ' + err.message;
+      }
+    }
+
+    // Configuración - Desbloqueo temporal
+    async function cfg_toggleUnlock() {
+      const isChecked = document.getElementById('cfg_unlock').checked;
+      const statusEl = document.getElementById('cfg_unlock_status');
+      
+      if (isChecked) {
+        let pin;
+        try {
+          pin = await promptSecurityPin('Ingrese su PIN para habilitar la edición de sistema:');
+        } catch(e) {
+          document.getElementById('cfg_unlock').checked = false;
+          return;
+        }
+        if (!pin) {
+          document.getElementById('cfg_unlock').checked = false;
+          return;
+        }
+
+        statusEl.innerHTML = '⏳ Validando PIN...';
+        try {
+          const res = await postWebApp({ operation: 'setSystemUnlock', unlock: true, pinFirma: pin, userId: sysData.currentUser.userId });
+          if (res.status === 'success') {
+            statusEl.innerHTML = '<span style="color:#b91c1c;">⚠️ SISTEMA DESBLOQUEADO (Ediciones no se revertirán)</span>';
+            showToast('Sistema desbloqueado. Proceda con precaución.', 'warning');
+          } else {
+            document.getElementById('cfg_unlock').checked = false;
+            statusEl.innerHTML = '❌ ' + (res.message || 'Error de validación');
+          }
+        } catch(e) {
+          document.getElementById('cfg_unlock').checked = false;
+          statusEl.innerHTML = '❌ ' + e.message;
+        }
+      } else {
+        statusEl.innerHTML = '⏳ Bloqueando...';
+        try {
+          const res = await postWebApp({ operation: 'setSystemUnlock', unlock: false, userId: sysData.currentUser.userId });
+          statusEl.innerHTML = '✅ Sistema bloqueado.';
+          showToast('Sistema bloqueado nuevamente.', 'success');
+        } catch(e) {
+          statusEl.innerHTML = '❌ Error al bloquear: ' + e.message;
+        }
       }
     }
 

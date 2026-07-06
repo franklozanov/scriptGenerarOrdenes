@@ -186,12 +186,19 @@ function onEditInstalled(e) {
     // Las ediciones manuales del propietario SÍ deben registrarse
     if (!e || !e.range) return;
 
+    // --- VERIFICACIÓN DE DESBLOQUEO TEMPORAL DE ADMIN ---
+    var isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
+
     // --- DEFENSA EN PROFUNDIDAD: revertir ediciones MANUALES a hojas/columnas de sistema ---
     // Las escrituras de la app son programáticas y NO disparan onEdit; aquí solo llega una edición
     // manual. La protección ACL ya bloquea a los colaboradores; esto además revierte ediciones
     // manuales del propietario, que por diseño solo debe modificar estos datos vía la aplicación.
-    var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad'];
+    var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad', 'Sys_MatricesConfig'];
     if (HOJAS_BLOQUEADAS_.indexOf(sheetName) !== -1) {
+      if (isUnlocked) {
+        logChange('EDICION_ADMIN_LIBRE', 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, e.user ? e.user.getEmail() : 'Admin');
+        return;
+      }
       revertManualEdit_(editedRange, e, sheetName, 'hoja bloqueada');
       return;
     }
@@ -200,6 +207,10 @@ function onEditInstalled(e) {
       var hdrsSis = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       var colEditadaNombre = hdrsSis[eCol - 1] ? hdrsSis[eCol - 1].toString().trim() : '';
       if (ORDENES_COLS_SISTEMA_.indexOf(colEditadaNombre) !== -1) {
+        if (isUnlocked) {
+          logChange('EDICION_ADMIN_LIBRE', 'Admin modificó columna ' + colEditadaNombre + ' en Ordenes', e.user ? e.user.getEmail() : 'Admin');
+          return;
+        }
         revertManualEdit_(editedRange, e, sheetName, 'columna de sistema: ' + colEditadaNombre);
         return;
       }
@@ -229,15 +240,11 @@ function onEditInstalled(e) {
     var userIdentity = "Usuario no identificado (edición directa)";
     
     if (!hasPermission) {
-      editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
-        "⚠️ Edición no permitida",
-        5
-      );
-      var cellAddress = editedRange.getA1Notation();
-      var violationDesc = "Intento de edición denegado en la celda " + cellAddress + " de la hoja " + sheetName;
-      logChange('VIOLACION_PERMISO', violationDesc, userIdentity);
+      if (isUnlocked) {
+        logChange('EDICION_ADMIN_LIBRE', 'Admin modificó rango protegido en ' + sheetName + ' (' + protectionDesc + ')', e.user ? e.user.getEmail() : 'Admin');
+        return;
+      }
+      revertManualEdit_(editedRange, e, sheetName, 'rango protegido: ' + protectionDesc);
       return;
     }
     
@@ -394,8 +401,13 @@ function revertManualEdit_(range, e, sheetName, motivo) {
   try {
     if (e && e.oldValue !== undefined) {
       range.setValue(e.oldValue);
+    } else if (e && e.value !== undefined) {
+      // Era una celda vacía y se escribió algo
+      range.clearContent();
     } else {
-      Logger.log("revertManualEdit_: edición múltiple en " + sheetName + " (" + motivo + "), no se pudo restaurar el valor previo por celda.");
+      // Edición múltiple, pegado, o borrado.
+      range.clearContent();
+      Logger.log("revertManualEdit_: edición múltiple o sin oldValue en " + sheetName + " (" + motivo + "), se limpió la celda. El usuario debe usar Ctrl+Z si sobreescribió datos.");
     }
   } catch (err) {
     Logger.log("revertManualEdit_ error al restaurar: " + err.message);

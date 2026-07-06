@@ -306,6 +306,19 @@ function handlePrivilegedOperation_(params) {
     return procesarSetAutoApproval(params, callingUserId);
   }
 
+  if (operation === 'setSystemUnlock') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
+      return { status: 'error', message: 'No tiene permisos de administración.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (params.unlock) {
+      requireAuthorizedUserStrict_(params);
+      PropertiesService.getScriptProperties().setProperty('SYS_UNLOCKED', 'true');
+    } else {
+      PropertiesService.getScriptProperties().deleteProperty('SYS_UNLOCKED');
+    }
+    return { status: 'success' };
+  }
+
   if (operation === 'processPrint') {
     if (!hasPermission(callingUserId, PERMISOS.IMPRIMIR_ORDEN)) {
       return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };
