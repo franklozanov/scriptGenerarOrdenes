@@ -104,17 +104,17 @@
         
         <div id="tab-floor" class="tab-content">
           <div class="section-title">Gestión de Piso</div>
-          <div id="btn-register-novelty" class="btn-action hidden" onclick="openModal('abrirModalRegistroNovedad')">
+          <div id="btn-register-novelty" class="btn-action hidden" onclick="openSubView('registro-novedad')">
             <span class="icon">📝</span> Registrar Novedad / Entrega
           </div>
         </div>
         
         <div id="tab-qa" class="tab-content">
           <div class="section-title">Aprobaciones QA</div>
-          <div id="btn-auth-qa" class="btn-action hidden" onclick="openModal('abrirModalAutorizarQA')">
+          <div id="btn-auth-qa" class="btn-action hidden" onclick="openSubView('qa-autorizar')">
             <span class="icon">✅</span> Autorizar Órdenes
           </div>
-          <div id="btn-approve-print" class="btn-action hidden" onclick="openModal('abrirModalAprobarImpresion')">
+          <div id="btn-approve-print" class="btn-action hidden" onclick="openSubView('qa-impresion')">
             <span class="icon">🛡️</span> Aprobar Reimpresión
           </div>
         </div>
@@ -187,6 +187,137 @@
         </div>
       </div>
 
+      <!-- Vista: Registrar Novedad -->
+      <div id="view-registro-novedad" class="hidden h-100" style="display:flex; flex-direction:column; height:100%;">
+        <div class="sub-header">
+          <button class="btn-back" onclick="goBackToMain()">🔙</button>
+          <h2 class="sub-title">Registrar Novedad</h2>
+        </div>
+        
+        <div class="view-body" style="flex:1;">
+          <div class="paste-instruction">
+            <strong>Info:</strong> Actualiza el STATUS de la orden y deja un registro en el historial.
+          </div>
+          
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <label style="font-size:12px; font-weight:bold;">Número de Orden:</label>
+              <select id="nov_noOrden" class="form-input" style="width:100%; padding:6px; font-size:13px;" required onchange="nov_handleOrdenChange()">
+                <option value="">Cargando órdenes...</option>
+              </select>
+              <input type="hidden" id="nov_ordenCodigo">
+              <input type="hidden" id="nov_ordenTotalPags">
+            </div>
+            
+            <div>
+              <label style="font-size:12px; font-weight:bold;">Nuevo Estado (STATUS):</label>
+              <select id="nov_nuevoStatus" class="form-input" style="width:100%; padding:6px; font-size:13px;" required>
+                <option value="">Seleccione estado</option>
+                <option value="RecibidaQA">RecibidaQA</option>
+                <option value="DevueltaQA">DevueltaQA</option>
+                <option value="Cerrada">Cerrada</option>
+              </select>
+            </div>
+            
+            <div>
+              <label style="font-size:12px; font-weight:bold;">Tipo de Novedad:</label>
+              <select id="nov_tipoNovedad" class="form-input" style="width:100%; padding:6px; font-size:13px;" required>
+                <option value="">Seleccione tipo</option>
+                <option value="Entrega de orden de acondicionamiento">Entrega de orden de acondicionamiento</option>
+                <option value="Devolución de orden de acondicionamiento">Devolución de orden de acondicionamiento</option>
+              </select>
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+              <div style="flex:1;">
+                <label style="font-size:12px; font-weight:bold;">Entregadas:</label>
+                <input type="number" id="nov_totalPagsMostrado" class="form-input" readonly style="background-color: #f5f5f5; width:100%; padding:6px; font-size:13px;" placeholder="-">
+              </div>
+              <div style="flex:1;">
+                <label style="font-size:12px; font-weight:bold;">Devueltas:</label>
+                <input type="number" id="nov_noPagDevueltas" class="form-input" min="0" style="width:100%; padding:6px; font-size:13px;" placeholder="0" oninput="nov_validarPaginas()">
+              </div>
+            </div>
+            
+            <div id="nov_paginasWarning" class="hidden" style="color: #e65100; font-size: 11px; background-color: #fff3e0; padding: 6px; border-radius: 4px; border-left: 3px solid #ffb74d;">
+              ⚠️ Diferencia de páginas. Comentario obligatorio.
+            </div>
+            
+            <div>
+              <label style="font-size:12px; font-weight:bold;">Comentario <span id="nov_reqAsterisk" class="hidden" style="color: red;">*</span></label>
+              <textarea id="nov_comentario" class="form-input" style="width:100%; padding:6px; font-size:13px; resize:vertical; min-height:60px;" placeholder="Opcional"></textarea>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bottom-actions">
+           <button class="btn-primary-small" onclick="nov_guardarNovedad()">Registrar Novedad</button>
+        </div>
+      </div>
+
+      <!-- Vista: Autorizar Órdenes (QA) -->
+      <div id="view-qa-autorizar" class="hidden h-100" style="display:flex; flex-direction:column; height:100%;">
+        <div class="sub-header">
+          <button class="btn-back" onclick="goBackToMain()">🔙</button>
+          <h2 class="sub-title">Autorizar (QA)</h2>
+        </div>
+        
+        <div class="view-body" style="flex:1;">
+          <div class="paste-instruction">
+            <strong>Info:</strong> Solo se pueden autorizar órdenes con STATUS "Solicitada" y documentos completos.
+          </div>
+          
+          <div style="display:flex; align-items:center; margin-bottom:12px; font-size:13px;">
+             <input type="checkbox" id="qa_selectAll" onchange="qa_toggleSelectAll()" style="margin-right:8px;">
+             <label for="qa_selectAll"><strong>Seleccionar Todas (Habilitadas)</strong></label>
+          </div>
+          
+          <div id="qa_cardsContainer">
+            <!-- Las tarjetas de QA se generan aquí -->
+          </div>
+          
+          <div id="qa_noOrdersMsg" class="hidden" style="text-align:center; padding:20px; font-size:13px; color:#666;">
+            No hay órdenes pendientes de aprobación.
+          </div>
+        </div>
+        
+        <div class="bottom-actions">
+           <button class="btn-primary-small" onclick="qa_autorizarOrdenes()">✅ Firmar y Autorizar</button>
+        </div>
+      </div>
+
+      <!-- Vista: Aprobar Reimpresión (QA) -->
+      <div id="view-qa-impresion" class="hidden h-100" style="display:flex; flex-direction:column; height:100%;">
+        <div class="sub-header">
+          <button class="btn-back" onclick="goBackToMain()">🔙</button>
+          <h2 class="sub-title">Reimpresiones</h2>
+        </div>
+        
+        <div class="view-body" style="flex:1;">
+          <div class="paste-instruction">
+            <strong>Info:</strong> Aprueba o rechaza solicitudes de impresión extraordinaria.
+          </div>
+          
+          <div style="display:flex; align-items:center; margin-bottom:12px; font-size:13px;">
+             <input type="checkbox" id="qai_selectAll" onchange="qai_toggleSelectAll()" style="margin-right:8px;">
+             <label for="qai_selectAll"><strong>Seleccionar Todas</strong></label>
+          </div>
+          
+          <div id="qai_cardsContainer">
+            <!-- Las tarjetas de QA Impresion se generan aquí -->
+          </div>
+          
+          <div id="qai_noOrdersMsg" class="hidden" style="text-align:center; padding:20px; font-size:13px; color:#666;">
+            No hay solicitudes pendientes de aprobación.
+          </div>
+        </div>
+        
+        <div class="bottom-actions" style="gap:5px;">
+           <button class="btn-primary-small" onclick="qai_procesarAprobacion('Aprobada')">✅ Aprobar</button>
+           <button class="btn-primary-small" onclick="qai_procesarAprobacion('Rechazada')" style="background-color:#c5221f;">❌ Rechazar</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -252,6 +383,9 @@
       // Ocultar todas las vistas internas
       document.getElementById('view-carga-ordenes').classList.add('hidden');
       document.getElementById('view-subida-documentos').classList.add('hidden');
+      document.getElementById('view-registro-novedad').classList.add('hidden');
+      document.getElementById('view-qa-autorizar').classList.add('hidden');
+      document.getElementById('view-qa-impresion').classList.add('hidden');
       
       // Mostrar la solicitada
       document.getElementById('view-' + viewId).classList.remove('hidden');
@@ -262,9 +396,10 @@
       container.classList.add('show-sub');
       
       // Lógica específica al abrir
-      if(viewId === 'subida-documentos') {
-        up_initView();
-      }
+      if(viewId === 'subida-documentos') up_initView();
+      if(viewId === 'registro-novedad') nov_initView();
+      if(viewId === 'qa-autorizar') qa_initView();
+      if(viewId === 'qa-impresion') qai_initView();
     }
 
     function goBackToMain() {
@@ -717,6 +852,371 @@
          .then(result => resolve(result))
          .catch(err => reject(err));
       });
-    }  </script>
+    }
+
+    /* ========================================================
+       MODULO: REGISTRAR NOVEDAD (MIGRADO A SIDEBAR SPA)
+       ======================================================== */
+    let nov_ordenes = [];
+
+    function nov_initView() {
+      showLoading('Cargando órdenes...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          nov_ordenes = data || [];
+          nov_populateOrdenesSelect();
+          hideLoading();
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar órdenes: ' + error.message);
+          document.getElementById('nov_noOrden').innerHTML = '<option value="">Error</option>';
+        })
+        .getOrdenesParaNovedad();
+    }
+
+    function nov_populateOrdenesSelect() {
+      const select = document.getElementById('nov_noOrden');
+      select.innerHTML = '<option value="">Seleccione orden</option>';
+      nov_ordenes.forEach(orden => {
+        let option = document.createElement('option');
+        option.value = orden.noOrden;
+        option.textContent = orden.noOrden + ' - ' + orden.codigo;
+        option.setAttribute('data-codigo', orden.codigo);
+        option.setAttribute('data-totalpags', orden.totalPags);
+        select.appendChild(option);
+      });
+    }
+
+    function nov_handleOrdenChange() {
+      const select = document.getElementById('nov_noOrden');
+      const selected = select.options[select.selectedIndex];
+      
+      if (selected && selected.value !== "") {
+        document.getElementById('nov_ordenCodigo').value = selected.getAttribute('data-codigo') || '';
+        const totalPags = selected.getAttribute('data-totalpags') || '0';
+        document.getElementById('nov_ordenTotalPags').value = totalPags;
+        document.getElementById('nov_totalPagsMostrado').value = totalPags;
+      } else {
+        document.getElementById('nov_ordenCodigo').value = '';
+        document.getElementById('nov_ordenTotalPags').value = '0';
+        document.getElementById('nov_totalPagsMostrado').value = '';
+      }
+      nov_validarPaginas();
+    }
+
+    function nov_validarPaginas() {
+      const totalPags = document.getElementById('nov_totalPagsMostrado').value;
+      const devueltas = document.getElementById('nov_noPagDevueltas').value;
+      const warning = document.getElementById('nov_paginasWarning');
+      const comentario = document.getElementById('nov_comentario');
+      const reqAsterisk = document.getElementById('nov_reqAsterisk');
+      const noOrden = document.getElementById('nov_noOrden').value;
+      
+      if (!noOrden || totalPags === "") {
+        warning.classList.add('hidden');
+        comentario.placeholder = "Opcional";
+        reqAsterisk.classList.add('hidden');
+        return;
+      }
+      
+      let numTotal = Number(totalPags) || 0;
+      let numDevueltas = devueltas === "" ? -1 : Number(devueltas);
+      
+      if (numDevueltas >= 0 && numTotal !== numDevueltas) {
+        warning.classList.remove('hidden');
+        reqAsterisk.classList.remove('hidden');
+        comentario.placeholder = "Motivo de diferencia (Obligatorio)";
+      } else {
+        warning.classList.remove('hidden', false);
+        warning.classList.add('hidden');
+        reqAsterisk.classList.add('hidden');
+        comentario.placeholder = "Opcional";
+      }
+    }
+
+    async function nov_guardarNovedad() {
+      const noOrden = document.getElementById('nov_noOrden').value;
+      const codigo = document.getElementById('nov_ordenCodigo').value;
+      const totalPags = document.getElementById('nov_ordenTotalPags').value;
+      const nuevoStatus = document.getElementById('nov_nuevoStatus').value;
+      const tipoNovedad = document.getElementById('nov_tipoNovedad').value;
+      const noPagDevueltas = document.getElementById('nov_noPagDevueltas').value;
+      const comentario = document.getElementById('nov_comentario').value;
+
+      if (!noOrden || !codigo) { showError('Seleccione una orden válida.'); return; }
+      if (!nuevoStatus) { showError('Seleccione el nuevo estado.'); return; }
+      if (!tipoNovedad) { showError('Seleccione el tipo de novedad.'); return; }
+
+      let numTotal = Number(totalPags) || 0;
+      let numDevueltas = noPagDevueltas === "" ? -1 : Number(noPagDevueltas);
+      if (numDevueltas >= 0 && numTotal !== numDevueltas && !comentario.trim()) {
+        showAlert('Diferencia de páginas requiere comentario obligatorio.', 'warning');
+        document.getElementById('nov_comentario').focus();
+        return;
+      }
+
+      let pin;
+      try {
+        pin = await promptSecurityPin('Ingrese su PIN para autorizar el registro:');
+      } catch (e) {
+        showToast(e.message, 'warning');
+        return;
+      }
+
+      const params = {
+        operation: 'registrarNovedad',
+        noOrden, codigo, tipoNovedad, status: nuevoStatus, comentario,
+        totalPags: Number(totalPags) || 0,
+        noPagDevueltas: Number(numDevueltas === -1 ? 0 : numDevueltas),
+        pinFirma: pin,
+        userId: sysData.currentUser.userId
+      };
+
+      showLoading('Registrando novedad...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          if (result.status === 'success') {
+            showAlert('Novedad registrada exitosamente.', 'success');
+            nov_resetearCampos();
+            goBackToMain();
+          } else {
+            showError(result.message || 'Error al registrar novedad.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error de comunicación: ' + error.message);
+        })
+        .procesarRegistroNovedad(params, sysData.currentUser.userId);
+    }
+
+    function nov_resetearCampos() {
+      document.getElementById('nov_noOrden').value = '';
+      document.getElementById('nov_nuevoStatus').value = '';
+      document.getElementById('nov_tipoNovedad').value = '';
+      document.getElementById('nov_noPagDevueltas').value = '';
+      document.getElementById('nov_comentario').value = '';
+      document.getElementById('nov_ordenCodigo').value = '';
+      document.getElementById('nov_ordenTotalPags').value = '0';
+      document.getElementById('nov_totalPagsMostrado').value = '';
+      nov_validarPaginas();
+    }
+
+    /* ========================================================
+       MODULO: AUTORIZAR QA (MIGRADO A SIDEBAR SPA)
+       ======================================================== */
+    let qa_ordenes = [];
+
+    function qa_initView() {
+      showLoading('Cargando órdenes...');
+      google.script.run
+        .withSuccessHandler(function(ordenes) {
+          qa_ordenes = ordenes || [];
+          hideLoading();
+          qa_renderCards();
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar órdenes: ' + error.message);
+        })
+        .getOrdenesSolicitadasParaQA();
+    }
+
+    function qa_renderCards() {
+      const container = document.getElementById('qa_cardsContainer');
+      const noOrdersMsg = document.getElementById('qa_noOrdersMsg');
+      const selectAllCheck = document.getElementById('qa_selectAll');
+      
+      container.innerHTML = '';
+      selectAllCheck.checked = false;
+      
+      if (qa_ordenes.length === 0) {
+        noOrdersMsg.classList.remove('hidden');
+        return;
+      }
+      
+      noOrdersMsg.classList.add('hidden');
+      
+      qa_ordenes.forEach(orden => {
+        const estadoCarga = orden.estadoCarga || '';
+        const isPendiente = (
+          estadoCarga === 'Pendiente COA/OA' ||
+          estadoCarga === 'Pendiente OA' ||
+          estadoCarga === 'Pendiente COA' ||
+          estadoCarga === 'Pendiente Ambos'
+        );
+        
+        const estadoColor = (estadoCarga === 'Cargados' || estadoCarga === '✅ Cargados') ? 'color:#166534; background:#dcfce7;' : 'color:#854d0e; background:#fef9c3;';
+        
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.style.display = 'flex';
+        card.style.alignItems = 'center';
+        card.style.padding = '10px';
+        
+        card.innerHTML = `
+          <input type="checkbox" class="qa-orden-checkbox" data-noorden="${orden.noOrden}" ${isPendiente ? 'disabled' : ''} style="margin-right:10px; transform:scale(1.2);">
+          <div style="flex:1;">
+            <div style="font-size:13px;"><strong>${orden.noOrden}</strong> - ${orden.codigo}</div>
+            <div style="font-size:11px; color:#5f6368; margin-bottom:4px;">${orden.descripcion || orden.lote}</div>
+            <span style="font-size:11px; padding:2px 6px; border-radius:4px; ${estadoColor}">
+               ${estadoCarga || 'Desconocido'}
+            </span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function qa_toggleSelectAll() {
+      const isChecked = document.getElementById('qa_selectAll').checked;
+      const checkboxes = document.querySelectorAll('.qa-orden-checkbox:not(:disabled)');
+      checkboxes.forEach(cb => cb.checked = isChecked);
+    }
+
+    async function qa_autorizarOrdenes() {
+      const checkboxes = document.querySelectorAll('.qa-orden-checkbox:checked');
+      const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-noorden'));
+      
+      if (selectedIds.length === 0) {
+        showToast('Seleccione al menos una orden.', 'warning');
+        return;
+      }
+      
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese PIN para autorizar ' + selectedIds.length + ' orden(es):');
+      } catch (e) {
+        showToast(e.message, 'warning');
+        return;
+      }
+      
+      showLoading('Autorizando órdenes...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          hideLoading();
+          if (data.status === 'success') {
+            showToast(data.message || 'Órdenes autorizadas.', 'success');
+            qa_initView(); // Recargar
+          } else {
+            showAlert(data.message || 'Error al autorizar.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error: ' + error.message);
+        })
+        .procesarAutorizacionQA({ targetIds: selectedIds, pinFirma: pinFirma }, sysData.currentUser.userId);
+    }
+
+    /* ========================================================
+       MODULO: APROBAR IMPRESIÓN QA (MIGRADO A SIDEBAR SPA)
+       ======================================================== */
+    let qai_solicitudes = [];
+
+    function qai_initView() {
+      showLoading('Cargando solicitudes...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          qai_solicitudes = data || [];
+          hideLoading();
+          qai_renderCards();
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar solicitudes: ' + error.message);
+        })
+        .getSolicitudesPendientesQA();
+    }
+
+    function qai_renderCards() {
+      const container = document.getElementById('qai_cardsContainer');
+      const noOrdersMsg = document.getElementById('qai_noOrdersMsg');
+      const selectAllCheck = document.getElementById('qai_selectAll');
+      
+      container.innerHTML = '';
+      selectAllCheck.checked = false;
+      
+      if (qai_solicitudes.length === 0) {
+        noOrdersMsg.classList.remove('hidden');
+        return;
+      }
+      
+      noOrdersMsg.classList.add('hidden');
+      
+      qai_solicitudes.forEach(sol => {
+        const tipoClass = sol.tipoSolicitud === 'Reimpresión' ? 'color:#92400e; background:#fef3c7;' : 'color:#1e40af; background:#dbeafe;';
+        const tipoDisplay = sol.tipoSolicitud || 'Desconocido';
+        
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.style.display = 'flex';
+        card.style.alignItems = 'flex-start';
+        card.style.padding = '10px';
+        
+        card.innerHTML = `
+          <input type="checkbox" class="qai-solicitud-checkbox" data-idsolicitud="${sol.idSolicitud}" style="margin-right:10px; margin-top:4px; transform:scale(1.2);">
+          <div style="flex:1;">
+            <div style="font-size:13px; margin-bottom:4px;">
+               <strong>${sol.idSolicitud}</strong> | Orden: ${sol.noOrden}
+            </div>
+            <div style="font-size:11px; margin-bottom:4px;">
+               <span style="padding:2px 6px; border-radius:4px; ${tipoClass}">${tipoDisplay}</span>
+            </div>
+            <div style="font-size:11px; color:#3c4043;">
+               <strong>Por:</strong> ${sol.solicitadoPor}<br>
+               <strong>Motivo:</strong> ${sol.motivo}<br>
+               <span style="color:#1a73e8;">${sol.plantillas}</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function qai_toggleSelectAll() {
+      const isChecked = document.getElementById('qai_selectAll').checked;
+      const checkboxes = document.querySelectorAll('.qai-solicitud-checkbox');
+      checkboxes.forEach(cb => cb.checked = isChecked);
+    }
+
+    async function qai_procesarAprobacion(accion) {
+      const checkboxes = document.querySelectorAll('.qai-solicitud-checkbox:checked');
+      const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-idsolicitud'));
+      
+      if (selectedIds.length === 0) {
+        showToast('Seleccione al menos una solicitud.', 'warning');
+        return;
+      }
+      
+      const accionTexto = accion === 'Aprobada' ? 'aprobar' : 'rechazar';
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese su PIN para ' + accionTexto + ' las solicitudes:');
+      } catch (e) {
+        showToast(e.message, 'warning');
+        return;
+      }
+      
+      showLoading(accion === 'Aprobada' ? 'Aprobando...' : 'Rechazando...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          hideLoading();
+          if (data.status === 'success') {
+            showToast(data.message || 'Solicitudes procesadas.', 'success');
+            qai_initView(); // Recargar
+          } else {
+            showAlert(data.message || 'Error al procesar.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error de comunicación: ' + error.message);
+        })
+        .procesarAprobacionImpresionQA({ targetIds: selectedIds, accion: accion, pinFirma: pinFirma }, sysData.currentUser.userId);
+    }
+  </script>
 </body>
 </html>
