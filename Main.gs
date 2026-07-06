@@ -334,16 +334,19 @@ function getUserRecordByEmail_(email) {
     // Usar la función utilitaria existente para buscar columnas, o por defecto A (0) y B (1)
     var emailCol = getColumnIndexByNameCaseInsensitive(headers, 'Correo', false) || getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
     var rolCol = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+    var estadoCol = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
     
     var emailIdx = emailCol ? emailCol - 1 : 0;
     var rolIdx = rolCol ? rolCol - 1 : 1;
+    var estadoIdx = estadoCol ? estadoCol - 1 : 2; // Asumir col C si no se encuentra
     
     for (var i = 1; i < data.length; i++) {
       var rowEmail = data[i][emailIdx] ? data[i][emailIdx].toString().trim().toLowerCase() : '';
       if (rowEmail === email.toLowerCase()) {
         return {
           email: data[i][emailIdx].toString().trim(),
-          rol: data[i][rolIdx].toString().trim()
+          rol: data[i][rolIdx].toString().trim(),
+          estado: data[i][estadoIdx] ? data[i][estadoIdx].toString().trim() : 'Activo' // Por defecto Activo si no hay columna
         };
       }
     }
