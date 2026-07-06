@@ -193,20 +193,20 @@
         
         <div class="view-body" style="flex:1;">
           <div class="paste-instruction">
-            <strong>Tip:</strong> Pega directamente desde Excel (8 columnas) en esta pantalla para auto-generar las tarjetas.
+            <strong>Tip:</strong> Pega directamente desde Excel (8 columnas) en esta pantalla para auto-generar las órdenes.
           </div>
           
-          <div style="display:flex; justify-content:space-between; margin-bottom: 12px; align-items:center;">
-            <div>
-              <button class="btn-secondary-small" onclick="co_addCard()">+ Nueva Tarjeta</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div id="tableInfo" style="font-size:12px; color:#5f6368; font-weight:500;">0 fila(s) agregada(s).</div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-secondary-small" onclick="co_addCard()">+ Nueva Orden</button>
             </div>
             <button class="btn-secondary-small" onclick="co_clearCards()" style="color: #c5221f;">Limpiar</button>
           </div>
           
-          <div id="tableInfo">0 filas agregadas.</div>
           
           <div id="cardsContainer">
-            <!-- Las tarjetas se generan aquí -->
+            <!-- Las órdenes se generan aquí -->
           </div>
         </div>
         
@@ -783,7 +783,7 @@
       card.innerHTML = `
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span>Tarjeta #${co_cardCount}</span>
+            <span>Nueva Orden #${co_cardCount}</span>
             <div id="badge_${co_cardCount}"></div>
           </div>
           <button class="btn-icon" onclick="co_deleteCard(this)">\u274C</button>
@@ -835,12 +835,31 @@
 
       e.preventDefault();
       var rows = pastedText.split('\n');
-      var nuevasTarjetas = [];
+      var cardIdsToValidate = [];
       
       rows.forEach(function(rowText) {
         if (!rowText.trim()) return;
         var columns = rowText.split('\t');
+        if (columns.length >= 1 && columns[0].trim() !== '') {
+          var data = {
+            Proceso: columns[0] ? columns[0].trim() : '',
+            Codigo: columns[1] ? columns[1].trim() : '',
+            Descripcion: columns[2] ? columns[2].trim() : '',
+            Lote: columns[3] ? columns[3].trim() : '',
+            Exp: columns[4] ? columns[4].trim() : '',
+            Cantidad: columns[5] ? columns[5].trim() : '',
+            NoAnalisis: columns[6] ? columns[6].trim() : '',
+            NoOrden: columns[7] ? columns[7].trim() : ''
+          };
+          co_addCard(data);
+          cardIdsToValidate.push(co_cardCount);
+        }
       });
+      
+      if (cardIdsToValidate.length > 0) {
+        co_validarTarjetasMasivo(cardIdsToValidate);
+      }
+      
       showAlert('Datos pegados exitosamente desde Excel.', 'success');
     }
 
@@ -982,7 +1001,7 @@
     async function co_guardarDatos() {
       var records = co_collectData();
       if (records.length === 0) {
-        showError('No hay datos para cargar. Agregue tarjetas.');
+        showError('No hay datos para cargar. Agregue órdenes.');
         return;
       }
       
