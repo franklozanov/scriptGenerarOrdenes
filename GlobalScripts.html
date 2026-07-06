@@ -256,9 +256,10 @@
 
   /**
    * Solicita crear un nuevo PIN en dos etapas.
+   * @param {Object} [targetUser] - Objeto de usuario si se firma a nombre de otro.
    * @returns {Promise<string>} Promesa que resuelve con el nuevo PIN configurado o rechaza.
    */
-  async function setupSecurityPin() {
+  async function setupSecurityPin(targetUser) {
     try {
       const pin1 = await promptSecurityPin("Usted no tiene un PIN configurado. Cree su nuevo PIN (4 dígitos):");
       const pin2 = await promptSecurityPin("Reingrese su nuevo PIN para confirmar:");
@@ -270,9 +271,11 @@
 
       showNotification("Configurando nuevo PIN...", "info");
       
+      const uId = targetUser ? targetUser.userId : sysData.currentUser.userId;
+
       const payload = {
         operation: 'configurarNuevoPin',
-        userId: sysData.currentUser.userId,
+        userId: uId,
         nuevoPin: pin1
       };
       
@@ -285,7 +288,11 @@
       if (data.status === 'success') {
         showNotification(data.message, "success");
         // Actualizar el estado local para que no vuelva a pedirlo en la misma sesión
-        sysData.currentUser.pin = "CONFIGURADO"; 
+        if (targetUser && targetUser.pinStatus) {
+            targetUser.pinStatus = "CONFIGURADO";
+        } else if (sysData && sysData.currentUser) {
+            sysData.currentUser.pin = "CONFIGURADO"; 
+        }
         return pin1;
       } else {
         showNotification(data.message, "error");
@@ -303,20 +310,29 @@
    * Verifica si el usuario tiene PIN configurado. Si no ("PENDIENTE"), inicia el flujo de creación.
    * Luego solicita el PIN para la acción correspondiente.
    * @param {string} message - Mensaje a mostrar en el modal
+   * @param {Object} [targetUser] - Usuario que firma, si es distinto al de sesión principal
    * @returns {Promise<string>} PIN válido.
    */
-  async function getSecurityPinOrSetup(message) {
-    if (sysData && sysData.currentUser && (sysData.currentUser.pin === "PENDIENTE" || sysData.currentUser.pin === "")) {
+  async function getSecurityPinOrSetup(message, targetUser) {
+    let isPending = false;
+    
+    if (targetUser) {
+      isPending = (targetUser.pinStatus === "PENDIENTE" || targetUser.pinStatus === "");
+    } else if (sysData && sysData.currentUser) {
+      isPending = (sysData.currentUser.pin === "PENDIENTE" || sysData.currentUser.pin === "");
+    }
+    
+    if (isPending) {
       // Flujo de creación de PIN
-      const nuevoPin = await setupSecurityPin();
+      const nuevoPin = await setupSecurityPin(targetUser);
       // Si tuvo éxito, lo devuelve automáticamente como el PIN ingresado para la firma actual.
-      // (Podríamos volver a pedirlo, pero si lo acaba de crear y verificar, podemos usarlo directamente)
       return nuevoPin; 
     } else {
       // Flujo normal
       return await promptSecurityPin(message);
     }
   }
+
 
   /**
    * Muestra el modal global de PIN de seguridad de 4 dígitos.

@@ -139,17 +139,23 @@ function getInitialData(includeBase64) {
         if (colEmailIdx) colEmailIdx = colEmailIdx - 1;
         if (colRolIdx) colRolIdx = colRolIdx - 1;
         
+        var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+        if (colClaveIdx) colClaveIdx = colClaveIdx - 1;
+
         for (var j = 1; j < userData.length; j++) {
           if (colUserIdIdx !== undefined && colNombreCompletoIdx !== undefined && userData[j][colUserIdIdx] && userData[j][colNombreCompletoIdx]) {
             var userId = userData[j][colUserIdIdx].toString().trim();
             var nombreCompleto = userData[j][colNombreCompletoIdx].toString().trim();
             if (userId && nombreCompleto) {
+              var claveVal = colClaveIdx !== undefined && colClaveIdx !== null && userData[j][colClaveIdx] !== undefined ? userData[j][colClaveIdx].toString().trim() : "";
+              var pinStatus = (claveVal === "" || claveVal === "PENDIENTE") ? "PENDIENTE" : "CONFIGURADO";
               users.push({
                 userId: userId,
                 nombreCompleto: nombreCompleto,
                 nombreCorto: colNombreCortoIdx !== undefined && userData[j][colNombreCortoIdx] ? userData[j][colNombreCortoIdx].toString().trim() : "",
                 email: colEmailIdx !== undefined && colEmailIdx !== null && userData[j][colEmailIdx] ? userData[j][colEmailIdx].toString().trim() : "",
-                rol: colRolIdx !== undefined && colRolIdx !== null && userData[j][colRolIdx] ? userData[j][colRolIdx].toString().trim() : ""
+                rol: colRolIdx !== undefined && colRolIdx !== null && userData[j][colRolIdx] ? userData[j][colRolIdx].toString().trim() : "",
+                pinStatus: pinStatus
               });
             }
           }

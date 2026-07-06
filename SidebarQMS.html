@@ -2063,7 +2063,7 @@
         // Firma electrónica (21 CFR Part 11) requerida antes de emitir el documento controlado.
         let pinFirma;
         try {
-          pinFirma = await getSecurityPinOrSetup('Ingrese su PIN para firmar y emitir la impresión:');
+          pinFirma = await getSecurityPinOrSetup('Ingrese su PIN para firmar y emitir la impresión:', userObj);
         } catch (e) {
           window.removeEventListener('message', onViewerMessage);
           if (printWindow) printWindow.close();
@@ -2232,7 +2232,7 @@
       if (!userObj) return showToast("Usuario no válido.", 'error');
       
       try {
-        const pin = await getSecurityPinOrSetup("PIN para solicitar reimpresión:");
+        const pin = await getSecurityPinOrSetup("PIN para solicitar reimpresión:", userObj);
         showLoading("Enviando solicitud a QA...");
         const res = await postWebApp({
           operation: 'solicitarImpresion',
