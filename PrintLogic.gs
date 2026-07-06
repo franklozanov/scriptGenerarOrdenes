@@ -1333,28 +1333,31 @@ function getPdfSeguroBase64(fileId) {
 }
 
 /**
- * Evalúa permisos si el visor seguro falla en renderizar.
- * Usa RBAC: Si tiene el permiso VER_NATIVO_DRIVE -> Retorna URL de Drive.
- * Si NO tiene permiso -> Ejecuta rollback de impresión y retorna error.
+ * Contingencia cuando el visor PDF.js falla en renderizar.
+ * El servidor (dueño del script) SÍ tiene acceso al archivo, por lo que devuelve los bytes
+ * del PDF en Base64 para que el navegador los renderice de forma nativa (blob URL en el cliente).
+ * @param {string} fileId - ID del archivo en Drive
+ * @param {string} orderNo - Número de orden (para rollback si el acceso falla por completo)
+ * @returns {Object} { action:'render', base64:... } o { action:'error', message:... }
  */
 function handleViewerFallback(fileId, orderNo) {
-  // Se remueve la restriccion por email por incompatibilidad con cuentas externas
-  // Solo se retorna el link nativo de Google Drive como fallback.
-  var tienePermiso = true;
-  
-  if (tienePermiso) {
-    return { 
-      action: 'redirect', 
-      url: 'https://drive.google.com/file/d/' + fileId + '/view' 
-    };
-  } else {
+  // NO redirigir al enlace nativo de Drive (drive.google.com/file/d/.../view): ese enlace se
+  // abre con la identidad de Google del USUARIO FINAL —no la del dueño del script—, y si el PDF
+  // no está compartido con él, Google muestra "usuario restringido / necesitas acceso".
+  // En su lugar servimos el Base64 desde el servidor, eliminando la dependencia de permisos de Drive.
+  try {
+    var file = DriveApp.getFileById(fileId);
+    var base64 = Utilities.base64Encode(file.getBlob().getBytes());
+    return { action: 'render', base64: base64 };
+  } catch (e) {
+    Logger.log('Error en handleViewerFallback: ' + e.message);
     // Rollback para no contabilizar la impresión fallida en personal operativo
     if (orderNo) {
       rollbackPrint(orderNo, fileId);
     }
-    return { 
-      action: 'error', 
-      message: 'Ha ocurrido un error al cargar el documento. Solicite al administrador realizar la reimpresión.' 
+    return {
+      action: 'error',
+      message: 'Ha ocurrido un error al cargar el documento. Solicite al administrador realizar la reimpresión.'
     };
   }
 }

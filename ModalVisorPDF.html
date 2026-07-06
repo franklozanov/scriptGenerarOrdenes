@@ -195,11 +195,20 @@
      */
     function triggerFallback(error) {
       console.error("Falla en motor PDF, iniciando contingencia:", error);
+
+      // Si ya recibimos los bytes del servidor, el fallo fue solo del renderizador (PDF.js/CDN).
+      // Renderizamos con el visor nativo del navegador usando un blob URL, sin ir al servidor.
+      if (rawPdfBase64) {
+        renderNativeFromBase64(rawPdfBase64);
+        return;
+      }
+
       showLoading('Verificando acceso a visor de recuperación...');
       google.script.run
         .withSuccessHandler(function(res) {
-          if (res.action === 'redirect') {
-            window.location.href = res.url;
+          if (res.action === 'render' && res.base64) {
+            rawPdfBase64 = res.base64;
+            renderNativeFromBase64(res.base64);
           } else {
             hideLoading();
             document.querySelector('.canvas-wrapper').innerHTML = `
@@ -215,6 +224,32 @@
           showError('Falla crítica en recuperación: ' + err.message);
         })
         .handleViewerFallback(TARGET_FILE_ID, TARGET_ORDER_NO);
+    }
+
+    /**
+     * Renderiza el PDF con el visor nativo del navegador a partir de Base64,
+     * usando un blob URL (misma técnica que la impresión segura). No depende de PDF.js
+     * ni del CDN, y los bytes provienen del servidor (dueño), por lo que no requiere
+     * permisos de Drive del usuario final.
+     */
+    function renderNativeFromBase64(base64) {
+      hideLoading();
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const wrapper = document.querySelector('.canvas-wrapper');
+      wrapper.innerHTML = '';
+      const iframe = document.createElement('iframe');
+      iframe.src = blobUrl + '#toolbar=0'; // Oculta la barra nativa (incluye descarga) en Chrome
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      wrapper.appendChild(iframe);
     }
 
     /**
