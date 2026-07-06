@@ -31,7 +31,8 @@
     .section-title { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; margin-top: 8px; }
     
     .btn-action { width: 100%; padding: 14px 16px; text-align: left; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; margin-bottom: 12px; font-size: 14px; color: #334155; font-weight: 500; display: flex; align-items: center; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.02); transition: all 0.2s ease; }
-    .btn-action:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .btn-action:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; background-color: #f1f5f9; color: #94a3b8; }
     .icon { margin-right: 14px; font-size: 18px; width: 24px; text-align: center; }
     
     /* Overlay global compatible con GlobalScripts */
@@ -81,47 +82,49 @@
     <div class="view-panel" id="mainView">
       <div class="tabs">
         <div class="tab-header">
-          <button class="tab-btn active" data-target="tab-orders">📑 Órdenes</button>
-          <button class="tab-btn" data-target="tab-print">🖨️ Impresión</button>
-          <button class="tab-btn" data-target="tab-floor">📦 Piso</button>
-          <button class="tab-btn hidden" id="tabQA-btn" data-target="tab-qa">🛡️ QA</button>
+          <button class="tab-btn active" data-target="tab-gestion">📋 Gestión de Órdenes</button>
+          <button class="tab-btn" data-target="tab-config">⚙️ Configuración</button>
         </div>
         
-        <div id="tab-orders" class="tab-content active">
+        <div id="tab-gestion" class="tab-content active">
           <div class="section-title">Gestión de Documentos</div>
-          <!-- FASE 3: Enrutado a vista interna -->
-          <div id="btn-load-orders" class="btn-action hidden" onclick="openSubView('carga-ordenes')">
+          <button id="btn-load-orders" class="btn-action" onclick="openSubView('carga-ordenes')">
             <span class="icon">📥</span> Cargar Nuevas Órdenes
-          </div>
-          <div id="btn-upload-docs" class="btn-action hidden" onclick="openSubView('subida-documentos')">
+          </button>
+          <button id="btn-upload-docs" class="btn-action" onclick="openSubView('subida-documentos')">
             <span class="icon">📤</span> Subir Documentos
-          </div>
-        </div>
-        
-        <div id="tab-print" class="tab-content">
-          <div class="section-title">Centro de Impresión</div>
-          <div id="btn-print-order" class="btn-action hidden" onclick="openSubView('imprimir-orden')">
+          </button>
+
+          <div class="section-title" style="margin-top: 24px;">Centro de Impresión</div>
+          <button id="btn-print-order" class="btn-action" onclick="openSubView('imprimir-orden')">
             <span class="icon">🖨️</span> Imprimir Orden
-          </div>
-          <div id="btn-request-reprint" class="btn-action hidden" onclick="openModal('abrirModalSolicitarReimpresion')">
+          </button>
+          <button id="btn-request-reprint" class="btn-action" onclick="openModal('abrirModalSolicitarReimpresion')">
             <span class="icon">📋</span> Solicitar Reimpresión
-          </div>
-        </div>
-        
-        <div id="tab-floor" class="tab-content">
-          <div class="section-title">Gestión de Piso</div>
-          <div id="btn-register-novelty" class="btn-action hidden" onclick="openSubView('registro-novedad')">
+          </button>
+
+          <div class="section-title" style="margin-top: 24px;">Gestión de Piso</div>
+          <button id="btn-register-novelty" class="btn-action" onclick="openSubView('registro-novedad')">
             <span class="icon">📝</span> Registrar Novedad / Entrega
-          </div>
+          </button>
+
+          <div class="section-title" style="margin-top: 24px;">Aprobaciones QA</div>
+          <button id="btn-auth-qa" class="btn-action" onclick="openSubView('qa-autorizar')">
+            <span class="icon">✅</span> Autorizar Órdenes
+          </button>
+          <button id="btn-approve-print" class="btn-action" onclick="openSubView('qa-impresion')">
+            <span class="icon">🛡️</span> Aprobar Reimpresión
+          </button>
         </div>
         
-        <div id="tab-qa" class="tab-content">
-          <div class="section-title">Aprobaciones QA</div>
-          <div id="btn-auth-qa" class="btn-action hidden" onclick="openSubView('qa-autorizar')">
-            <span class="icon">✅</span> Autorizar Órdenes
-          </div>
-          <div id="btn-approve-print" class="btn-action hidden" onclick="openSubView('qa-impresion')">
-            <span class="icon">🛡️</span> Aprobar Reimpresión
+        <div id="tab-config" class="tab-content">
+          <div class="section-title">Configuración del Sistema</div>
+          <div id="config-content" style="font-size: 13px; color: #64748b; padding: 10px 0;">
+            <p>Opciones de configuración exclusivas para administradores.</p>
+            <button id="btn-init-system" class="btn-action" onclick="google.script.run.inicializarSistemaCompleto(); showToast('Inicializando...', 'success')">
+              <span class="icon">🛠️</span> Inicializar Sistema
+            </button>
+            <!-- Future config buttons can go here -->
           </div>
         </div>
       </div>
@@ -428,17 +431,28 @@
 
     function applyPermissions(perms) {
       if(!perms) return;
-      if(perms["CARGAR_ORDENES"]) document.getElementById("btn-load-orders").classList.remove("hidden");
-      if(perms["SUBIR_DOCUMENTOS"]) document.getElementById("btn-upload-docs").classList.remove("hidden");
-      if(perms["IMPRIMIR_ORDEN"]) document.getElementById("btn-print-order").classList.remove("hidden");
-      if(perms["SOLICITAR_REIMPRESION"]) document.getElementById("btn-request-reprint").classList.remove("hidden");
-      if(perms["REGISTRAR_NOVEDAD"]) document.getElementById("btn-register-novelty").classList.remove("hidden");
       
-      var hasQA = false;
-      if(perms["AUTORIZAR_QA"]) { document.getElementById("btn-auth-qa").classList.remove("hidden"); hasQA = true; }
-      if(perms["APROBAR_REIMPRESION"]) { document.getElementById("btn-approve-print").classList.remove("hidden"); hasQA = true; }
+      // Habilitar botones de operaciones regulares si tienen permisos, de lo contrario deshabilitarlos
+      document.getElementById("btn-load-orders").disabled = !perms["CARGAR_ORDENES"];
+      document.getElementById("btn-upload-docs").disabled = !perms["SUBIR_DOCUMENTOS"];
+      document.getElementById("btn-print-order").disabled = !perms["IMPRIMIR_ORDEN"];
+      document.getElementById("btn-request-reprint").disabled = !perms["SOLICITAR_REIMPRESION"];
+      document.getElementById("btn-register-novelty").disabled = !perms["REGISTRAR_NOVEDAD"];
       
-      if(hasQA) document.getElementById("tabQA-btn").classList.remove("hidden");
+      // Habilitar botones de QA solo si tienen permisos correspondientes
+      document.getElementById("btn-auth-qa").disabled = !perms["AUTORIZAR_QA"];
+      document.getElementById("btn-approve-print").disabled = !perms["APROBAR_REIMPRESION"];
+      
+      // El botón de Configuración Inicializar Sistema requiere ADMIN o propietario
+      // Si el usuario no tiene permisos (ej. no es ADMIN), se deshabilita
+      var esAdmin = false;
+      if (sysData && sysData.currentUser && sysData.currentUser.rol === "ADMIN") {
+         esAdmin = true;
+      }
+      
+      // Si no tenemos session email o falla la validación extra, podemos basarnos en un permiso genérico o dejarlo
+      // Por seguridad el backend lo rechaza igual si no es ADMIN, pero lo inhabilitamos visualmente
+      document.getElementById("btn-init-system").disabled = !esAdmin;
     }
 
     // Navegación
