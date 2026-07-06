@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f8fafc;
+      color: #1e293b;
+      overflow: hidden;
+    }
+    .spinner-container {
+      position: relative;
+      width: 60px;
+      height: 60px;
+      margin-bottom: 24px;
+    }
+    .spinner {
+      width: 100%;
+      height: 100%;
+      border: 4px solid #e2e8f0;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+      box-sizing: border-box;
+    }
+    .spinner-inner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      border: 3px solid transparent;
+      border-bottom-color: #0ea5e9;
+      border-radius: 50%;
+      animation: spin-reverse 0.75s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spin-reverse {
+      to { transform: translate(-50%, -50%) rotate(-360deg); }
+    }
+    
+    .status-text {
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 8px;
+      color: #0f172a;
+    }
+    
+    .sub-text {
+      font-size: 14px;
+      color: #64748b;
+      text-align: center;
+      max-width: 85%;
+      line-height: 1.4;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .success-icon {
+      font-size: 54px;
+      margin-bottom: 16px;
+      display: none;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    
+    .error-icon {
+      font-size: 54px;
+      margin-bottom: 16px;
+      display: none;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    
+    @keyframes popIn {
+      from { transform: scale(0); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    
+    .btn-close {
+      margin-top: 24px;
+      padding: 10px 24px;
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
+      display: none;
+    }
+    
+    .btn-close:hover {
+      background-color: #2563eb;
+      box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .progress-messages {
+      height: 20px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    
+    .message-item {
+      font-size: 13px;
+      color: #94a3b8;
+      text-align: center;
+      transition: opacity 0.3s;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="spinnerContainer" class="spinner-container">
+    <div class="spinner"></div>
+    <div class="spinner-inner"></div>
+  </div>
+  
+  <div id="successIcon" class="success-icon">✅</div>
+  <div id="errorIcon" class="error-icon">❌</div>
+  
+  <div id="statusText" class="status-text">Inicializando Sistema</div>
+  <div id="subText" class="sub-text">Por favor, no interactúe con la hoja mientras se realiza este proceso.</div>
+  
+  <div class="progress-messages">
+    <div id="dynamicMsg" class="message-item">Verificando roles y permisos...</div>
+  </div>
+  
+  <button id="btnClose" class="btn-close" onclick="google.script.host.close()">Cerrar Ventana</button>
+
+  <script>
+    const messages = [
+      "Verificando roles y permisos...",
+      "Validando columnas de la hoja...",
+      "Aplicando protecciones de datos...",
+      "Sincronizando reglas de negocio...",
+      "Preparando el entorno final..."
+    ];
+    let msgIndex = 0;
+    let msgInterval;
+
+    window.onload = function() {
+      // Rotar mensajes para dar sensación de progreso continuo
+      msgInterval = setInterval(() => {
+        msgIndex = (msgIndex + 1) % messages.length;
+        document.getElementById('dynamicMsg').innerText = messages[msgIndex];
+      }, 3000);
+      
+      // Llamar al backend
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          clearInterval(msgInterval);
+          document.getElementById('spinnerContainer').style.display = 'none';
+          document.getElementById('successIcon').style.display = 'block';
+          
+          document.getElementById('statusText').innerText = "¡Validación Completada!";
+          document.getElementById('statusText').style.color = '#16a34a';
+          
+          document.getElementById('subText').innerText = msg || "El sistema ha sido inicializado y asegurado correctamente.";
+          document.getElementById('subText').style.animation = 'none';
+          
+          document.getElementById('dynamicMsg').style.display = 'none';
+          
+          // Cerrar automáticamente
+          setTimeout(function() {
+            google.script.host.close();
+          }, 3000);
+        })
+        .withFailureHandler(function(err) {
+          clearInterval(msgInterval);
+          document.getElementById('spinnerContainer').style.display = 'none';
+          document.getElementById('errorIcon').style.display = 'block';
+          
+          document.getElementById('statusText').innerText = "Proceso Detenido";
+          document.getElementById('statusText').style.color = '#dc2626';
+          
+          document.getElementById('subText').innerText = err.message || err;
+          document.getElementById('subText').style.animation = 'none';
+          
+          document.getElementById('dynamicMsg').style.display = 'none';
+          document.getElementById('btnClose').style.display = 'block';
+        })
+        .inicializarSistemaCompleto();
+    };
+  </script>
+</body>
+</html>
