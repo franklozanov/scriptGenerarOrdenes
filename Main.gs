@@ -121,18 +121,19 @@ function onOpenMain(email) {
   
   mainMenu.addToUi();
   
-  // Cache warmup: precargar datos silenciosamente
+  // Abrir Sidebar automáticamente al iniciar la hoja (debe ir antes de acciones pesadas)
   try {
-    getInitialData();
-    // syncVerifCantDisponible() OBSOLETO: el snapshot de CantDispAFecha
-    // ahora se captura en el backend al crear la orden (Fase 3 MatrixValidation).
-    hideUnauthorizedSheets_();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Abriendo Panel Principal...', 'Sistema QMS', 3);
-    
-    // Abrir Sidebar automáticamente al iniciar la hoja
     abrirSidebarQMS();
   } catch (e) {
-    Logger.log("Error en warmup de caché: " + e.message);
+    Logger.log("Error al abrir Sidebar: " + e.message);
+  }
+
+  // Operaciones de UI secundarias
+  try {
+    hideUnauthorizedSheets_();
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Cargando datos en el panel...', 'Sistema QMS', 3);
+  } catch (e) {
+    Logger.log("Error en operaciones secundarias: " + e.message);
   }
 }
 
