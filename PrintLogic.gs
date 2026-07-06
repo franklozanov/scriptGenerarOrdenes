@@ -752,7 +752,7 @@ function finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, actingUse
  * @throws {Error} Si el usuario no está autorizado
  */
 function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId) {
-  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  enforcePermission(userId, 'IMPRIMIR_ORDEN');
   return saveFinalUnifiedPDF(base64Data, orderNo);
 }
 
@@ -768,7 +768,7 @@ function saveFinalUnifiedPDFForUser(base64Data, orderNo, userId) {
  * @throws {Error} Si el usuario no está autorizado
  */
 function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
-  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  enforcePermission(userId, 'IMPRIMIR_ORDEN');
   return finalizeFinalPdfPostSave(orderNo, fileId, archivoReemplazado, userId);
 }
 
@@ -784,7 +784,7 @@ function finalizeFinalPdfForUser(orderNo, fileId, archivoReemplazado, userId) {
  * @throws {Error} Si el usuario no está autorizado
  */
 function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
-  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  enforcePermission(userId, 'IMPRIMIR_ORDEN');
   return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
 
@@ -948,6 +948,7 @@ function getOrdenesValidasParaImpresion() {
  */
 function registrarSolicitudImpresion(params, userId) {
   try {
+    enforcePermission(userId, 'SOLICITAR_REIMPRESION');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var ordenesSheet = ss.getSheetByName('Ordenes');
     if (!ordenesSheet) throw new Error("La hoja 'Ordenes' no existe.");
@@ -1048,6 +1049,7 @@ function registrarSolicitudImpresion(params, userId) {
  */
 function procesarAprobacionImpresionQA(params, userId) {
   try {
+    enforcePermission(userId, 'APROBAR_REIMPRESION');
     params.userId = userId;
     requireAuthorizedUserStrict_(params);
 

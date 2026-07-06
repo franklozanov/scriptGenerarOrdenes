@@ -678,3 +678,14 @@ function hasPermissionByRol(rol, permisoRequerido) {
     return false;
   }
 }
+
+/**
+ * Lanza un error si el usuario no tiene el permiso especificado.
+ * @param {string} userId - UserID del usuario
+ * @param {string} permissionKey - Clave del permiso a verificar
+ */
+function enforcePermission(userId, permissionKey) {
+  if (!hasPermission(userId, permissionKey)) {
+    throw new Error('ACCESO DENEGADO: No tiene el permiso requerido (' + permissionKey + ') para realizar esta acción.');
+  }
+}

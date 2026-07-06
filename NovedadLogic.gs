@@ -220,6 +220,7 @@ function getOrdenesSolicitadasParaQA() {
  */
 function procesarRegistroNovedad(params, userId) {
   try {
+    enforcePermission(userId, 'REGISTRAR_NOVEDAD');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // Obtener información del usuario
@@ -349,6 +350,7 @@ function procesarRegistroNovedad(params, userId) {
  */
 function procesarCargaOrdenesMasivas(params, userId) {
   try {
+    enforcePermission(userId, 'CARGAR_ORDENES');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // Obtener información del usuario

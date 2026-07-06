@@ -259,6 +259,7 @@ function getPendingOrdersList() {
  */
 function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed, actingUserId) {
   try {
+    enforcePermission(actingUserId, 'SUBIR_DOCUMENTOS');
     // Validación de seguridad: solo permitir PDF
     if (mimeType !== 'application/pdf') {
       return { status: 'error', message: 'Solo se permiten archivos PDF.' };

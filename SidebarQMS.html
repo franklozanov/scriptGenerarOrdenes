@@ -1333,36 +1333,34 @@
         debouncedPreload(e.target.value);
       });
 
-      // Fetch config & orders
-      google.script.run
-        .withSuccessHandler(data => {
-          imp_globalTemplates = data.templates;
-          data.templates.forEach(t => { if (t.base64) imp_preloadedStaticPdfs[t.key] = t.base64; });
-          
-          document.getElementById('imp_tplList').innerHTML = data.templates.map(t => {
-            let defVal = (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") ? "0" : (t.key === "TPL_CONTROLES" ? "2" : "1");
-            const noAccess = t.hasAccess === false;
-            return `
-              <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0; border-bottom: 1px solid #eee; ${noAccess ? 'opacity:0.5' : ''}">
-                <span style="font-size:11px; font-weight:500; ${noAccess ? 'color:#dc2626' : ''}">${t.name}</span>
-                <div style="display:flex; align-items:center;">
-                  <button type="button" onclick="imp_dec('${t.key}', ${noAccess})" style="width:24px; height:24px; background:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" ${noAccess?'disabled':''}>-</button>
-                  <input type="text" id="imp_val_${t.key}" value="${defVal}" style="width:30px; height:24px; text-align:center; border:1px solid #ccc; margin:0 4px;" ${noAccess?'disabled':''} oninput="imp_updateBtnState()">
-                  <button type="button" onclick="imp_inc('${t.key}', ${noAccess})" style="width:24px; height:24px; background:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" ${noAccess?'disabled':''}>+</button>
-                </div>
-              </div>
-            `;
-          }).join('');
-          
-          google.script.run.withSuccessHandler(ordenes => {
-            document.getElementById('imp_ordenesList').innerHTML = ordenes.map(o => `<option value="${o.noOrden}">${o.label}</option>`).join('');
-            hideLoading();
-            imp_updateBtnState();
-          }).getOrdenesValidasParaImpresion();
-          
-        })
-        .withFailureHandler(e => { hideLoading(); showError(e.message); })
-        .getInitialData();
+      // Use preloaded data and config
+      imp_globalTemplates = sysData.templates;
+      sysData.templates.forEach(t => {
+        if (base64Data[t.key]) {
+          imp_preloadedStaticPdfs[t.key] = base64Data[t.key];
+        }
+      });
+      
+      document.getElementById('imp_tplList').innerHTML = sysData.templates.map(t => {
+        let defVal = (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") ? "0" : (t.key === "TPL_CONTROLES" ? "2" : "1");
+        const noAccess = t.hasAccess === false;
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0; border-bottom: 1px solid #eee; ${noAccess ? 'opacity:0.5' : ''}">
+            <span style="font-size:11px; font-weight:500; ${noAccess ? 'color:#dc2626' : ''}">${t.name}</span>
+            <div style="display:flex; align-items:center;">
+              <button type="button" onclick="imp_dec('${t.key}', ${noAccess})" style="width:24px; height:24px; background:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" ${noAccess?'disabled':''}>-</button>
+              <input type="text" id="imp_val_${t.key}" value="${defVal}" style="width:30px; height:24px; text-align:center; border:1px solid #ccc; margin:0 4px;" ${noAccess?'disabled':''} oninput="imp_updateBtnState()">
+              <button type="button" onclick="imp_inc('${t.key}', ${noAccess})" style="width:24px; height:24px; background:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" ${noAccess?'disabled':''}>+</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      google.script.run.withSuccessHandler(ordenes => {
+        document.getElementById('imp_ordenesList').innerHTML = ordenes.map(o => `<option value="${o.noOrden}">${o.label}</option>`).join('');
+        hideLoading();
+        imp_updateBtnState();
+      }).getOrdenesValidasParaImpresion();
     }
 
     function imp_dec(key, noAccess) {
