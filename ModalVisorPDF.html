@@ -115,11 +115,14 @@
       <div class="toolbar-group">
         <button class="tool-btn" id="zoom-out">➖ Zoom</button>
         <button class="tool-btn" id="zoom-in">➕ Zoom</button>
-        <!-- Solo impresión permitida, descarga omitida intencionalmente -->
-        <button class="tool-btn btn-print-secure" id="print-doc">🖨️ Imprimir</button>
+        <!-- Solo impresión permitida, descarga omitida intencionalmente.
+             En modo 'pending' arranca deshabilitado hasta confirmar el guardado oficial. -->
+        <button class="tool-btn btn-print-secure" id="print-doc" <?!= typeof mode !== "undefined" && mode === "pending" ? "disabled" : "" ?>>🖨️ Imprimir</button>
       </div>
     </div>
-    
+
+    <div id="vp-banner" class="hidden" style="padding: 8px 20px; font-size: 12px; text-align: center; flex-shrink: 0;"></div>
+
     <div class="canvas-wrapper">
       <canvas id="pdf-render-canvas"></canvas>
     </div>
@@ -140,12 +143,16 @@
         currentPageNum = 1,
         TARGET_FILE_ID = '<?!= typeof fileId !== "undefined" ? fileId : "" ?>',
         TARGET_ORDER_NO = '<?!= typeof orderNo !== "undefined" ? orderNo : "" ?>',
+        TARGET_MODE = '<?!= typeof mode !== "undefined" ? mode : "" ?>',
+        TARGET_NONCE = '<?!= typeof nonce !== "undefined" ? nonce : "" ?>',
         isPageRendering = false,
         pageNumPending = null,
         currentScale = 1.5,
         canvas = document.getElementById('pdf-render-canvas'),
         ctx = canvas.getContext('2d'),
-        rawPdfBase64 = null;
+        rawPdfBase64 = null,
+        pendingRendered = false,
+        pendingConfirmed = false;
 
     // Prevención de atajos de teclado (Ctrl+S, Ctrl+P)
     document.addEventListener('keydown', function(e) {
@@ -170,6 +177,11 @@
         minHeight: 600
       });
 
+      if (TARGET_MODE === 'pending') {
+        initPendingViewer();
+        return;
+      }
+
       if (!TARGET_FILE_ID) {
         showError('No se proporcionó un ID de archivo válido para visualizar.');
         return;
@@ -189,6 +201,80 @@
         .withFailureHandler(triggerFallback)
         .getPdfSeguroBase64(TARGET_FILE_ID);
     };
+
+    /**
+     * Modo 'pending': el opener (sidebar) ya generó el PDF en el navegador y aún no ha
+     * terminado de guardarlo oficialmente en Drive. En vez de descargar el archivo del
+     * servidor (que sería una descarga redundante del mismo PDF que el cliente acaba de
+     * generar), se recibe por postMessage: primero la vista previa (vp-data) y luego la
+     * confirmación de guardado (vp-confirmed), que habilita el botón de imprimir.
+     */
+    function initPendingViewer() {
+      if (!window.opener) {
+        hideLoading();
+        vpSetBanner('error', '❌ No se pudo conectar con la ventana de origen. Cierre esta pestaña e intente de nuevo.');
+        return;
+      }
+
+      showLoading('Esperando documento...');
+      vpSetBanner('info', '⏳ Esperando datos del documento...');
+
+      // Si por algún motivo el opener nunca responde (ventana cerrada, error silencioso),
+      // no dejar la vista colgada indefinidamente.
+      var timeoutId = setTimeout(function() {
+        if (!pendingRendered) {
+          hideLoading();
+          vpSetBanner('error', '❌ Tiempo de espera agotado esperando el documento. Cierre esta pestaña e intente de nuevo.');
+        }
+      }, 25000);
+
+      window.addEventListener('message', function(event) {
+        // Solo se acepta si el mensaje proviene EXACTAMENTE de la ventana que nos abrió
+        // (identidad de objeto, no de origen) y coincide el nonce de esta impresión. El
+        // origen de un Web App de Apps Script no es estable entre ejecuciones (sandbox
+        // script.googleusercontent.com dinámico), por lo que validar por identidad de
+        // ventana + nonce es más confiable aquí que comparar event.origin.
+        if (event.source !== window.opener) return;
+        var data = event.data || {};
+        if (!data.nonce || data.nonce !== TARGET_NONCE) return;
+
+        if (data.type === 'vp-data' && data.base64) {
+          clearTimeout(timeoutId);
+          pendingRendered = true;
+          TARGET_ORDER_NO = data.orderNo || TARGET_ORDER_NO;
+          rawPdfBase64 = data.base64;
+          vpSetBanner('info', '👁️ Vista previa — guardando documento oficial en segundo plano...');
+          renderPdfFromBase64(data.base64);
+          if (pendingConfirmed) vpApplyConfirmed();
+        } else if (data.type === 'vp-confirmed') {
+          pendingConfirmed = true;
+          if (pendingRendered) vpApplyConfirmed();
+        } else if (data.type === 'vp-failed') {
+          clearTimeout(timeoutId);
+          hideLoading();
+          vpSetBanner('error', '❌ ' + (data.message || 'No se pudo guardar el documento oficial.'));
+        }
+      });
+
+      // Avisar al opener que ya podemos recibir datos
+      window.opener.postMessage({ type: 'vp-ready', nonce: TARGET_NONCE }, '*');
+    }
+
+    function vpApplyConfirmed() {
+      document.getElementById('print-doc').disabled = false;
+      vpSetBanner('success', '✅ Documento oficial guardado. Ya puede imprimir.');
+    }
+
+    function vpSetBanner(type, message) {
+      const banner = document.getElementById('vp-banner');
+      if (!banner) return;
+      if (!message) { banner.classList.add('hidden'); return; }
+      banner.classList.remove('hidden');
+      banner.innerHTML = message;
+      if (type === 'success') { banner.style.background = '#d1e7dd'; banner.style.color = '#0f5132'; }
+      else if (type === 'error') { banner.style.background = '#f8d7da'; banner.style.color = '#842029'; }
+      else { banner.style.background = '#cff4fc'; banner.style.color = '#055160'; }
+    }
 
     /**
      * Dispara la compensación y evaluación RBAC del backend si el canvas falla.

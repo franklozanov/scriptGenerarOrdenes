@@ -438,26 +438,31 @@
         });
       });
 
-      // Cargar datos iniciales
+      // Precalentar pdf-lib desde el arranque (no esperar a que se abra la vista Imprimir),
+      // para que ya esté cargado o en caché del navegador cuando el usuario imprima.
+      imp_preloadPdfLib();
+
+      // Cargar datos iniciales. getInitialData y getTemplatesBase64Async son independientes
+      // en el servidor (ambas leen del mismo caché initialData_v2), así que se disparan en
+      // paralelo en vez de anidar la segunda dentro del success handler de la primera.
       google.script.run
         .withSuccessHandler(function(data) {
           sysData = data;
           applyPermissions(data.userPermissions);
           document.getElementById("loading-overlay").classList.add("hidden");
-          
-          // Lazy load base64
-          google.script.run
-            .withSuccessHandler(function(b64) {
-              base64Data = b64;
-              console.log("Plantillas Base64 cargadas en segundo plano.");
-            })
-            .getTemplatesBase64Async();
         })
         .withFailureHandler(function(err) {
           alert("Error: " + err.message);
           document.getElementById("loading-overlay").classList.add("hidden");
         })
         .getInitialData(false);
+
+      google.script.run
+        .withSuccessHandler(function(b64) {
+          base64Data = b64;
+          console.log("Plantillas Base64 cargadas en segundo plano.");
+        })
+        .getTemplatesBase64Async();
 
       // Event Listener Global para Pegar (para Carga Órdenes)
       document.addEventListener('paste', co_handlePaste);
@@ -1355,7 +1360,10 @@
         hideLoading();
         if (data.status === 'success') {
           showToast(data.message || 'Órdenes autorizadas.', 'success');
-          qa_initView(); // Recargar
+          // UI optimista: quitar localmente las procesadas en vez de recargar todo el
+          // listado desde el servidor (evita un round-trip completo por acción).
+          qa_ordenes = qa_ordenes.filter(o => selectedIds.indexOf(o.noOrden) === -1);
+          qa_renderCards();
         } else {
           showAlert(data.message || 'Error al autorizar.', 'error');
         }
@@ -1460,7 +1468,10 @@
         hideLoading();
         if (data.status === 'success') {
           showToast(data.message || 'Solicitudes procesadas.', 'success');
-          qai_initView(); // Recargar
+          // UI optimista: quitar localmente las procesadas en vez de recargar todo el
+          // listado desde el servidor (evita un round-trip completo por acción).
+          qai_solicitudes = qai_solicitudes.filter(s => selectedIds.indexOf(s.idSolicitud) === -1);
+          qai_renderCards();
         } else {
           showAlert(data.message || 'Error al procesar.', 'error');
         }
@@ -1492,13 +1503,23 @@
       imp_updateBtnState();
     }
 
+    let imp_pdfLibLoading = false;
+
+    /**
+     * Carga pdf-lib desde CDN si aún no está disponible. Se llama desde el arranque del
+     * sidebar (DOMContentLoaded) para precalentarlo antes de que el usuario abra la vista
+     * Imprimir, y también aquí como respaldo por si ese precalentamiento no alcanzó a cargar.
+     */
+    function imp_preloadPdfLib() {
+      if (typeof PDFLib !== 'undefined' || imp_pdfLibLoading) return;
+      imp_pdfLibLoading = true;
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/pdf-lib/dist/pdf-lib.min.js';
+      document.head.appendChild(script);
+    }
+
     function imp_initView() {
-      // Cargar pdf-lib dinámicamente si no existe
-      if (typeof PDFLib === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/pdf-lib/dist/pdf-lib.min.js';
-        document.head.appendChild(script);
-      }
+      imp_preloadPdfLib();
 
       // Evitar recargar si ya hay datos
       if (imp_globalTemplates.length > 0) return;
@@ -1664,20 +1685,55 @@
       const printType = document.getElementById('imp_printType').value;
       const status = document.getElementById('imp_status');
       const btn = document.getElementById('imp_goBtn');
-      
+
       const config = imp_globalTemplates.map(t => ({
         key: t.key, fileId: t.fileId, hasAccess: t.hasAccess,
         copies: parseInt(document.getElementById('imp_val_' + t.key).value) || 0
       })).filter(c => c.copies > 0);
-      
+
       const userObj = sysData.users.find(u => u.nombreCompleto === userName);
       const userId = userObj ? userObj.userId : null;
-      
+
       if (!userId) return showError("Usuario no válido.");
-      
+
       btn.disabled = true;
       status.innerText = "⏳ Generando PDF (Puede tardar unos segundos)...";
       status.style.color = "#1a73e8";
+
+      // Handshake con el visor seguro: se abre apuntando a modo 'pending' para poder
+      // mostrarle la vista previa por postMessage en cuanto el merge termine, sin esperar
+      // a que el guardado oficial en Drive concluya. Se abre lo antes posible (antes de
+      // construir el payload/PIN/merge) para que cargue en paralelo con ese trabajo.
+      const nonce = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('n' + Date.now() + Math.random().toString(36).slice(2));
+      let popupReady = false;
+      let previewBase64 = null;
+      let previewSent = false;
+
+      function trySendPreview() {
+        if (previewSent || !popupReady || !previewBase64) return;
+        previewSent = true;
+        printWindow.postMessage({ type: 'vp-data', nonce: nonce, base64: previewBase64, orderNo: orderNo }, '*');
+      }
+
+      function onViewerMessage(event) {
+        if (event.source !== printWindow) return;
+        const data = event.data || {};
+        if (data.nonce !== nonce) return;
+        if (data.type === 'vp-ready') {
+          popupReady = true;
+          trySendPreview();
+        }
+      }
+      window.addEventListener('message', onViewerMessage);
+
+      const printWindow = window.open(sysData.webAppUrl + '?action=secure&mode=pending&nonce=' + encodeURIComponent(nonce), '_blank');
+      if (!printWindow) {
+        window.removeEventListener('message', onViewerMessage);
+        imp_setBanner('error', 'Por favor habilite las ventanas emergentes (pop-ups) para este sitio.');
+        btn.disabled = false;
+        status.innerText = "Error: Ventana emergente bloqueada.";
+        return;
+      }
 
       try {
         const payload = { formData: imp_preloadState.data.formData, coords: imp_preloadState.data.coords, pdfs: [] };
@@ -1699,22 +1755,12 @@
         });
         payload.pdfs = finalPdfs;
 
-        // Abrimos la ventana sincrónicamente AQUI, antes de cualquier await (para evitar bloqueadores de popups)
-        const printWindow = window.open('about:blank', '_blank');
-        if (printWindow) {
-          printWindow.document.write("<h3 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Procesando y Asegurando Documento...</h3>");
-        } else {
-          imp_setBanner('error', 'Por favor habilite las ventanas emergentes (pop-ups) para este sitio.');
-          btn.disabled = false;
-          status.innerText = "Error: Ventana emergente bloqueada.";
-          return;
-        }
-
         // Firma electrónica (21 CFR Part 11) requerida antes de emitir el documento controlado.
         let pinFirma;
         try {
           pinFirma = await promptSecurityPin('Ingrese su PIN para firmar y emitir la impresión:');
         } catch (e) {
+          window.removeEventListener('message', onViewerMessage);
           if (printWindow) printWindow.close();
           btn.disabled = false;
           status.innerText = 'Impresión cancelada.';
@@ -1726,31 +1772,34 @@
         let totalPages = 0;
         const now = new Date();
         const formattedDate = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        
+
         for (let i = 0; i < payload.pdfs.length; i++) {
           const item = payload.pdfs[i];
           status.innerText = `⏳ Procesando ${item.key}...`;
           await new Promise(r => setTimeout(r, 10)); // yield
-          
+
           const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
+          // Cargar y rellenar UNA sola vez por plantilla: formData/coords no cambian entre
+          // copias, así que basta un PDFDocument.load + relleno; solo copyPages/addPage se
+          // repite por cada copia solicitada (antes se recargaba el PDF por cada copia).
+          const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+          if (item.key === "DOC_ORDENES") {
+            const firstPage = doc.getPages()[0];
+            Object.keys(payload.coords).forEach(k => {
+              firstPage.drawText(payload.formData[k]||"", { x: payload.coords[k].x, y: payload.coords[k].y, size: 10, color: rgb(0,0,0) });
+            });
+          } else if (item.key !== "DOC_ANALISIS") {
+            try {
+              const form = doc.getForm();
+              Object.keys(payload.formData).forEach(k => { try { form.getTextField(k).setText(payload.formData[k]); } catch(e){} });
+            } catch(e) {}
+          }
+
           for (let c = 0; c < item.copies; c++) {
-            const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
-            if (item.key === "DOC_ORDENES") {
-              const firstPage = doc.getPages()[0];
-              Object.keys(payload.coords).forEach(k => {
-                firstPage.drawText(payload.formData[k]||"", { x: payload.coords[k].x, y: payload.coords[k].y, size: 10, color: rgb(0,0,0) });
-              });
-            } else if (item.key !== "DOC_ANALISIS") {
-              try {
-                const form = doc.getForm();
-                Object.keys(payload.formData).forEach(k => { try { form.getTextField(k).setText(payload.formData[k]); } catch(e){} });
-              } catch(e) {}
-            }
-            
             const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
             copied.forEach(p => finalPdf.addPage(p));
             totalPages += copied.length;
-            
+
             if (copied.length % 2 !== 0) {
               const blankPage = finalPdf.addPage([612, 792]);
               blankPage.drawText("Página en blanco", { x: 250, y: 396, size: 11, color: rgb(0.5,0.5,0.5) });
@@ -1758,7 +1807,7 @@
             }
           }
         }
-        
+
         const allPages = finalPdf.getPages();
         status.innerText = `⏳ Añadiendo pie de página...`;
         await new Promise(r => setTimeout(r, 10));
@@ -1791,7 +1840,7 @@
         await new Promise(r => setTimeout(r, 10));
         
         const pdfData = await finalPdf.save({ useObjectStreams: true });
-        
+
         // Convert to Base64 (Manual without buffer for browser)
         const chunkSize = 0x8000;
         let binary = '';
@@ -1799,12 +1848,17 @@
           binary += String.fromCharCode.apply(null, pdfData.subarray(i, i + chunkSize));
         }
         const finalBase64 = btoa(binary);
-        
-        status.innerText = "☁️ Registrando impresión (firma electrónica)...";
+
+        // Vista previa instantánea: el visor ya puede mostrar el documento con los bytes que
+        // tenemos en memoria, sin esperar a que termine el guardado oficial en Drive.
+        previewBase64 = finalBase64;
+        status.innerText = "👁️ Vista previa lista. Registrando impresión (firma electrónica)...";
+        trySendPreview();
 
         // Se enruta por la Web App (corre como propietario) para poder escribir en las columnas
         // protegidas de Ordenes. La generación del PDF, el contador y la trazabilidad se registran
-        // de forma atómica en el servidor, con rollback si algo falla.
+        // de forma atómica en el servidor, con rollback si algo falla. Esto ocurre en 2º plano:
+        // el usuario ya está viendo la vista previa en el visor mientras se guarda oficialmente.
         try {
           const res = await postWebApp({
             operation: 'processPrint',
@@ -1818,16 +1872,13 @@
 
           if (res.status === 'success') {
             const data = res.data || {};
-            status.innerText = "✅ Listo. Abriendo visor...";
+            status.innerText = "✅ Listo. Documento oficial guardado.";
             status.style.color = "#0f5132";
             btn.disabled = false;
 
-            // ABRIR EL VISOR PDF EN LA VENTANA PRE-ABIERTA
-            if (data.viewerUrl) {
-               printWindow.location.href = data.viewerUrl;
-            } else if (data.fileId) {
-               printWindow.location.href = 'https://drive.google.com/file/d/' + data.fileId + '/view';
-            }
+            // Confirmar al visor (ya mostrando la vista previa) que el documento quedó
+            // guardado oficialmente, para que habilite el botón de imprimir.
+            printWindow.postMessage({ type: 'vp-confirmed', nonce: nonce, fileId: data.fileId }, '*');
 
             // Limpiar form
             document.getElementById('imp_orderNo').value = '';
@@ -1837,16 +1888,19 @@
             status.innerText = "❌ Error: " + (res.message || 'No se pudo registrar la impresión.');
             status.style.color = "#dc2626";
             btn.disabled = false;
-            if (printWindow) printWindow.close();
+            printWindow.postMessage({ type: 'vp-failed', nonce: nonce, message: res.message || 'No se pudo registrar la impresión.' }, '*');
           }
         } catch (postErr) {
           status.innerText = "❌ Error de comunicación: " + postErr.message;
           status.style.color = "#dc2626";
           btn.disabled = false;
-          if (printWindow) printWindow.close();
+          printWindow.postMessage({ type: 'vp-failed', nonce: nonce, message: postErr.message }, '*');
+        } finally {
+          window.removeEventListener('message', onViewerMessage);
         }
 
       } catch (err) {
+        window.removeEventListener('message', onViewerMessage);
         status.innerText = "❌ Error: " + err.message;
         status.style.color = "#dc2626";
         btn.disabled = false;

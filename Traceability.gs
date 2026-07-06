@@ -47,14 +47,18 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 
   if (rowIndex === -1) throw new Error("Row lost during update.");
 
-  var consecutivo = Number(sheet.getRange(rowIndex, cols.ConsecutivoImp).getValue()) || 0;
+  // Una sola lectura de la fila completa (en vez de una llamada de servicio por celda) para
+  // minimizar el tiempo que esta operación permanece bajo el LockService de impresión.
+  var rowValues = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+
+  var consecutivo = Number(rowValues[cols.ConsecutivoImp - 1]) || 0;
 
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
 
   var newEntry = consecutivo + "-" + nombreCorto + " " + timestamp + " (" + pagesPrinted + ")";
 
   // Capturar STATUS previo para distinguir impresión Inicial vs Adicional en el historial
-  var prevStatus = sheet.getRange(rowIndex, cols.STATUS).getValue();
+  var prevStatus = rowValues[cols.STATUS - 1];
   prevStatus = prevStatus ? prevStatus.toString().trim() : "";
 
   // Normalizar el tipo para tolerar variantes de acento/caso ('Reimpresión' vs 'Reimpresion')
@@ -63,25 +67,25 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   var etiquetaEvento;
 
   if (esReimpresion) {
-    sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.REIMPRESO);
+    rowValues[cols.STATUS - 1] = VALORES_STATUS.REIMPRESO;
 
     // La reimpresión se registra por separado y NO suma a TotalPags (copias válidas)
-    var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
-    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
+    var currentReimpresion = Number(rowValues[cols.Reimpresion - 1]) || 0;
+    rowValues[cols.Reimpresion - 1] = currentReimpresion + pagesPrinted;
 
-    var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
-    sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry);
+    var currentReimpresoPor = rowValues[cols.ReimpresoPor - 1] || "";
+    rowValues[cols.ReimpresoPor - 1] = currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry;
 
     etiquetaEvento = "REIMPRESIÓN";
   } else {
-    sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.IMPRESO);
+    rowValues[cols.STATUS - 1] = VALORES_STATUS.IMPRESO;
 
     // Impresión inicial y adicional suman a NoPags (copias válidas)
-    var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
+    var currentNoPags = Number(rowValues[cols.NoPags - 1]) || 0;
+    rowValues[cols.NoPags - 1] = currentNoPags + pagesPrinted;
 
-    var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
-    sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry);
+    var currentImpresoPor = rowValues[cols.ImpresoPor - 1] || "";
+    rowValues[cols.ImpresoPor - 1] = currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry;
 
     // Si la orden ya estaba Impresa/Reimpresa, es una impresión ADICIONAL; si no, es la INICIAL
     etiquetaEvento = (prevStatus === VALORES_STATUS.IMPRESO || prevStatus === VALORES_STATUS.REIMPRESO)
@@ -90,8 +94,12 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   }
 
   // TotalPags = copias válidas (Inicial + Adicional). La reimpresión NO suma aquí.
-  var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
-  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags);
+  var finalNoPags = Number(rowValues[cols.NoPags - 1]) || 0;
+  rowValues[cols.TotalPags - 1] = finalNoPags;
+
+  // Una sola escritura de toda la fila con los cambios aplicados (antes eran ~7 llamadas de
+  // servicio, una lectura y una escritura por cada celda individual).
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
 
   // Registrar el evento en el historial consolidado legible (columna HistorialImpresion)
   appendHistorialImpresion_(sheet, rowIndex, headers,

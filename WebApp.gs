@@ -16,22 +16,40 @@
 function doGet(e) {
   var fileId = e.parameter.fileId;
   var action = e.parameter.action;
-  
+  var mode = e.parameter.mode || '';
+
   // Validacion de sesion deshabilitada para visores publicos (Security by Obscurity via fileId)
   // var activeEmail = Session.getActiveUser().getEmail();
   // var userRecord = getUserRecordByEmail_(activeEmail);
-  
+
+  // Modo 'pending': el opener (sidebar) ya tiene los bytes del PDF en memoria y los entrega
+  // por postMessage en cuanto la vista señale que está lista; no requiere fileId todavía
+  // (el guardado en Drive ocurre en paralelo, en segundo plano). Ver ModalVisorPDF.html.
+  if (action === 'secure' && mode === 'pending') {
+    var htmlPending = HtmlService.createTemplateFromFile('ModalVisorPDF');
+    htmlPending.fileId = '';
+    htmlPending.orderNo = e.parameter.orderNo || '';
+    htmlPending.mode = 'pending';
+    htmlPending.nonce = e.parameter.nonce || '';
+    return htmlPending.evaluate()
+      .setTitle('Visor Restringido')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
   // Si action=secure, mostrar visor seguro con PDF.js
   if (action === 'secure' && fileId) {
     var htmlSecure = HtmlService.createTemplateFromFile('ModalVisorPDF');
     htmlSecure.fileId = fileId;
     htmlSecure.orderNo = e.parameter.orderNo || '';
+    htmlSecure.mode = '';
+    htmlSecure.nonce = '';
     return htmlSecure.evaluate()
       .setTitle('Visor Restringido')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
-  
+
   return HtmlService.createHtmlOutput('<h1>Ruta Inválida</h1><p>No se especificó una acción segura.</p>');
 }
 
