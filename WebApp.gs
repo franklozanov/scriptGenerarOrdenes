@@ -37,20 +37,26 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
 
-  // Si action=secure, mostrar visor seguro con PDF.js
-  if (action === 'secure' && fileId) {
-    var htmlSecure = HtmlService.createTemplateFromFile('ModalVisorPDF');
-    htmlSecure.fileId = fileId;
-    htmlSecure.orderNo = e.parameter.orderNo || '';
-    htmlSecure.mode = '';
-    htmlSecure.nonce = '';
-    return htmlSecure.evaluate()
-      .setTitle('Visor Restringido')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
+  try {
+    // Si action=secure, mostrar visor seguro con PDF.js
+    if (action === 'secure' && fileId) {
+      var htmlSecure = HtmlService.createTemplateFromFile('ModalVisorPDF');
+      htmlSecure.fileId = fileId;
+      htmlSecure.orderNo = e.parameter.orderNo || '';
+      htmlSecure.mode = '';
+      htmlSecure.nonce = '';
+      return htmlSecure.evaluate()
+        .setTitle('Visor Restringido')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    }
 
-  return HtmlService.createHtmlOutput('<h1>Ruta Inválida</h1><p>No se especificó una acción segura.</p>');
+    Logger.log("Ruta de visor inválida o incompleta. Parámetros: " + JSON.stringify(e.parameter));
+    return HtmlService.createHtmlOutput('<h1>Solicitud Inválida</h1><p>No se especificó un documento seguro o el enlace está incompleto.</p>');
+  } catch (error) {
+    Logger.log("❌ ERROR CRÍTICO en doGet: " + error.message + "\nStack trace: " + error.stack);
+    return HtmlService.createHtmlOutput('<h1>Error del Sistema</h1><p>Ocurrió un error inesperado al intentar cargar el visor. Por favor, intente nuevamente o contacte soporte técnico.</p>');
+  }
 }
 
 // --- ENDPOINT POST: Operaciones Privilegiadas ---
@@ -78,9 +84,25 @@ function doPost(e) {
     Logger.log("WebApp - Resultado: " + result.status);
     return jsonResponse_(result);
   } catch (error) {
-    Logger.log("Error general en doPost: " + error.message);
-    Logger.log("Stack trace: " + error.stack);
-    return jsonResponse_({ status: 'error', message: error.message, diagnostic: 'INTERNAL_SERVER_ERROR' });
+    var errorContext = "doPost(" + (e && e.postData && e.postData.contents ? "parametros presentes" : "parametros nulos") + ")";
+    Logger.log("❌ ERROR en " + errorContext + ": " + error.message);
+    Logger.log("Pila de ejecución (Stack trace): " + error.stack);
+    
+    // Determinar si es un error de validación que debe mostrarse al usuario (ej. PIN incorrecto)
+    var isValidationError = error.message.indexOf("ACCESO DENEGADO") !== -1 || 
+                            error.message.indexOf("FIRMA INVÁLIDA") !== -1 ||
+                            error.message.indexOf("No pudimos") !== -1;
+                            
+    var displayMessage = isValidationError 
+      ? error.message 
+      : 'Lo sentimos, ha ocurrido un error inesperado al procesar su solicitud en el servidor. Por favor, intente nuevamente más tarde o contacte al administrador.';
+
+    // Mensaje natural para el usuario, detalles técnicos en diagnostic
+    return jsonResponse_({ 
+      status: 'error', 
+      message: displayMessage, 
+      diagnostic: error.message 
+    });
   }
 }
 

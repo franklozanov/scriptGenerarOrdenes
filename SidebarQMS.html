@@ -546,12 +546,34 @@
     // todas las escrituras a hojas/columnas protegidas: impresión, solicitud, aprobación y
     // autorización QA. Devuelve el JSON de respuesta del servidor.
     async function postWebApp(payload) {
-      const res = await fetch(sysData.webAppUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      });
-      return res.json();
+      try {
+        console.log("➡️ Enviando postWebApp [Operación: " + payload.operation + "]");
+        const res = await fetch(sysData.webAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error('Servidor WebApp devolvió código HTTP ' + res.status);
+        
+        const jsonRes = await res.json();
+        
+        if (jsonRes.status === 'error') {
+          console.warn("⚠️ Error devuelto por el servidor [Op: " + payload.operation + "]:", jsonRes.diagnostic || jsonRes.message);
+        } else {
+          console.log("✅ Éxito en postWebApp [Op: " + payload.operation + "]");
+        }
+        
+        return jsonRes;
+        
+      } catch (err) {
+        console.error("❌ Error CRÍTICO de red/ejecución en postWebApp [Op: " + payload.operation + "]:", err);
+        return { 
+          status: 'error', 
+          message: 'Error de conexión con el servidor. Por favor, verifique su red o intente nuevamente más tarde.', 
+          diagnostic: err.message 
+        };
+      }
     }
 
     // ========================================================

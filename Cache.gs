@@ -326,9 +326,9 @@ function getInitialData(includeBase64) {
     return result;
     
   } catch (error) {
-    Logger.log("CRITICAL ERROR in getInitialData: " + error.message);
-    Logger.log("Stack trace: " + error.stack);
-    throw new Error("Error cargando datos iniciales: " + error.message);
+    Logger.log("❌ ERROR CRÍTICO en getInitialData: " + error.message);
+    Logger.log("Pila de ejecución (Stack trace): " + error.stack);
+    throw new Error("No pudimos cargar la configuración inicial del sistema. Es posible que falten permisos o configuraciones base. (Detalle técnico: " + error.message + ")");
   }
 }
 
