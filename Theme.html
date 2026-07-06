@@ -5,6 +5,8 @@
      ============================================================ -->
 
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
   /* === RESET Y BASE === */
   * {
     box-sizing: border-box;
@@ -14,32 +16,34 @@
 
   /* Estilos base para TODOS los modales */
   html, body {
-    font-family: 'Inter', 'Roboto', 'Segoe UI', Tahoma, sans-serif;
-    background-color: #f5f5f5;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #f8fafc;
+    color: #334155;
     width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;  /* Sin scroll en body - cada modal controla su propio scroll */
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
   /* === CONTENEDORES === */
   .container {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
     width: 100%;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   }
 
   .card {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
     position: absolute;
     top: 0;
     left: 0;
@@ -47,26 +51,23 @@
     bottom: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    transition: box-shadow 0.3s ease;
   }
 
   /* === SCROLLBAR PERSONALIZADO === */
   .card::-webkit-scrollbar,
   .container::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
-
   .card::-webkit-scrollbar-track,
   .container::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
+    background: transparent;
   }
-
   .card::-webkit-scrollbar-thumb,
   .container::-webkit-scrollbar-thumb {
     background: #cbd5e1;
-    border-radius: 4px;
+    border-radius: 8px;
   }
-
   .card::-webkit-scrollbar-thumb:hover,
   .container::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
@@ -74,82 +75,79 @@
 
   /* === TIPOGRAFÍA === */
   h1, h2, h3, h4, h5, h6 {
-    color: #1976d2;
-    font-weight: 500;
+    color: #0f172a;
+    font-weight: 600;
   }
-
   h2 {
-    font-size: 20px;
-    margin-bottom: 6px;
+    font-size: 22px;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
   }
-
   .subtitle {
-    color: #666;
-    font-size: 13px;
-    margin-bottom: 16px;
+    color: #64748b;
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.5;
   }
-
   .section-title {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #64748b;
-    margin-bottom: 10px;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 12px;
   }
 
   /* === FORMULARIOS === */
   .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
   }
-
   .form-group label {
     display: block;
-    font-size: 12px;
-    color: #333;
-    margin-bottom: 6px;
+    font-size: 13px;
+    color: #475569;
+    margin-bottom: 8px;
     font-weight: 500;
   }
-
   .form-group input,
   .form-group select,
   .form-group textarea {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 13px;
-    background: white;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #ffffff;
+    color: #1e293b;
+    transition: all 0.2s ease;
+    font-family: inherit;
   }
-
   .form-group textarea {
     resize: vertical;
     min-height: 80px;
+    line-height: 1.5;
   }
-
   .form-group input:focus,
   .form-group select:focus,
   .form-group textarea:focus {
     outline: none;
-    border-color: #1976d2;
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
   }
-
   .form-group input:disabled,
   .form-group select:disabled,
   .form-group textarea:disabled {
-    background-color: #f5f5f5;
+    background-color: #f8fafc;
+    color: #94a3b8;
     cursor: not-allowed;
-    opacity: 0.6;
+    border-color: #f1f5f9;
   }
 
   .form-row {
     display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 16px;
+    margin-bottom: 20px;
   }
-
   .form-row .form-group {
     flex: 1;
     margin-bottom: 0;
@@ -161,30 +159,28 @@
     display: flex;
     align-items: center;
   }
-  
   .password-input-wrapper input {
     width: 100%;
-    padding-right: 40px; /* Espacio para el botón */
+    padding-right: 44px;
   }
-  
   .password-toggle-btn {
     position: absolute;
     right: 8px;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px;
+    padding: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #64748b;
+    color: #94a3b8;
     transition: color 0.2s;
+    border-radius: 4px;
   }
-  
   .password-toggle-btn:hover {
-    color: #1976d2;
+    color: #3b82f6;
+    background-color: #eff6ff;
   }
-  
   .password-toggle-btn svg {
     width: 20px;
     height: 20px;
@@ -194,120 +190,132 @@
   .btn {
     padding: 10px 20px;
     border: none;
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: center;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
-
   .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none !important;
   }
-
   .btn-primary {
-    background-color: #1976d2;
-    color: white;
+    background-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.1);
   }
-
   .btn-primary:hover:not(:disabled) {
-    background-color: #1565c0;
-    box-shadow: 0 2px 4px rgba(25, 118, 210, 0.3);
+    background-color: #1d4ed8;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+    transform: translateY(-1px);
   }
-
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  
   .btn-secondary {
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
   }
-
   .btn-secondary:hover:not(:disabled) {
-    background-color: #e0e0e0;
+    background-color: #e2e8f0;
+    color: #1e293b;
   }
 
   .btn-success {
-    background-color: #4caf50;
+    background-color: #16a34a;
     color: white;
   }
-
   .btn-success:hover:not(:disabled) {
-    background-color: #43a047;
+    background-color: #15803d;
+    box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);
+    transform: translateY(-1px);
   }
 
   .btn-danger {
-    background-color: #f44336;
+    background-color: #ef4444;
     color: white;
   }
-
   .btn-danger:hover:not(:disabled) {
-    background-color: #e53935;
+    background-color: #b91c1c;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);
+    transform: translateY(-1px);
   }
 
   /* === ALERTAS E INFO === */
   .info {
-    background-color: #e3f2fd;
-    border-left: 4px solid #1976d2;
-    padding: 10px 12px;
+    background-color: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px 16px;
     margin-bottom: 16px;
-    font-size: 12px;
-    color: #333;
-    border-radius: 0 4px 4px 0;
+    font-size: 13px;
+    color: #1e293b;
+    border-radius: 4px 8px 8px 4px;
   }
 
   .alert {
     padding: 12px 16px;
-    border-radius: 4px;
+    border-radius: 8px;
     margin-bottom: 16px;
-    font-size: 13px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .alert-success {
-    background-color: #e8f5e9;
-    border-left: 4px solid #4caf50;
-    color: #2e7d32;
+    background-color: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    color: #166534;
   }
 
   .alert-error {
-    background-color: #ffebee;
-    border-left: 4px solid #f44336;
-    color: #c62828;
+    background-color: #fef2f2;
+    border-left: 4px solid #ef4444;
+    color: #991b1b;
   }
 
   .alert-warning {
-    background-color: #fff3e0;
-    border-left: 4px solid #ff9800;
-    color: #e65100;
+    background-color: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
   }
 
   /* === TOAST NOTIFICATIONS === */
   #toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    top: 24px;
+    right: 24px;
     z-index: 9999;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     pointer-events: none;
   }
 
   .toast {
-    background-color: white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-radius: 8px;
-    padding: 12px 16px;
+    background-color: #ffffff;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    padding: 14px 20px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 250px;
-    max-width: 350px;
+    gap: 14px;
+    min-width: 280px;
+    max-width: 380px;
     transform: translateX(120%);
     opacity: 0;
-    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.3s;
+    transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease;
     pointer-events: auto;
-    border-left: 4px solid #1976d2;
+    border-left: 4px solid #3b82f6;
   }
 
   .toast.show {
@@ -315,59 +323,63 @@
     opacity: 1;
   }
 
-  .toast-success { border-left-color: #4caf50; }
-  .toast-error { border-left-color: #f44336; }
-  .toast-warning { border-left-color: #ff9800; }
-  .toast-info { border-left-color: #1976d2; }
+  .toast-success { border-left-color: #22c55e; }
+  .toast-error { border-left-color: #ef4444; }
+  .toast-warning { border-left-color: #f59e0b; }
+  .toast-info { border-left-color: #3b82f6; }
 
-  .toast-icon { font-size: 18px; }
-  .toast-message { font-size: 13px; color: #333; line-height: 1.4; flex: 1; }
+  .toast-icon { font-size: 20px; }
+  .toast-message { font-size: 14px; font-weight: 500; color: #1e293b; line-height: 1.4; flex: 1; }
 
   /* === PIN MODAL === */
   .pin-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(4px);
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    animation: fadeIn 0.2s ease;
+    animation: fadeIn 0.2s ease-out;
   }
 
-  .pin-overlay.fade-out { animation: fadeOut 0.2s ease forwards; }
+  .pin-overlay.fade-out { animation: fadeOut 0.2s ease-in forwards; }
 
   .modern-pin-modal {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    background: #ffffff;
+    padding: 32px;
+    border-radius: 20px;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
     text-align: center;
-    width: 320px;
+    width: 340px;
     max-width: 90%;
+    transform: scale(0.95);
+    animation: scaleIn 0.2s ease-out forwards;
   }
 
-  .modern-pin-modal h3 { margin-top: 0; color: #1e293b; font-size: 18px; margin-bottom: 10px; }
-  .modern-pin-modal p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+  @keyframes scaleIn { to { transform: scale(1); } }
 
-  .pin-inputs-container { display: flex; justify-content: center; gap: 12px; margin-bottom: 24px; }
+  .modern-pin-modal h3 { margin-top: 0; color: #0f172a; font-size: 20px; margin-bottom: 12px; font-weight: 600; }
+  .modern-pin-modal p { color: #64748b; font-size: 15px; margin-bottom: 28px; }
+
+  .pin-inputs-container { display: flex; justify-content: center; gap: 14px; margin-bottom: 28px; }
 
   .modern-pin-input {
-    width: 50px; height: 60px; font-size: 24px; text-align: center;
-    border: 2px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f172a; transition: all 0.2s;
+    width: 54px; height: 64px; font-size: 28px; text-align: center; font-weight: 600;
+    border: 2px solid #e2e8f0; border-radius: 12px; background: #f8fafc; color: #0f172a; transition: all 0.2s ease;
   }
 
   .modern-pin-input:focus {
     outline: none; border-color: #3b82f6; background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
   }
 
   .modern-pin-input::-webkit-outer-spin-button,
   .modern-pin-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
   .pin-actions { display: flex; justify-content: center; }
-  .pin-actions .cancel-btn { width: 100%; padding: 12px; }
+  .pin-actions .cancel-btn { width: 100%; padding: 12px; border-radius: 10px; font-weight: 600; }
 
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
@@ -377,6 +389,7 @@
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -388,8 +401,8 @@
   .pdf-progress-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(4px);
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -402,59 +415,61 @@
     opacity: 0;
   }
   .pdf-progress-card {
-    background: white;
-    padding: 30px;
-    border-radius: 16px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    width: 320px;
+    background: #ffffff;
+    padding: 32px;
+    border-radius: 20px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    width: 340px;
     text-align: center;
+    transform: scale(0.95);
+    animation: scaleIn 0.2s ease-out forwards;
   }
   .pdf-progress-card h3 {
-    margin: 0 0 15px 0;
-    color: #1e293b;
-    font-size: 18px;
+    margin: 0 0 16px 0;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 600;
   }
   .pdf-progress-step {
-    font-size: 14px;
+    font-size: 15px;
     color: #64748b;
-    margin-bottom: 20px;
-    min-height: 40px;
+    margin-bottom: 24px;
+    min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .pdf-progress-bar-bg {
     background: #e2e8f0;
-    height: 8px;
-    border-radius: 4px;
+    height: 10px;
+    border-radius: 5px;
     overflow: hidden;
     position: relative;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
   }
   .pdf-progress-bar-fill {
     background: #3b82f6;
     height: 100%;
     width: 0%;
-    transition: width 0.3s ease;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .pdf-spinner {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     border: 4px solid #f1f5f9;
     border-top: 4px solid #3b82f6;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 20px auto;
+    animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    margin: 0 auto 24px auto;
   }
-  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
+  
   .spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #1976d2;
+    border: 4px solid #f1f5f9;
+    border-top: 4px solid #2563eb;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
+    width: 44px;
+    height: 44px;
+    animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     margin-bottom: 16px;
   }
 
@@ -464,27 +479,24 @@
   }
 
   .loading-text {
-    color: #333;
-    font-size: 14px;
+    color: #1e293b;
+    font-size: 15px;
     font-weight: 500;
   }
-
-  /* === PIN MODAL === */
-
 
   /* === PROGRESS BAR === */
   .progress-container {
     width: 100%;
-    background-color: #f0f0f0;
-    border-radius: 4px;
+    background-color: #f1f5f9;
+    border-radius: 6px;
     overflow: hidden;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
   }
 
   .progress-bar {
-    height: 8px;
-    background-color: #1976d2;
-    transition: width 0.3s ease;
+    height: 10px;
+    background-color: #3b82f6;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* === TABLAS === */

@@ -51,31 +51,36 @@
     }
 
     .rows-container {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     .upload-row {
       display: flex;
-      gap: 10px;
-      align-items: stretch;  /* Cambiar a stretch para altura uniforme */
+      gap: 12px;
+      align-items: stretch;
       width: 100%;
-      margin-bottom: 10px;
-      padding: 12px;
-      background: #fafafa;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      flex-wrap: wrap;  /* Permitir wrap para mensaje de error */
-      overflow: visible;  /* Permitir que los dropdowns se muestren */
+      margin-bottom: 12px;
+      padding: 16px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      flex-wrap: wrap;
+      overflow: visible;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px 0 rgba(0,0,0,0.02);
     }
 
     .upload-row:hover {
-      border-color: #1976d2;
-      background: #f5f9ff;
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      transform: translateY(-1px);
     }
 
     .upload-row.disabled {
       opacity: 0.6;
       pointer-events: none;
+      background: #f1f5f9;
     }
 
     .upload-row select.doc-type-select,
@@ -83,11 +88,12 @@
       flex: 0 0 180px;
       min-width: 180px;
       max-width: 180px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 13px;
-      background: white;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      transition: all 0.2s;
     }
 
     .upload-row select.order-select,
@@ -95,11 +101,21 @@
       flex: 0 0 150px;
       min-width: 150px;
       max-width: 150px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 13px;
-      background: white;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      transition: all 0.2s;
+    }
+
+    .upload-row select.doc-type-select:focus,
+    .upload-row .doc-type-select-input:focus,
+    .upload-row select.order-select:focus,
+    .upload-row .reference-select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
     }
 
     .upload-row .file-input-wrapper {
