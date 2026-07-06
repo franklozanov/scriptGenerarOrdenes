@@ -94,7 +94,7 @@
         
         <div id="tab-print" class="tab-content">
           <div class="section-title">Centro de Impresión</div>
-          <div id="btn-print-order" class="btn-action hidden" onclick="openModal('openPrintDialog')">
+          <div id="btn-print-order" class="btn-action hidden" onclick="openSubView('imprimir-orden')">
             <span class="icon">🖨️</span> Imprimir Orden
           </div>
           <div id="btn-request-reprint" class="btn-action hidden" onclick="openModal('abrirModalSolicitarReimpresion')">
@@ -318,6 +318,63 @@
         </div>
       </div>
 
+      <!-- Vista: Imprimir Orden -->
+      <div id="view-imprimir-orden" class="hidden h-100" style="display:flex; flex-direction:column; height:100%;">
+        <div class="sub-header">
+          <button class="btn-back" onclick="goBackToMain()">🔙</button>
+          <h2 class="sub-title">Imprimir Orden</h2>
+        </div>
+        
+        <div class="view-body" style="flex:1; padding-bottom: 20px;">
+          <div id="imp_preloadBanner" class="hidden" style="padding: 10px; margin-bottom: 12px; border-radius: 6px; font-size: 12px;"></div>
+
+          <div style="margin-bottom: 15px;">
+            <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">No. de Orden</label>
+            <input type="text" id="imp_orderNo" list="imp_ordenesList" class="form-input" autocomplete="off" placeholder="Ej: 8602" style="width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <datalist id="imp_ordenesList"></datalist>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Usuario</label>
+            <input type="text" id="imp_userName" list="imp_usersList" class="form-input" autocomplete="off" placeholder="Su nombre..." style="width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <datalist id="imp_usersList"></datalist>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Tipo de Impresión</label>
+            <select id="imp_printType" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+              <option value="Adicional">Inicial / Adicional</option>
+              <option value="Reimpresion">Reimpresión</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Selección de Plantillas</label>
+            <div id="imp_tplList" style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px; max-height: 200px; overflow-y: auto;"></div>
+          </div>
+
+          <div id="imp_panelSolicitudExtra" class="hidden" style="background:#fef3c7; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+            <div style="font-size: 11px; color: #92400e; margin-bottom: 8px;">
+              ⚠️ Esta orden ya fue impresa. Para reimpresiones o adicionales, envíe una solicitud a QA con las plantillas arriba requeridas.
+            </div>
+            <label style="display:block; font-size: 11px; font-weight: 600; margin-bottom: 2px;">Tipo Solicitud</label>
+            <select id="imp_solicitudTipo" style="width: 100%; font-size: 11px; margin-bottom: 8px;">
+              <option value="Reimpresión">Reimpresión (Daño)</option>
+              <option value="Adicional">Adicional (Proceso)</option>
+            </select>
+            <label style="display:block; font-size: 11px; font-weight: 600; margin-bottom: 2px;">Motivo *</label>
+            <textarea id="imp_solicitudMotivo" rows="2" style="width: 100%; font-size: 11px; resize: none; margin-bottom: 8px; box-sizing: border-box;"></textarea>
+            <button onclick="imp_enviarSolicitudExtra()" style="width: 100%; padding: 8px; background: #d97706; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">📨 Enviar a QA</button>
+          </div>
+
+          <div id="imp_status" style="font-size: 12px; text-align: center; font-weight: 500; margin-bottom: 10px; min-height: 15px;"></div>
+        </div>
+        
+        <div class="bottom-actions">
+           <button id="imp_goBtn" class="btn-primary-small" onclick="imp_run()" disabled>Generar PDF</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -386,6 +443,7 @@
       document.getElementById('view-registro-novedad').classList.add('hidden');
       document.getElementById('view-qa-autorizar').classList.add('hidden');
       document.getElementById('view-qa-impresion').classList.add('hidden');
+      document.getElementById('view-imprimir-orden').classList.add('hidden');
       
       // Mostrar la solicitada
       document.getElementById('view-' + viewId).classList.remove('hidden');
@@ -400,6 +458,7 @@
       if(viewId === 'registro-novedad') nov_initView();
       if(viewId === 'qa-autorizar') qa_initView();
       if(viewId === 'qa-impresion') qai_initView();
+      if(viewId === 'imprimir-orden') imp_initView();
     }
 
     function goBackToMain() {
@@ -1216,6 +1275,391 @@
           showError('Error de comunicación: ' + error.message);
         })
         .procesarAprobacionImpresionQA({ targetIds: selectedIds, accion: accion, pinFirma: pinFirma }, sysData.currentUser.userId);
+    }
+    
+    /* ========================================================
+       MODULO: IMPRESIÓN ORDEN (MIGRADO A SIDEBAR SPA)
+       ======================================================== */
+    let imp_globalTemplates = [];
+    let imp_preloadedStaticPdfs = {}; 
+    let imp_preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; 
+
+    function imp_setBanner(type, message) {
+      const banner = document.getElementById('imp_preloadBanner');
+      if (!message) { banner.classList.add('hidden'); return; }
+      banner.classList.remove('hidden');
+      banner.innerHTML = message;
+      if (type === 'success') { banner.style.background = '#d1e7dd'; banner.style.color = '#0f5132'; }
+      else if (type === 'error') { banner.style.background = '#f8d7da'; banner.style.color = '#842029'; }
+      else { banner.style.background = '#cff4fc'; banner.style.color = '#055160'; }
+    }
+
+    function imp_resetPreload() {
+      imp_preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] };
+      imp_updateBtnState();
+    }
+
+    function imp_initView() {
+      // Cargar pdf-lib dinámicamente si no existe
+      if (typeof PDFLib === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/pdf-lib/dist/pdf-lib.min.js';
+        document.head.appendChild(script);
+      }
+
+      // Evitar recargar si ya hay datos
+      if (imp_globalTemplates.length > 0) return;
+
+      showLoading('Cargando motor de impresión...');
+      
+      // Users list
+      if (sysData && sysData.users) {
+        document.getElementById('imp_usersList').innerHTML = sysData.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
+      }
+
+      // Listeners
+      document.getElementById('imp_userName').addEventListener('input', imp_updateBtnState);
+      const orderInput = document.getElementById('imp_orderNo');
+      const debouncedPreload = debounce((value) => {
+        if (value.trim().length >= 3) imp_preloadOrder(value);
+        else { imp_resetPreload(); imp_setBanner('', ''); }
+      }, 600);
+      
+      orderInput.addEventListener('input', (e) => {
+        if (imp_preloadState.orderNo && imp_preloadState.orderNo !== e.target.value.trim()) {
+          imp_resetPreload(); imp_setBanner('', '');
+        }
+        imp_updateBtnState();
+        debouncedPreload(e.target.value);
+      });
+
+      // Fetch config & orders
+      google.script.run
+        .withSuccessHandler(data => {
+          imp_globalTemplates = data.templates;
+          data.templates.forEach(t => { if (t.base64) imp_preloadedStaticPdfs[t.key] = t.base64; });
+          
+          document.getElementById('imp_tplList').innerHTML = data.templates.map(t => {
+            let defVal = (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") ? "0" : (t.key === "TPL_CONTROLES" ? "2" : "1");
+            const noAccess = t.hasAccess === false;
+            return `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0; border-bottom: 1px solid #eee; ${noAccess ? 'opacity:0.5' : ''}">
+                <span style="font-size:11px; font-weight:500; ${noAccess ? 'color:#dc2626' : ''}">${t.name}</span>
+                <div style="display:flex; align-items:center;">
+                  <button type="button" onclick="imp_dec('${t.key}', ${noAccess})" style="width:24px; height:24px; background:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" ${noAccess?'disabled':''}>-</button>
+                  <input type="text" id="imp_val_${t.key}" value="${defVal}" style="width:30px; height:24px; text-align:center; border:1px solid #ccc; margin:0 4px;" ${noAccess?'disabled':''} oninput="imp_updateBtnState()">
+                  <button type="button" onclick="imp_inc('${t.key}', ${noAccess})" style="width:24px; height:24px; background:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" ${noAccess?'disabled':''}>+</button>
+                </div>
+              </div>
+            `;
+          }).join('');
+          
+          google.script.run.withSuccessHandler(ordenes => {
+            document.getElementById('imp_ordenesList').innerHTML = ordenes.map(o => `<option value="${o.noOrden}">${o.label}</option>`).join('');
+            hideLoading();
+            imp_updateBtnState();
+          }).getOrdenesValidasParaImpresion();
+          
+        })
+        .withFailureHandler(e => { hideLoading(); showError(e.message); })
+        .getInitialData();
+    }
+
+    function imp_dec(key, noAccess) {
+      if(noAccess) return;
+      const input = document.getElementById('imp_val_' + key);
+      let val = parseInt(input.value) || 0;
+      if(val > 0) input.value = val - 1;
+      imp_updateBtnState();
+    }
+    
+    function imp_inc(key, noAccess) {
+      if(noAccess) return;
+      const input = document.getElementById('imp_val_' + key);
+      let val = parseInt(input.value) || 0;
+      if(val < 99) input.value = val + 1;
+      imp_updateBtnState();
+    }
+
+    function imp_updateBtnState() {
+      const btn = document.getElementById('imp_goBtn');
+      const order = document.getElementById('imp_orderNo').value.trim();
+      const user = document.getElementById('imp_userName').value.trim();
+      
+      const isReady = (imp_preloadState.orderNo === order && imp_preloadState.status === 'ready');
+      const isValidUser = sysData && sysData.users && sysData.users.some(u => u.nombreCompleto === user);
+      
+      let hasCopies = false;
+      imp_globalTemplates.forEach(t => {
+        const inp = document.getElementById('imp_val_' + t.key);
+        if (inp && parseInt(inp.value) > 0) hasCopies = true;
+      });
+
+      btn.disabled = !(isReady && isValidUser && hasCopies);
+    }
+
+    function imp_preloadOrder(orderNo) {
+      if (imp_preloadState.status === 'loading' && imp_preloadState.orderNo === orderNo) return;
+      if (imp_preloadState.orderNo === orderNo && imp_preloadState.status === 'ready') return;
+      
+      imp_preloadState.orderNo = orderNo;
+      imp_preloadState.status = 'loading';
+      imp_preloadState.pdfsByKey = {};
+      imp_updateBtnState();
+      
+      imp_setBanner('info', '🔍 Buscando documentos...');
+      
+      google.script.run
+        .withSuccessHandler(res => {
+          if (document.getElementById('imp_orderNo').value.trim() !== orderNo) return;
+          
+          imp_preloadState.status = res.ready ? 'ready' : 'error';
+          imp_preloadState.data = res;
+          imp_preloadState.pdfsByKey = {};
+          (res.pdfs || []).forEach(p => imp_preloadState.pdfsByKey[p.key] = p);
+          
+          if (res.ready) imp_setBanner('success', '✅ Documentos listos para impresión.');
+          else imp_setBanner('error', (res.errors || []).map(e => '⚠️ '+e.message).join('<br>'));
+          
+          const goBtn = document.getElementById('imp_goBtn');
+          const panelExtra = document.getElementById('imp_panelSolicitudExtra');
+          
+          if (res.approvedRequest && res.approvedRequest.id) {
+            goBtn.classList.remove('hidden');
+            panelExtra.classList.add('hidden');
+            imp_setBanner('success', '✅ Solicitud Aprobada. Puede imprimir.');
+            
+            // Set copies to 0, then inject approved copies
+            imp_globalTemplates.forEach(t => {
+              const inp = document.getElementById('imp_val_' + t.key);
+              if (inp) { inp.value = 0; inp.disabled = true; }
+            });
+            try {
+              JSON.parse(res.approvedRequest.plantillas).forEach(t => {
+                const inp = document.getElementById('imp_val_' + t.key);
+                if (inp && t.copies > 0) inp.value = t.copies;
+              });
+            } catch(e) {}
+          } else if (res.orderStatus === 'Impreso' || res.orderStatus === 'Reimpreso') {
+            goBtn.classList.add('hidden');
+            panelExtra.classList.remove('hidden');
+          } else {
+            goBtn.classList.remove('hidden');
+            panelExtra.classList.add('hidden');
+          }
+          imp_updateBtnState();
+        })
+        .withFailureHandler(err => {
+          imp_preloadState.status = 'error';
+          imp_setBanner('error', '⚠️ ' + err.message);
+          imp_updateBtnState();
+        })
+        .fetchOrderData(orderNo);
+    }
+
+    async function imp_run() {
+      const orderNo = document.getElementById('imp_orderNo').value.trim();
+      const userName = document.getElementById('imp_userName').value.trim();
+      const printType = document.getElementById('imp_printType').value;
+      const status = document.getElementById('imp_status');
+      const btn = document.getElementById('imp_goBtn');
+      
+      const config = imp_globalTemplates.map(t => ({
+        key: t.key, fileId: t.fileId, hasAccess: t.hasAccess,
+        copies: parseInt(document.getElementById('imp_val_' + t.key).value) || 0
+      })).filter(c => c.copies > 0);
+      
+      const userObj = sysData.users.find(u => u.nombreCompleto === userName);
+      const userId = userObj ? userObj.userId : null;
+      
+      if (!userId) return showError("Usuario no válido.");
+      
+      btn.disabled = true;
+      status.innerText = "⏳ Generando PDF (Puede tardar unos segundos)...";
+      status.style.color = "#1a73e8";
+
+      try {
+        const payload = { formData: imp_preloadState.data.formData, coords: imp_preloadState.data.coords, pdfs: [] };
+        config.forEach(cfg => {
+          if (cfg.key === "DOC_ORDENES" || cfg.key === "DOC_ANALISIS") {
+            payload.pdfs.push({ key: cfg.key, base64: imp_preloadState.pdfsByKey[cfg.key].base64, copies: cfg.copies });
+          }
+        });
+
+        // MERGE STATIC
+        const finalPdfs = [];
+        config.forEach(cfg => {
+          if (["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"].includes(cfg.key)) {
+            if (imp_preloadedStaticPdfs[cfg.key]) finalPdfs.push({ key: cfg.key, base64: imp_preloadedStaticPdfs[cfg.key], copies: cfg.copies });
+          } else {
+            const dynamic = payload.pdfs.find(p => p.key === cfg.key);
+            if (dynamic) finalPdfs.push(dynamic);
+          }
+        });
+        payload.pdfs = finalPdfs;
+
+        const { PDFDocument, rgb, degrees } = PDFLib;
+        const finalPdf = await PDFDocument.create();
+        let totalPages = 0;
+        const now = new Date();
+        const formattedDate = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        
+        for (let i = 0; i < payload.pdfs.length; i++) {
+          const item = payload.pdfs[i];
+          status.innerText = `⏳ Procesando ${item.key}...`;
+          await new Promise(r => setTimeout(r, 10)); // yield
+          
+          const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
+          for (let c = 0; c < item.copies; c++) {
+            const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+            if (item.key === "DOC_ORDENES") {
+              const firstPage = doc.getPages()[0];
+              Object.keys(payload.coords).forEach(k => {
+                firstPage.drawText(payload.formData[k]||"", { x: payload.coords[k].x, y: payload.coords[k].y, size: 10, color: rgb(0,0,0) });
+              });
+            } else if (item.key !== "DOC_ANALISIS") {
+              try {
+                const form = doc.getForm();
+                Object.keys(payload.formData).forEach(k => { try { form.getTextField(k).setText(payload.formData[k]); } catch(e){} });
+              } catch(e) {}
+            }
+            
+            const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
+            copied.forEach(p => finalPdf.addPage(p));
+            totalPages += copied.length;
+            
+            if (copied.length % 2 !== 0) {
+              const blankPage = finalPdf.addPage([612, 792]);
+              blankPage.drawText("Página en blanco", { x: 250, y: 396, size: 11, color: rgb(0.5,0.5,0.5) });
+              totalPages++;
+            }
+          }
+        }
+        
+        const allPages = finalPdf.getPages();
+        status.innerText = `⏳ Añadiendo pie de página...`;
+        await new Promise(r => setTimeout(r, 10));
+        
+        for (let pIdx = 0; pIdx < allPages.length; pIdx++) {
+          const p = allPages[pIdx];
+          let { width, height } = p.getSize();
+          let currentRotation = p.getRotation().angle || 0;
+          if (width > height) {
+            currentRotation = (currentRotation + 90) % 360;
+            p.setRotation(degrees(currentRotation));
+            [width, height] = [height, width];
+          }
+          const nombreParaPie = userName.includes(" - ") ? userName.split(" - ")[1].trim() : userName;
+          const footerLeftText = `Impreso por: ${nombreParaPie} el ${formattedDate}   |   No. Orden: ${orderNo}`;
+          const footerRightText = "Pág. ____ de ____";
+          
+          let lX = 35, lY = 20, tRot = 0;
+          let normAngle = ((currentRotation % 360) + 360) % 360;
+          if (normAngle === 90) { lX = height - 20; lY = 35; tRot = 90; }
+          else if (normAngle === 180) { lX = height - 35; lY = width - 20; tRot = 180; }
+          else if (normAngle === 270) { lX = 20; lY = width - 35; tRot = 270; }
+          
+          p.drawText(footerLeftText, { x: lX, y: lY, size: 8, rotate: degrees(tRot), color: rgb(0,0,0) });
+        }
+        
+        try { finalPdf.getForm().flatten(); } catch(e) {}
+        
+        status.innerText = "⏳ Guardando PDF optimizado...";
+        await new Promise(r => setTimeout(r, 10));
+        
+        const pdfData = await finalPdf.save({ useObjectStreams: true });
+        
+        // Convert to Base64 (Manual without buffer for browser)
+        const chunkSize = 0x8000;
+        let binary = '';
+        for (let i = 0; i < pdfData.length; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, pdfData.subarray(i, i + chunkSize));
+        }
+        const finalBase64 = btoa(binary);
+        
+        status.innerText = "☁️ Subiendo a Drive...";
+        
+        google.script.run
+          .withSuccessHandler(res => {
+            status.innerText = "✅ Listo. Abriendo visor...";
+            status.style.color = "#0f5132";
+            btn.disabled = false;
+            
+            // Log post-guardado y trazabilidad (en paralelo)
+            google.script.run.finalizeFinalPdfForUser(orderNo, res.fileId, res.archivoReemplazado, userId);
+            google.script.run.updateTraceabilityForUser(orderNo, userId, totalPages, printType);
+            
+            // ABRIR EL VISOR PDF EN EL MISMO NAVEGADOR!
+            if (res.viewerUrl) {
+               window.open(res.viewerUrl, '_blank');
+            } else {
+               window.open('https://drive.google.com/file/d/' + res.fileId + '/view', '_blank');
+            }
+            
+            // Limpiar form
+            document.getElementById('imp_orderNo').value = '';
+            imp_resetPreload();
+            imp_setBanner('', '');
+          })
+          .withFailureHandler(err => {
+            status.innerText = "❌ Error: " + err.message;
+            status.style.color = "#dc2626";
+            btn.disabled = false;
+          })
+          .saveFinalUnifiedPDFForUser(finalBase64, orderNo, userId);
+        
+      } catch (err) {
+        status.innerText = "❌ Error: " + err.message;
+        status.style.color = "#dc2626";
+        btn.disabled = false;
+      }
+    }
+
+    async function imp_enviarSolicitudExtra() {
+      const orderNo = document.getElementById('imp_orderNo').value.trim();
+      const userName = document.getElementById('imp_userName').value.trim();
+      const tipo = document.getElementById('imp_solicitudTipo').value;
+      const motivo = document.getElementById('imp_solicitudMotivo').value.trim();
+      
+      if (!motivo) return showToast("El motivo es obligatorio.", 'error');
+      
+      const config = imp_globalTemplates.map(t => ({
+        key: t.key, fileId: t.fileId, hasAccess: t.hasAccess, name: t.name,
+        copies: parseInt(document.getElementById('imp_val_' + t.key).value) || 0
+      })).filter(c => c.copies > 0);
+      
+      if (config.length === 0) return showToast("Seleccione al menos 1 copia.", 'error');
+      
+      const userObj = sysData.users.find(u => u.nombreCompleto === userName);
+      if (!userObj) return showToast("Usuario no válido.", 'error');
+      
+      try {
+        const pin = await promptSecurityPin("PIN para solicitar reimpresión:");
+        showLoading("Enviando solicitud a QA...");
+        google.script.run
+          .withSuccessHandler(res => {
+            hideLoading();
+            if (res.status === 'success') {
+              showToast("Solicitud enviada a QA", "success");
+              document.getElementById('imp_orderNo').value = '';
+              imp_resetPreload();
+            } else {
+              showError(res.message);
+            }
+          })
+          .withFailureHandler(e => { hideLoading(); showError(e.message); })
+          .registrarSolicitudImpresion({
+            orderNo: orderNo,
+            solicitadoPor: userObj.nombreCompleto,
+            tipoSolicitud: tipo,
+            motivo: motivo,
+            plantillasJSON: JSON.stringify(config),
+            plantillasResumen: config.map(c => `${c.copies}x ${c.name}`).join(', '),
+            pinFirma: pin
+          }, userObj.userId);
+      } catch (e) {
+        showToast(e.message, 'warning');
+      }
     }
   </script>
 </body>
