@@ -462,7 +462,7 @@
           document.getElementById("loading-overlay").classList.add("hidden");
         })
         .withFailureHandler(function(err) {
-          alert("Error: " + err.message);
+          showAlert("Error de carga inicial: " + err.message, "error");
           document.getElementById("loading-overlay").classList.add("hidden");
         })
         .getInitialData(false);
@@ -524,8 +524,12 @@
       return res.json();
     }
 
-    function ejecutarInicializacion() {
-      if (!confirm('¿Inicializar el sistema? Se validarán hojas, columnas, permisos y protecciones. Puede aparecer un resumen sobre la hoja de cálculo.')) return;
+    // ========================================================
+    // Configuración y Botones Simples
+    async function ejecutarInicializacion() {
+      const confirmado = await showConfirm('Inicializar Sistema', '¿Inicializar el sistema? Se validarán hojas, columnas, permisos y protecciones. Puede aparecer un resumen sobre la hoja de cálculo.');
+      if (!confirmado) return;
+      
       var btn = document.getElementById('btn-init-system');
       if (btn) btn.disabled = true;
       showToast('Inicializando sistema...', 'success');
@@ -730,7 +734,7 @@
         .withSuccessHandler(function() { document.getElementById("loading-overlay").classList.add("hidden"); })
         .withFailureHandler(function(err) {
           document.getElementById("loading-overlay").classList.add("hidden");
-          alert("Error al abrir: " + err.message);
+          showAlert("Error al abrir: " + err.message, "error");
         })[actionName]();
     }
 
@@ -1221,7 +1225,8 @@
          try {
            let res = await up_doUploadRequest(t, userId, false);
            if(res.status === 'exists') {
-              if(confirm(`El archivo ${res.fileName} ya existe. ¿Deseas sobreescribirlo?`)) {
+              const overwrite = await showConfirm('Archivo Existente', `El archivo ${res.fileName} ya existe. ¿Deseas sobreescribirlo?`);
+              if(overwrite) {
                  res = await up_doUploadRequest(t, userId, true);
               } else {
                  res = await up_doUploadRequest(t, userId, 'skipUpload');
@@ -1533,7 +1538,7 @@
       const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-noorden'));
 
       if (selectedIds.length === 0) {
-        showToast('Seleccione al menos una orden.', 'warning');
+        showToast('Seleccione al menos una orden para autorizar', 'warning');
         return;
       }
 
@@ -1552,23 +1557,19 @@
         const resumen = ordenesConAlerta
           .map(o => `• ${o.noOrden}: ${o.decision}`)
           .join('\n');
-        const confirmado = confirm(
-          '\u26A0\uFE0F Alerta del Sistema\n\n' +
-          'Las siguientes órdenes presentan discrepancias con la Matriz K:\n\n' +
-          resumen + '\n\n' +
-          '¿Desea autorizar estas órdenes BAJO SU RESPONSABILIDAD?\n' +
-          '(Esta acción quedará registrada en el historial de trazabilidad)'
+        const confirmado = await showConfirm('Alerta de Matriz K',
+          'Las siguientes órdenes presentan discrepancias:\n\n' + resumen + '\n\n' +
+          '¿Desea autorizar BAJO SU RESPONSABILIDAD?'
         );
-        if (!confirmado) {
-          showToast('Autorización cancelada.', 'warning');
-          return;
-        }
+        if (!confirmado) return;
       }
-      // ────────────────────────────────────────────────────────────────────
+      
+      const confirmado = await showConfirm('Autorización QA', "¿Autorizar de forma final " + selectedIds.length + " órdenes seleccionadas?");
+      if (!confirmado) return;
 
       let pinFirma;
       try {
-        pinFirma = await promptSecurityPin('Ingrese PIN para autorizar ' + selectedIds.length + ' orden(es):');
+        pinFirma = await promptSecurityPin('Ingrese PIN para autorizar:');
       } catch (e) {
         showToast(e.message, 'warning');
         return;
@@ -1599,31 +1600,27 @@
 
     // ── Edición In Situ + Re-validación (Fase 4) ────────────────────────
     async function qa_abrirEdicionOrden(noOrden) {
-      const orden = qa_ordenes.find(o => o.noOrden === noOrden);
-      if (!orden) { showToast('Orden no encontrada.', 'warning'); return; }
+      const rowData = qa_ordenes.find(o => o.noOrden === noOrden);
+      if (!rowData) { showToast('Orden no encontrada.', 'warning'); return; }
 
-      // Modal sencillo usando prompt nativo (se puede mejorar a Swal en versiones futuras)
-      const nuevoNoAnalisis = prompt(
-        '\u270F\uFE0F Editar Orden: ' + noOrden + '\n\n' +
-        'No Análisis K actual: ' + (orden.noAnalisis || '(vacío)') + '\n\n' +
-        'Ingrese el nuevo No Análisis K (o deje igual y presione OK para re-validar):',
-        orden.noAnalisis || ''
-      );
-      if (nuevoNoAnalisis === null) return; // Cancelado
+      const nuevoNoAnalisis = await showPrompt('Reemplazar Análisis K', "Reemplazar Análisis K para orden " + rowData.noOrden + "\nAntiguo: " + (rowData.noAnalisis || ""), rowData.noAnalisis || "");
+      if (nuevoNoAnalisis === null) return; // cancelado
+      if (nuevoNoAnalisis.trim() === rowData.noAnalisis) {
+        showToast('No hubo cambios.', 'info');
+        return;
+      }
 
       showLoading('Re-validando contra Matriz K...');
       try {
-        // Si cambió el No Análisis, primero guardar el dato actualizado
-        if (nuevoNoAnalisis.trim() !== (orden.noAnalisis || '').trim()) {
-          await postWebApp({
-            operation:    'actualizarCampoOrden',
-            noOrden:      noOrden,
-            campo:        'NoAnalisis',
-            nuevoValor:   nuevoNoAnalisis.trim(),
-            userId:       sysData.currentUser.userId
-          });
-          orden.noAnalisis = nuevoNoAnalisis.trim();
-        }
+        // Guardar dato actualizado
+        await postWebApp({
+          operation:    'actualizarCampoOrden',
+          noOrden:      noOrden,
+          campo:        'NoAnalisis',
+          nuevoValor:   nuevoNoAnalisis.trim(),
+          userId:       sysData.currentUser.userId
+        });
+        rowData.noAnalisis = nuevoNoAnalisis.trim();
 
         // Disparar re-validación
         const resultado = await postWebApp({
@@ -1634,7 +1631,7 @@
         hideLoading();
 
         if (resultado.ok) {
-          orden.decision = resultado.decision;
+          rowData.decision = resultado.decision;
           qa_renderCards();
           const msg = resultado.decision === 'OK, Generar orden'
             ? '\u2705 Re-validación exitosa: ' + resultado.decision

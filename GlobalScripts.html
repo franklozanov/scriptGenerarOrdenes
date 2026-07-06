@@ -4,7 +4,92 @@
      FASE 6: Design System
      ============================================================ -->
 
+<!-- MODAL CUSTOM: Confirm / Prompt -->
+<div id="custom-modal-overlay" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.6); z-index:9999; display:flex; justify-content:center; align-items:center; backdrop-filter: blur(2px); transition: opacity 0.2s;">
+  <div style="background:white; border-radius:12px; padding:24px; width:85%; max-width:320px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);">
+    <h3 id="custom-modal-title" style="margin:0 0 12px 0; font-size:16px; font-weight:600; color:#0f172a;">Título</h3>
+    <p id="custom-modal-message" style="margin:0 0 20px 0; font-size:13px; color:#475569; line-height:1.5;">Mensaje</p>
+    <input type="text" id="custom-modal-input" class="form-input" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:20px; display:none; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; outline:none;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#cbd5e1'">
+    <div style="display:flex; justify-content:flex-end; gap:12px;">
+      <button id="custom-modal-cancel" style="padding:8px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; transition:background 0.2s;">Cancelar</button>
+      <button id="custom-modal-ok" style="padding:8px 16px; background:#2563eb; color:white; border:none; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; transition:background 0.2s;">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <script>
+  /**
+   * Muestra un modal de confirmación HTML
+   * @param {string} title - Título del modal
+   * @param {string} message - Mensaje
+   * @returns {Promise<boolean>} True si Aceptar, False si Cancelar
+   */
+  function showConfirm(title, message) {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('custom-modal-overlay');
+      document.getElementById('custom-modal-title').innerText = title;
+      document.getElementById('custom-modal-message').innerText = message;
+      document.getElementById('custom-modal-input').style.display = 'none';
+      
+      const btnOk = document.getElementById('custom-modal-ok');
+      const btnCancel = document.getElementById('custom-modal-cancel');
+      
+      // Estilo de botones
+      btnOk.innerText = 'Aceptar';
+      btnOk.style.background = '#2563eb';
+      btnCancel.style.display = 'inline-block';
+
+      const cleanup = () => {
+        overlay.classList.add('hidden');
+        btnOk.onclick = null;
+        btnCancel.onclick = null;
+      };
+
+      btnOk.onclick = () => { cleanup(); resolve(true); };
+      btnCancel.onclick = () => { cleanup(); resolve(false); };
+      
+      overlay.classList.remove('hidden');
+    });
+  }
+
+  /**
+   * Muestra un modal tipo Prompt HTML
+   * @param {string} title - Título del modal
+   * @param {string} message - Mensaje
+   * @param {string} defaultValue - Valor por defecto
+   * @returns {Promise<string|null>} Valor ingresado o null si cancela
+   */
+  function showPrompt(title, message, defaultValue = '') {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('custom-modal-overlay');
+      document.getElementById('custom-modal-title').innerText = title;
+      document.getElementById('custom-modal-message').innerText = message;
+      
+      const inputEl = document.getElementById('custom-modal-input');
+      inputEl.style.display = 'block';
+      inputEl.value = defaultValue;
+      
+      const btnOk = document.getElementById('custom-modal-ok');
+      const btnCancel = document.getElementById('custom-modal-cancel');
+      
+      // Estilo de botones
+      btnOk.innerText = 'Aceptar';
+      btnOk.style.background = '#2563eb';
+      btnCancel.style.display = 'inline-block';
+
+      const cleanup = () => {
+        overlay.classList.add('hidden');
+        btnOk.onclick = null;
+        btnCancel.onclick = null;
+      };
+
+      btnOk.onclick = () => { cleanup(); resolve(inputEl.value); };
+      btnCancel.onclick = () => { cleanup(); resolve(null); };
+      
+      overlay.classList.remove('hidden');
+      inputEl.focus();
+    });
+  }
   // === CONTEXTO GLOBAL DE LA APLICACIÓN (QMS) ===
   window.QMSContext = {
     users: null,
