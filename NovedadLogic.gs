@@ -425,6 +425,13 @@ function procesarCargaOrdenesMasivas(params, userId) {
     var colStatus = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
     var colSolicitadaPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'SolicitadaPor', false);
 
+    // Columnas de validación de Matriz K (Fase 2)
+    var colVerifLote     = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'VerifLote', false);
+    var colVerifCant     = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'VerifCant. Disponible', false);
+    var colVerifExp      = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'VerifExp', false);
+    var colCantDispAFecha = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'CantDispAFecha', false);
+    var colDecision      = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Decision', false);
+
     if (!colNoOrden || !colCodigo) {
       return { status: 'error', message: 'No se encontraron las columnas requeridas (NoOrden, Codigo) en la hoja Ordenes.' };
     }
@@ -433,27 +440,63 @@ function procesarCargaOrdenesMasivas(params, userId) {
     var newRows = [];
     var lastRow = sheetOrdenes.getLastRow();
     var startRow = lastRow > 0 ? lastRow + 1 : 2;
+    var ordenesConAlerta = [];
 
     // Procesar cada registro
-    var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
-    
+    var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
     records.forEach(function(record) {
       var row = new Array(numColumns).fill('');
-      
+
       // Variables para rastrear estado de carga de documentos
       var oaCargado = false;
       var coaCargado = false;
 
       // Mapear valores del registro a las columnas correctas
-      if (colProceso) row[colProceso - 1] = record.Proceso || '';
-      if (colCodigo) row[colCodigo - 1] = record.Codigo || '';
-      if (colDescripcion) row[colDescripcion - 1] = record.Descripcion || '';
-      if (colLote) row[colLote - 1] = record.Lote || '';
-      if (colExp) row[colExp - 1] = record.Exp || '';
-      if (colCantidad) row[colCantidad - 1] = record.Cantidad || 0;
-      if (colNoAnalisis) row[colNoAnalisis - 1] = record.NoAnalisis || '';
-      if (colNoOrden) row[colNoOrden - 1] = record.NoOrden || '';
-      
+      if (colProceso)     row[colProceso - 1]     = record.Proceso     || '';
+      if (colCodigo)      row[colCodigo - 1]       = record.Codigo      || '';
+      if (colDescripcion) row[colDescripcion - 1]  = record.Descripcion || '';
+      if (colLote)        row[colLote - 1]         = record.Lote        || '';
+      if (colExp)         row[colExp - 1]          = record.Exp         || '';
+      if (colCantidad)    row[colCantidad - 1]     = record.Cantidad    || 0;
+      if (colNoAnalisis)  row[colNoAnalisis - 1]   = record.NoAnalisis  || '';
+      if (colNoOrden)     row[colNoOrden - 1]      = record.NoOrden     || '';
+
+      // ─── VALIDACIÓN CONTRA MATRIZ K (Fase 2) ──────────────────────
+      var noAnalisisK = (record.NoAnalisis || '').toString().trim();
+      if (noAnalisisK) {
+        try {
+          var datosOrdenParaValidar = {
+            lote:     (record.Lote     || '').toString().trim(),
+            cantidad: parseFloat((record.Cantidad || 0).toString()) || 0,
+            exp:      record.Exp || ''
+          };
+          var resultadoValidacion = validarNoAnalisisContraMatrices(noAnalisisK, datosOrdenParaValidar);
+
+          if (colVerifLote)      row[colVerifLote - 1]      = resultadoValidacion.verifLote;
+          if (colVerifCant)      row[colVerifCant - 1]      = resultadoValidacion.verifCantDisponible;
+          if (colVerifExp)       row[colVerifExp - 1]       = resultadoValidacion.verifExp;
+          if (colCantDispAFecha) row[colCantDispAFecha - 1] = resultadoValidacion.cantDispAFecha;
+          if (colDecision)       row[colDecision - 1]       = resultadoValidacion.decision;
+          // Fabricante viene de la Matriz K, no del Excel del usuario
+          if (colFabricante)     row[colFabricante - 1]     = resultadoValidacion.fabricante;
+
+          if (resultadoValidacion.decision !== VALORES_DECISION.OK) {
+            ordenesConAlerta.push({
+              noOrden:  record.NoOrden,
+              decision: resultadoValidacion.decision,
+              alertas:  resultadoValidacion.alertas
+            });
+          }
+        } catch (eVal) {
+          Logger.log('procesarCargaOrdenesMasivas: Error en validación de ' + record.NoOrden + ': ' + eVal.message);
+          if (colDecision) row[colDecision - 1] = VALORES_DECISION.NO_ENCONTRADO;
+        }
+      } else {
+        if (colDecision) row[colDecision - 1] = VALORES_DECISION.NO_ENCONTRADO;
+      }
+      // ─────────────────────────────────────────────────────────────
+
       // Procesar archivo OA si viene
       if (record.fileOABase64 && folderDocOrdenes) {
         try {
@@ -462,17 +505,14 @@ function procesarCargaOrdenesMasivas(params, userId) {
           folderDocOrdenes.createFile(blobOA);
           row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.CARGADO;
           oaCargado = true;
-          Logger.log("Archivo OA guardado para orden: " + record.NoOrden);
         } catch (e) {
-          Logger.log("ERROR al guardar archivo OA para orden " + record.NoOrden + ": " + e.message);
+          Logger.log('ERROR al guardar archivo OA para orden ' + record.NoOrden + ': ' + e.message);
           row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
-          oaCargado = false;
         }
       } else {
         row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
-        oaCargado = false;
       }
-      
+
       // Procesar archivo COA si viene
       if (record.fileCOABase64 && folderDocAnalisis) {
         try {
@@ -481,34 +521,24 @@ function procesarCargaOrdenesMasivas(params, userId) {
           folderDocAnalisis.createFile(blobCOA);
           row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.CARGADO;
           coaCargado = true;
-          Logger.log("Archivo COA guardado para orden: " + record.NoOrden);
         } catch (e) {
-          Logger.log("ERROR al guardar archivo COA para orden " + record.NoOrden + ": " + e.message);
+          Logger.log('ERROR al guardar archivo COA para orden ' + record.NoOrden + ': ' + e.message);
           row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
-          coaCargado = false;
         }
       } else {
         row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
-        coaCargado = false;
       }
-      
+
       // Calcular EstadoCarga dinámicamente
-      if (oaCargado && coaCargado) {
-        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.CARGADOS;
-      } else if (oaCargado && !coaCargado) {
-        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_COA;
-      } else if (!oaCargado && coaCargado) {
-        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_OA;
-      } else {
-        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
-      }
-      
-      // Valores por defecto para columnas no proporcionadas
-      if (colFabricante) row[colFabricante - 1] = '';
+      if (oaCargado && coaCargado)        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.CARGADOS;
+      else if (oaCargado && !coaCargado)  row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_COA;
+      else if (!oaCargado && coaCargado)  row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_OA;
+      else                                row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
+
       if (colConsecutivoImp) row[colConsecutivoImp - 1] = '';
-      if (colImpresoPor) row[colImpresoPor - 1] = '';
-      if (colStatus) row[colStatus - 1] = 'Solicitada';
-      if (colSolicitadaPor) row[colSolicitadaPor - 1] = (nombreCorto || userId) + " | " + timestamp;
+      if (colImpresoPor)     row[colImpresoPor - 1]     = '';
+      if (colStatus)         row[colStatus - 1]         = 'Solicitada';
+      if (colSolicitadaPor)  row[colSolicitadaPor - 1]  = (nombreCorto || userId) + ' | ' + timestamp;
 
       newRows.push(row);
     });
@@ -526,10 +556,14 @@ function procesarCargaOrdenesMasivas(params, userId) {
 
     return {
       status: 'success',
-      message: 'Se cargaron exitosamente ' + newRows.length + ' órdenes en la hoja Ordenes.',
+      message: 'Se cargaron exitosamente ' + newRows.length + ' órdenes en la hoja Ordenes.' +
+        (ordenesConAlerta.length > 0
+          ? ' ⚠️ ' + ordenesConAlerta.length + ' orden(es) con discrepancias en Matriz K.'
+          : ''),
       data: {
-        rowsInserted: newRows.length,
-        insertedBy: nombreCorto
+        rowsInserted:      newRows.length,
+        insertedBy:        nombreCorto,
+        ordenesConAlerta:  ordenesConAlerta  // Array de { noOrden, decision, alertas[] }
       }
     };
 

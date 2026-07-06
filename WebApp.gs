@@ -176,6 +176,43 @@ function handlePrivilegedOperation_(params) {
     return procesarCargaOrdenesMasivas(params, callingUserId);
   }
 
+  if (operation === 'revalidarOrden') {
+    if (!hasPermission(callingUserId, PERMISOS.AUTORIZAR_QA) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
+      return { status: 'error', message: 'No tiene permisos para re-validar órdenes.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.noOrden) {
+      return { status: 'error', message: 'Falta el parámetro noOrden.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return revalidarOrden(params.noOrden, callingUserId);
+  }
+
+  if (operation === 'getMatricesConfig') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
+      return { status: 'error', message: 'No tiene permisos para ver la configuración de matrices.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    return { status: 'success', data: getMatricesConfig() };
+  }
+
+  if (operation === 'guardarMatrizConfig') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
+      return { status: 'error', message: 'No tiene permisos para modificar matrices.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.config) {
+      return { status: 'error', message: 'Falta el parámetro config.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return guardarMatrizConfig(params.config, params.rowIndex || null);
+  }
+
+  if (operation === 'eliminarMatrizConfig') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
+      return { status: 'error', message: 'Solo un administrador puede eliminar matrices.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.rowIndex) {
+      return { status: 'error', message: 'Falta el parámetro rowIndex.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return eliminarMatrizConfig(params.rowIndex);
+  }
+
   if (operation === 'autorizarOrdenesQA') {
     if (!hasPermission(callingUserId, PERMISOS.AUTORIZAR_QA)) {
       return { status: 'error', message: 'No tiene permisos para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };

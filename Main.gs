@@ -124,7 +124,8 @@ function onOpenMain(email) {
   // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();
-    syncVerifCantDisponible();
+    // syncVerifCantDisponible() OBSOLETO: el snapshot de CantDispAFecha
+    // ahora se captura en el backend al crear la orden (Fase 3 MatrixValidation).
     hideUnauthorizedSheets_();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Use "Gestionar OA → 🎛️ Abrir Panel Principal QMS" para gestionar las órdenes.', 'Sistema QMS', 7);
   } catch (e) {
@@ -132,81 +133,14 @@ function onOpenMain(email) {
   }
 }
 
-// --- SINCRONIZACIÓN DE DATOS ---
-
 /**
- * Sincroniza valores de VerifCant. Disponible a CantDispAFecha al abrir la hoja.
- * Solo actualiza si VerifCant. Disponible tiene un número >= 0 y es diferente a CantDispAFecha.
+ * @deprecated Fase 3: Esta función fue reemplazada por el motor de validación backend
+ * (MatrixValidation.gs → validarNoAnalisisContraMatrices). El snapshot de CantDispAFecha
+ * ahora se escribe en el momento exacto de la carga masiva de órdenes. Esta función
+ * se mantiene como referencia histórica pero NO debe llamarse.
  */
 function syncVerifCantDisponible() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('Ordenes');
-    if (!sheet) {
-      Logger.log("syncVerifCantDisponible: Hoja 'Ordenes' no encontrada.");
-      return;
-    }
-
-    var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return; // No hay datos
-
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Usar getColumnIndexByNameCaseInsensitive (devuelve base-1)
-    var verifCantCol = getColumnIndexByNameCaseInsensitive(headers, 'VerifCant. Disponible', false);
-    var cantDispCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
-
-    if (!verifCantCol) {
-      Logger.log("syncVerifCantDisponible: Columna 'VerifCant. Disponible' no encontrada.");
-      return;
-    }
-    
-    if (!cantDispCol) {
-      Logger.log("syncVerifCantDisponible: Columna 'CantDispAFecha' no encontrada.");
-      return;
-    }
-
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
-    var values = dataRange.getValues();
-    var updates = [];
-
-    for (var i = 0; i < values.length; i++) {
-      var verifCantValue = values[i][verifCantCol - 1]; // -1 para acceso a array base-0
-      var cantDispValue = values[i][cantDispCol - 1];
-
-      // Si VerifCant. Disponible es un número >= 0 (no "-")
-      if (verifCantValue !== '-' && verifCantValue !== '' && !isNaN(verifCantValue)) {
-        var numVerifCant = Number(verifCantValue);
-        if (numVerifCant >= 0) {
-          // CORRECCIÓN: Solo copiar si 'CantDispAFecha' está vacío, para no sobreescribir datos existentes.
-          // Esto asegura que la lógica solo se aplique a filas nuevas o no inicializadas.
-          if (cantDispValue === '' || cantDispValue === null || cantDispValue === undefined) {
-            updates.push({
-              row: i + 2, // +2 porque i empieza en 0 y hay header
-              value: numVerifCant
-            });
-          }
-        }
-      }
-    }
-
-    if (updates.length > 0) {
-      Logger.log("syncVerifCantDisponible: Actualizando " + updates.length + " filas.");
-      updates.forEach(function(update) {
-        sheet.getRange(update.row, cantDispCol).setValue(update.value); // cantDispCol ya es base-1
-      });
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        'Se sincronizaron ' + updates.length + ' valores de Cantidad Disponible.', 
-        'Sincronización', 
-        3
-      );
-    } else {
-      Logger.log("syncVerifCantDisponible: No se requieren actualizaciones.");
-    }
-  } catch (e) {
-    Logger.log("ERROR en syncVerifCantDisponible: " + e.message);
-    Logger.log("Stack trace: " + e.stack);
-  }
+  Logger.log('syncVerifCantDisponible: FUNCIÓN OBSOLETA. El snapshot ahora lo maneja el backend en procesarCargaOrdenesMasivas.');
 }
 
 /**

@@ -249,34 +249,10 @@ function onEditInstalled(e) {
 
       var editedColName = headers[editedRange.getColumn() - 1];
       
-      if (editedColName === 'VerifCant. Disponible') {
-        var oldValue = e.oldValue;
-        var newValue = e.value;
-
-        if (oldValue === '-' && newValue !== undefined && newValue !== '' && !isNaN(newValue)) {
-          var numNewValue = Number(newValue);
-          if (numNewValue > 0) {
-            var rowIdx = editedRange.getRow();
-            var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
-            
-            if (cantDispAFechaCol) {
-              sheet.getRange(rowIdx, cantDispAFechaCol).setValue(numNewValue);
-              logChange(
-                'AUTO_COPY_VERIFCANT', 
-                'Copiado automáticamente ' + numNewValue + ' de "VerifCant. Disponible" a "CantDispAFecha" en fila ' + rowIdx, 
-                userIdentity
-              );
-              SpreadsheetApp.getActiveSpreadsheet().toast(
-                'Cantidad disponible copiada automáticamente: ' + numNewValue,
-                'Sistema QMS',
-                3
-              );
-            } else {
-              Logger.log("ADVERTENCIA: Columna 'CantDispAFecha' no encontrada para auto-copia.");
-            }
-          }
-        }
-      }
+      // MIGRADO A BACKEND (Fase 3 - MatrixValidation):
+      // El snapshot de CantDispAFecha ahora se captura en el momento exacto de la carga
+      // de la orden desde el motor validarNoAnalisisContraMatrices. Ya no se usa onEdit
+      // para este propósito (que de todas formas no funciona con fórmulas IMPORTRANGE).
 
       var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
       var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
