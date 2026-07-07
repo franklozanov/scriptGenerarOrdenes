@@ -1,0 +1,22 @@
+{
+  "env": {
+    "googleappsscript/googleappsscript": true,
+    "browser": true,
+    "es2022": true
+  },
+  "plugins": [
+    "googleappsscript",
+    "html"
+  ],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "script"
+  },
+  "rules": {
+    "no-undef": "error",
+    "no-unused-vars": ["warn", { "vars": "local", "args": "none" }]
+  },
+  "ignorePatterns": [
+    "node_modules/"
+  ]
+}
