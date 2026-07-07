@@ -600,6 +600,18 @@
          esAdmin = true;
       }
       
+      var hasMenuConfig = !!perms["MENU_CONFIG"] || !!perms["MENU_ADMIN"] || esAdmin;
+      var tabConfigBtn = document.querySelector('button[data-target="tab-config"]');
+      if (tabConfigBtn) {
+        tabConfigBtn.style.display = hasMenuConfig ? 'inline-block' : 'none';
+      }
+      
+      // Si el usuario actual está en la pestaña de configuración y no tiene permiso, forzar a Gestión de Órdenes
+      if (!hasMenuConfig && tabConfigBtn && tabConfigBtn.classList.contains('active')) {
+         var tabGestionBtn = document.querySelector('button[data-target="tab-gestion"]');
+         if (tabGestionBtn) tabGestionBtn.click();
+      }
+      
       // Si no tenemos session email o falla la validación extra, podemos basarnos en un permiso genérico o dejarlo
       // Por seguridad el backend lo rechaza igual si no es ADMIN, pero lo inhabilitamos visualmente
       document.getElementById("btn-init-system").disabled = !esAdmin;

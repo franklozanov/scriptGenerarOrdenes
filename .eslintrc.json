@@ -106,5 +106,13 @@
   },
   "ignorePatterns": [
     "node_modules/"
+  ],
+  "overrides": [
+    {
+      "files": ["*.html"],
+      "rules": {
+        "no-undef": "off"
+      }
+    }
   ]
 }
