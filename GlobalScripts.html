@@ -325,33 +325,49 @@
    * @param {Object} [targetUser] - Usuario que firma, si es distinto al de sesión principal
    * @returns {Promise<string>} PIN válido.
    */
-  async function getSecurityPinOrSetup(message, targetUser) {
+  async function getSecurityPinOrSetup(message, targetUser, opts) {
     let isPending = false;
-    
+
     if (targetUser) {
       isPending = (targetUser.pinStatus === "PENDIENTE" || targetUser.pinStatus === "");
     } else if (sysData && sysData.currentUser) {
       isPending = !isPinConfiguredClient_(sysData.currentUser.pin);
     }
-    
+
     if (isPending) {
       // Flujo de creación de PIN
       const nuevoPin = await setupSecurityPin(targetUser);
       // Si tuvo éxito, lo devuelve automáticamente como el PIN ingresado para la firma actual.
-      return nuevoPin; 
+      return nuevoPin;
     } else {
       // Flujo normal
-      return await promptSecurityPin(message);
+      return await promptSecurityPin(message, opts);
     }
+  }
+
+  /**
+   * Determina si un rol corresponde a Administrador (incluye variaciones de nombre).
+   * @param {string} rol
+   * @returns {boolean}
+   */
+  function esRolAdmin_(rol) {
+    var u = (rol || '').toString().toUpperCase();
+    return u === 'ADMIN' || u === 'ADMINISTRADOR' || u === 'ADMINISTRADOR DE SISTEMA';
   }
 
 
   /**
    * Muestra el modal global de PIN de seguridad de 4 dígitos.
    * @param {string} message - Mensaje a mostrar en el modal
-   * @returns {Promise<string>} Promesa que resuelve con el PIN o rechaza si se cancela
+   * @param {Object} [opts] - Opciones. { allowAdminOverride: boolean } habilita el enlace de
+   *   recuperación con clave de administrador, visible únicamente si el usuario en sesión es ADMIN.
+   * @returns {Promise<string>} Promesa que resuelve con el PIN (o con la clave de admin, marcada
+   *   con el prefijo __ADMIN_OVERRIDE__:) o rechaza si se cancela
    */
-  function promptSecurityPin(message = "Ingrese su PIN de autorización (4 dígitos)") {
+  function promptSecurityPin(message = "Ingrese su PIN de autorización (4 dígitos)", opts) {
+    opts = opts || {};
+    const showAdminOverride = !!opts.allowAdminOverride && sysData && sysData.currentUser && esRolAdmin_(sysData.currentUser.rol);
+
     return new Promise((resolve, reject) => {
       // Eliminar modal anterior si existe
       let existingOverlay = document.querySelector('.pin-overlay');
@@ -360,7 +376,7 @@
       // Crear contenedor
       const overlay = document.createElement('div');
       overlay.className = 'pin-overlay';
-      
+
       overlay.innerHTML = `
         <div class="pin-modal modern-pin-modal">
           <h3>Autorización Requerida</h3>
@@ -371,6 +387,14 @@
             <input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
             <input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
           </div>
+          ${showAdminOverride ? `
+          <div class="admin-override-section">
+            <a href="#" class="admin-override-link" style="font-size:12px; color:#2563eb; text-decoration:underline; cursor:pointer;">¿Olvidó su PIN? Usar clave de administrador</a>
+            <div class="admin-override-form" style="display:none; margin-top:10px;">
+              <input type="password" class="admin-override-input" placeholder="Clave de administrador" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+              <button type="button" class="btn btn-secondary admin-override-submit" style="margin-top:8px;">Validar clave de administrador</button>
+            </div>
+          </div>` : ''}
           <div class="pin-actions">
             <button class="btn btn-secondary cancel-btn">Cancelar</button>
           </div>
@@ -381,23 +405,48 @@
       const inputs = overlay.querySelectorAll('.modern-pin-input');
       const cancelBtn = overlay.querySelector('.cancel-btn');
 
+      function closeWith(fn) {
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+          overlay.remove();
+          fn();
+        }, 200);
+      }
+
+      if (showAdminOverride) {
+        const overrideLink = overlay.querySelector('.admin-override-link');
+        const overrideForm = overlay.querySelector('.admin-override-form');
+        const overrideInput = overlay.querySelector('.admin-override-input');
+        const overrideSubmit = overlay.querySelector('.admin-override-submit');
+
+        overrideLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          overrideForm.style.display = 'block';
+          overrideLink.style.display = 'none';
+          overrideInput.focus();
+        });
+
+        function submitOverride() {
+          const clave = overrideInput.value;
+          if (!clave) return;
+          closeWith(() => resolve("__ADMIN_OVERRIDE__:" + clave));
+        }
+
+        overrideSubmit.addEventListener('click', submitOverride);
+        overrideInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') submitOverride();
+        });
+      }
+
       function submitPin() {
         let pin = Array.from(inputs).map(i => i.value).join('');
         if (pin.length === 4) {
-          overlay.classList.add('fade-out');
-          setTimeout(() => {
-            overlay.remove();
-            resolve(pin);
-          }, 200);
+          closeWith(() => resolve(pin));
         }
       }
 
       function handleCancel() {
-        overlay.classList.add('fade-out');
-        setTimeout(() => {
-          overlay.remove();
-          reject(new Error("PIN cancelado por el usuario"));
-        }, 200);
+        closeWith(() => reject(new Error("PIN cancelado por el usuario")));
       }
 
       inputs.forEach((input, index) => {

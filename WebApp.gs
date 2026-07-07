@@ -524,6 +524,10 @@ function handlePrivilegedOperation_(params) {
 
 // --- SEGURIDAD 21 CFR Part 11 ---
 
+// Prefijo que identifica una firma enviada como clave de administrador (bypass de PIN), en vez
+// de un PIN de 4 dígitos. Ver requireAuthorizedUserStrict_ y GlobalScripts.html:promptSecurityPin.
+var ADMIN_OVERRIDE_PREFIX_ = "__ADMIN_OVERRIDE__:";
+
 /**
  * Valida rigurosamente la identidad del usuario y su PIN.
  * No confía en parámetros front-end, obtiene el correo directamente de la sesión de Google.
@@ -550,6 +554,26 @@ function requireAuthorizedUserStrict_(params) {
   var validUser = getUserRecordByUserId_(userId);
   if (!validUser) {
     throw new Error("ACCESO DENEGADO: El usuario con ID " + userId + " no está registrado en el sistema.");
+  }
+
+  // 1.b Vía de recuperación exclusiva para ADMIN: permite usar la clave de administrador
+  // (Script Property LOCK_PASSWORD) en vez del PIN, para desbloquear el acceso cuando el
+  // PIN aún no se ha migrado/configurado o el usuario olvidó su PIN. Nunca aplica a otros roles.
+  if (typeof pinRecibido === 'string' && pinRecibido.indexOf(ADMIN_OVERRIDE_PREFIX_) === 0) {
+    var claveAdminIngresada = pinRecibido.substring(ADMIN_OVERRIDE_PREFIX_.length);
+    var rolUpperOverride = (validUser.rol || '').toString().toUpperCase();
+    var esAdminRolOverride = (rolUpperOverride === 'ADMIN' || rolUpperOverride === 'ADMINISTRADOR' || rolUpperOverride === 'ADMINISTRADOR DE SISTEMA');
+    if (!esAdminRolOverride) {
+      throw new Error("ACCESO DENEGADO: La clave de administrador solo puede usarse con el rol ADMIN.");
+    }
+    if (!ADMIN_PASS || claveAdminIngresada !== ADMIN_PASS) {
+      throw new Error("ACCESO DENEGADO: Clave de administrador incorrecta.");
+    }
+    if (validUser.intentosFallidos > 0 || validUser.estado === "Bloqueado") {
+      updateUserSecurityState_(validUser.userId, 0, "Activo");
+    }
+    Logger.log("AUDITORÍA: Acceso autorizado mediante CLAVE DE ADMINISTRADOR (bypass PIN) para usuario " + validUser.email);
+    return validUser.userId;
   }
 
   if (validUser.estado === "Bloqueado") {

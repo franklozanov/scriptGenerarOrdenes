@@ -860,7 +860,7 @@
       if (isChecked) {
         let pin;
         try {
-          pin = await getSecurityPinOrSetup('Ingrese su PIN para habilitar la edición de sistema:');
+          pin = await getSecurityPinOrSetup('Ingrese su PIN para habilitar la edición de sistema:', null, { allowAdminOverride: true });
         } catch(e) {
           document.getElementById('cfg_unlock').checked = false;
           return;
