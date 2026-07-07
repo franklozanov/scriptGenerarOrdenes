@@ -153,6 +153,13 @@ function handlePrivilegedOperation_(params) {
     return { status: 'success', message: 'PIN configurado exitosamente.' };
   }
 
+  if (operation === 'validarAccesoSesion') {
+    // requireAuthorizedUserStrict_ ya validó existencia, estado y PIN, y aplicó
+    // el conteo de intentos fallidos / bloqueo antes de llegar aquí (línea 137).
+    // Si llegamos a este punto, el acceso es válido.
+    return { status: 'success', message: 'Acceso concedido.', userId: callingUserId };
+  }
+
   if (operation === 'gestionarUsuarioSeguridad') {
     if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
       return { status: 'error', message: 'No tiene permisos de administrador para ejecutar esta acción.', diagnostic: 'PERMISSION_DENIED' };

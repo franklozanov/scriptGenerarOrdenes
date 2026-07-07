@@ -147,12 +147,28 @@ function initializeCompleteSystem(ui) {
     summary.push("⚠️ Diagnóstico ConsecutivoImp: " + e.message);
   }
 
-  // Migración de Seguridad de PIN y Bloqueo
-  try {
-    migrarSeguridadPIN();
-    summary.push("✓ Seguridad PIN encriptado migrada");
-  } catch (e) {
-    summary.push("⚠️ Migración Seguridad PIN: " + e.message);
+  // Migración de Seguridad de PIN y Bloqueo — requiere confirmación explícita, ya que
+  // puede reiniciar a "PENDIENTE" cualquier valor de Clave que no sea ya un hash válido
+  // (esto forzaría a esos usuarios a crear un PIN nuevo en su próximo inicio de sesión).
+  var confirmarMigracionPin = ui.alert(
+    "Migración de Seguridad de PIN",
+    "¿Desea ejecutar la migración de seguridad de PIN ahora?\n\n" +
+    "Esto normalizará la hoja 'Usuarios': cualquier valor de la columna 'Clave' que no sea ya " +
+    "un PIN encriptado válido se reiniciará a \"PENDIENTE\" (el usuario deberá crear un PIN nuevo " +
+    "en su próximo inicio de sesión). Los PIN ya encriptados correctamente NO se modifican.\n\n" +
+    "Si está en medio de otra migración de cambios y prefiere posponer este paso, seleccione \"No\".",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmarMigracionPin === ui.Button.YES) {
+    try {
+      migrarSeguridadPIN();
+      summary.push("✓ Seguridad PIN encriptado migrada");
+    } catch (e) {
+      summary.push("⚠️ Migración Seguridad PIN: " + e.message);
+    }
+  } else {
+    summary.push("⏭️ Migración de Seguridad PIN omitida (seleccionado por el usuario)");
   }
 
   // Migración de datos históricos (Fase 5): congelar IMPORTRANGE obsoletos

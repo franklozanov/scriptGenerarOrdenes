@@ -562,21 +562,12 @@
       // para que ya esté cargado o en caché del navegador cuando el usuario imprima.
       imp_preloadPdfLib();
 
-      // Cargar datos iniciales. Primero getInitialData para quitar el bloqueo,
-      // luego getTemplatesBase64Async para cargar las plantillas sin error de caché faltante.
+      // Cargar datos iniciales. Primero getInitialData, luego el gate de inicio de
+      // sesión (PIN) antes de habilitar la UI, y por último getTemplatesBase64Async.
       google.script.run
         .withSuccessHandler(function(data) {
           sysData = data;
-          applyPermissions(data.userPermissions);
-          document.getElementById("loading-overlay").classList.add("hidden");
-          
-          // Ahora cargar las plantillas en segundo plano
-          google.script.run
-            .withSuccessHandler(function(b64) {
-              base64Data = b64;
-              console.log("Plantillas Base64 cargadas en segundo plano.");
-            })
-            .getTemplatesBase64Async();
+          runLoginGate(data);
         })
         .withFailureHandler(function(err) {
           showAlert("Error de carga inicial: " + err.message, "error");
@@ -638,6 +629,67 @@
         aaPanel.style.display = puedeAutoAprob ? 'block' : 'none';
         if (puedeAutoAprob) autoAprob_init();
       }
+    }
+
+    // Gate de inicio de sesión: se ejecuta antes de habilitar la UI del sidebar.
+    // - Usuario bloqueado (5 intentos fallidos) -> pantalla de bloqueo, sin gastar más intentos.
+    // - PIN no configurado ("" / "PENDIENTE") -> dispara la creación de PIN existente.
+    // - PIN configurado -> lo solicita y lo valida contra el backend (con reintentos).
+    async function runLoginGate(data) {
+      var overlayText = document.getElementById("loading-text");
+      var user = data.currentUser;
+
+      if (!user) {
+        overlayText.textContent = "⛔ Acceso denegado: su usuario no está registrado en el sistema.";
+        return;
+      }
+
+      if (user.estado === "Bloqueado") {
+        overlayText.textContent = "⛔ Usuario bloqueado por intentos fallidos de PIN. Contacte al administrador.";
+        return;
+      }
+
+      var pinPendiente = (user.pin === "" || user.pin === "PENDIENTE");
+
+      while (true) {
+        try {
+          if (pinPendiente) {
+            await setupSecurityPin();
+            finishLoginGate(data);
+            return;
+          }
+
+          var pin = await promptSecurityPin("Ingrese su PIN para iniciar sesión");
+          var res = await postWebApp({ operation: "validarAccesoSesion", userId: user.userId, pinFirma: pin });
+
+          if (res.status === "success") {
+            finishLoginGate(data);
+            return;
+          }
+
+          showAlert(res.message, "error");
+          if (res.message && res.message.indexOf("bloqueado") !== -1) {
+            overlayText.textContent = "⛔ Usuario bloqueado por intentos fallidos de PIN. Contacte al administrador.";
+            return;
+          }
+          // PIN incorrecto pero aún no bloqueado: se vuelve a pedir (continúa el while).
+        } catch (e) {
+          // Modal de PIN cancelado por el usuario: se vuelve a solicitar, no se permite continuar sin validar.
+        }
+      }
+    }
+
+    function finishLoginGate(data) {
+      applyPermissions(data.userPermissions);
+      document.getElementById("loading-overlay").classList.add("hidden");
+
+      // Ahora cargar las plantillas en segundo plano
+      google.script.run
+        .withSuccessHandler(function(b64) {
+          base64Data = b64;
+          console.log("Plantillas Base64 cargadas en segundo plano.");
+        })
+        .getTemplatesBase64Async();
     }
 
     // Envía una operación privilegiada a la Web App (corre como propietario). Se usa para
