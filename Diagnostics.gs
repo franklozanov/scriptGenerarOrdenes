@@ -269,3 +269,59 @@ function diagnosticarConsecutivoImp() {
     SpreadsheetApp.getUi().alert("❌ Error en diagnóstico: " + e.message);
   }
 }
+
+/**
+ * Función para diagnosticar la salud de las Matrices K activas.
+ * @returns {Array<Object>} Lista de resultados por cada matriz
+ */
+function diagnosticarMatricesConfig() {
+  var matrices = getMatricesActivasOrdenadas();
+  var resultados = [];
+  
+  if (matrices.length === 0) {
+    return [{ status: 'warning', nombre: 'Global', mensaje: 'No hay matrices activas configuradas.' }];
+  }
+  
+  for (var i = 0; i < matrices.length; i++) {
+    var matriz = matrices[i];
+    var res = { nombre: matriz.nombreMatriz, status: 'ok', mensaje: 'Conexión y columnas verificadas correctamente.' };
+    
+    try {
+      var ssK = SpreadsheetApp.openById(matriz.idArchivo);
+      var sheetK = ssK.getSheetByName(matriz.nombrePestana);
+      
+      if (!sheetK) {
+        res.status = 'error';
+        res.mensaje = "Pestaña '" + matriz.nombrePestana + "' no encontrada.";
+        resultados.push(res);
+        continue;
+      }
+      
+      var headers = sheetK.getRange(1, 1, 1, sheetK.getLastColumn()).getValues()[0];
+      var checkCols = [matriz.columnaLlave, matriz.columnaLote, matriz.columnaCantidad, matriz.columnaVencimiento];
+      if (matriz.columnaFabricante) checkCols.push(matriz.columnaFabricante);
+      
+      var missing = [];
+      for (var c = 0; c < checkCols.length; c++) {
+        var cName = checkCols[c].toString().trim();
+        if (!cName) continue;
+        if (!getColumnIndexByNameCaseInsensitive(headers, cName, false)) {
+          missing.push(cName);
+        }
+      }
+      
+      if (missing.length > 0) {
+        res.status = 'error';
+        res.mensaje = "Columnas faltantes: " + missing.join(', ');
+      }
+      
+    } catch (e) {
+      res.status = 'error';
+      res.mensaje = "Error de acceso: " + e.message;
+    }
+    
+    resultados.push(res);
+  }
+  
+  return resultados;
+}

@@ -134,6 +134,50 @@
               <span class="icon">🛠️</span> Inicializar Sistema
             </button>
 
+            <!-- Diagnóstico de Matrices -->
+            <div id="diagnostics-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Diagnóstico de Sistemas</div>
+              <p style="font-size:12px; margin-bottom:8px;">Verifica la salud de las Matrices K conectadas.</p>
+              <button class="btn-action" onclick="cfg_diagnosticarMatrices()">
+                <span class="icon">🩺</span> Ejecutar Diagnóstico de Matrices
+              </button>
+              <div id="diagnostics-results" style="margin-top:10px; font-size:12px; display:none; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;"></div>
+            </div>
+
+            <!-- Gestión de Plantillas -->
+            <div id="templates-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Gestión de Plantillas / Variables</div>
+              <p style="font-size:12px; margin-bottom:8px;">Añadir nuevas configuraciones o plantillas.</p>
+              <button class="btn-action" onclick="cfg_abrirModalPlantilla()">
+                <span class="icon">➕</span> Añadir Nueva Plantilla
+              </button>
+              
+              <!-- Mini form embebido (oculto por defecto) -->
+              <div id="form-nueva-plantilla" style="display:none; margin-top:10px; background:#f1f5f9; padding:10px; border-radius:6px; border:1px solid #cbd5e1;">
+                <label style="font-size:12px; font-weight:600;">Clave (Key):</label>
+                <input type="text" id="tpl_clave" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. PLANTILLA_NUEVA">
+                
+                <label style="font-size:12px; font-weight:600;">Enlace o ID (Valor):</label>
+                <input type="text" id="tpl_valor" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Link de Drive o ID">
+                
+                <label style="font-size:12px; font-weight:600;">Tipo (Type):</label>
+                <select id="tpl_tipo" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;">
+                  <option value="plantilla_doc">Documento PDF/Docs</option>
+                  <option value="carpeta_destino">Carpeta de Drive</option>
+                  <option value="hoja_db">Hoja de Base de Datos</option>
+                  <option value="variable">Variable de Texto</option>
+                </select>
+                
+                <label style="font-size:12px; font-weight:600;">Descripción (Opcional):</label>
+                <input type="text" id="tpl_desc" class="form-input" style="width:100%; margin-bottom:12px; padding:4px;" placeholder="Notas sobre la plantilla">
+                
+                <div style="display:flex; gap:8px;">
+                  <button class="btn-primary-small" style="flex:1;" onclick="cfg_guardarPlantilla()">Guardar</button>
+                  <button class="btn-secondary-small" style="flex:1;" onclick="document.getElementById('form-nueva-plantilla').style.display='none'">Cancelar</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Panel: Autoaprobación temporal de solicitudes (requiere GESTIONAR_AUTOAPROBACION) -->
             <div id="unlock-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
               <div class="section-title" style="margin-top:0;">Desbloqueo de Sistema (Edición Manual)</div>
@@ -799,6 +843,72 @@
         } catch(e) {
           statusEl.innerHTML = '❌ Error al bloquear: ' + e.message;
         }
+      }
+    }
+
+    // --- Diagnóstico de Matrices ---
+    async function cfg_diagnosticarMatrices() {
+      const resContainer = document.getElementById('diagnostics-results');
+      resContainer.style.display = 'block';
+      resContainer.innerHTML = '⏳ Ejecutando diagnóstico... (Puede tardar varios segundos)';
+      try {
+        const res = await postWebApp({ operation: 'diagnosticarMatrices', userId: sysData.currentUser.userId });
+        if (res.status === 'success') {
+          let html = '<strong>Resultados:</strong><ul style="margin:4px 0; padding-left:20px;">';
+          res.data.forEach(d => {
+            const icon = d.status === 'ok' ? '✅' : (d.status === 'warning' ? '⚠️' : '❌');
+            html += `<li style="margin-bottom:4px;">${icon} <strong>${d.nombre}:</strong> ${d.mensaje}</li>`;
+          });
+          html += '</ul>';
+          resContainer.innerHTML = html;
+        } else {
+          resContainer.innerHTML = `❌ Error: ${res.message}`;
+        }
+      } catch (err) {
+        resContainer.innerHTML = `❌ Error de red: ${err.message}`;
+      }
+    }
+
+    // --- Gestión de Plantillas ---
+    function cfg_abrirModalPlantilla() {
+      document.getElementById('form-nueva-plantilla').style.display = 'block';
+      document.getElementById('tpl_clave').value = '';
+      document.getElementById('tpl_valor').value = '';
+      document.getElementById('tpl_desc').value = '';
+    }
+
+    async function cfg_guardarPlantilla() {
+      const clave = document.getElementById('tpl_clave').value.trim();
+      const valor = document.getElementById('tpl_valor').value.trim();
+      const tipo = document.getElementById('tpl_tipo').value;
+      const desc = document.getElementById('tpl_desc').value.trim();
+
+      if (!clave || !valor) {
+        showError('La Clave y el Valor (ID/Enlace) son obligatorios.');
+        return;
+      }
+
+      showLoading('Guardando plantilla...');
+      try {
+        const res = await postWebApp({
+          operation: 'agregarPlantilla',
+          clave: clave,
+          valor: valor,
+          tipo: tipo,
+          descripcion: desc,
+          userId: sysData.currentUser.userId
+        });
+        
+        hideLoading();
+        if (res.status === 'success') {
+          showToast(res.message, 'success');
+          document.getElementById('form-nueva-plantilla').style.display = 'none';
+        } else {
+          showError('Error: ' + res.message);
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error de comunicación: ' + err.message);
       }
     }
 

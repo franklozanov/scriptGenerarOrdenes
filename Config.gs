@@ -98,3 +98,60 @@ var VALORES_DECISION = {
   NO_ENCONTRADO: 'No encontrado en ninguna Matriz',
   ERROR_PREFIX: 'Error en: '   // Se concatena con los campos fallidos (ej. "Error en: Lote")
 };
+
+/**
+ * Agrega o actualiza una plantilla en la hoja 'templates'
+ */
+function procesarAgregarPlantilla(params) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('templates');
+  if (!sheet) return { status: 'error', message: 'Hoja templates no encontrada.' };
+  
+  var valorLimpio = params.valor.trim();
+  // Extraer ID usando la función existente en Helpers.gs si la hay
+  if (typeof extractDriveId === 'function') {
+    var extracted = extractDriveId(valorLimpio);
+    if (extracted) valorLimpio = extracted;
+  } else {
+    // Regex manual si no existe
+    var match = valorLimpio.match(/[-\w]{25,}/);
+    if (match) valorLimpio = match[0];
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(data[0], 'Clave', false) || 1;
+  var colValorIdx = getColumnIndexByNameCaseInsensitive(data[0], 'Valor', false) || 2;
+  var colTypeIdx = getColumnIndexByNameCaseInsensitive(data[0], 'Type', false) || 3;
+  var colDescIdx = getColumnIndexByNameCaseInsensitive(data[0], 'Descripcion', false) || 4;
+  
+  var existingRow = -1;
+  var searchKey = params.clave.trim();
+  
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][colClaveIdx - 1] && data[i][colClaveIdx - 1].toString().trim() === searchKey) {
+      existingRow = i + 1;
+      break;
+    }
+  }
+  
+  if (existingRow > -1) {
+    // Actualizar
+    sheet.getRange(existingRow, colValorIdx).setValue(valorLimpio);
+    if (colTypeIdx) sheet.getRange(existingRow, colTypeIdx).setValue(params.tipo.trim());
+    if (colDescIdx && params.descripcion) sheet.getRange(existingRow, colDescIdx).setValue(params.descripcion.trim());
+    if (typeof clearInitialDataCache === 'function') clearInitialDataCache();
+    return { status: 'success', message: 'Plantilla actualizada exitosamente.' };
+  } else {
+    // Añadir nueva fila
+    var lastCol = sheet.getLastColumn() || 4;
+    var newRow = new Array(lastCol).fill("");
+    newRow[colClaveIdx - 1] = searchKey;
+    newRow[colValorIdx - 1] = valorLimpio;
+    if (colTypeIdx) newRow[colTypeIdx - 1] = params.tipo.trim();
+    if (colDescIdx && params.descripcion) newRow[colDescIdx - 1] = params.descripcion.trim();
+    
+    sheet.appendRow(newRow);
+    if (typeof clearInitialDataCache === 'function') clearInitialDataCache();
+    return { status: 'success', message: 'Plantilla agregada exitosamente.' };
+  }
+}

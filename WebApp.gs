@@ -253,6 +253,32 @@ function handlePrivilegedOperation_(params) {
     return { status: 'success', data: dataMatriz };
   }
 
+  if (operation === 'diagnosticarMatrices') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
+      return { status: 'error', message: 'No tiene permisos de Administrador.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    try {
+      var resultados = diagnosticarMatricesConfig();
+      return { status: 'success', data: resultados };
+    } catch (e) {
+      return { status: 'error', message: 'Fallo al ejecutar diagnóstico: ' + e.message };
+    }
+  }
+
+  if (operation === 'agregarPlantilla') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
+      return { status: 'error', message: 'No tiene permisos de Administrador.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.clave || !params.valor || !params.tipo) {
+      return { status: 'error', message: 'Faltan parámetros (clave, valor, tipo).' };
+    }
+    try {
+      return procesarAgregarPlantilla(params);
+    } catch (e) {
+      return { status: 'error', message: 'Fallo al agregar plantilla: ' + e.message };
+    }
+  }
+
   if (operation === 'validarOrdenDuplicada') {
     if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) {
       return { status: 'error', message: 'No tiene permisos.', diagnostic: 'PERMISSION_DENIED' };
