@@ -1,3 +1,22 @@
-plans/
-Agent Rules/
-node_modules/
+# ============================================================
+# Proyecto Apps Script SIN clasp: no hay estructura de carpetas
+# de despliegue que respetar. Regla: todo se ignora por defecto;
+# solo se permite explícitamente lo que el proyecto necesita
+# (código GAS válido + tooling imprescindible en la raíz).
+# ============================================================
+
+# --- Ignorar TODAS las carpetas por defecto ---
+*/
+
+# Excepción: .husky/ debe versionarse para que el pre-commit
+# hook de lint-staged se instale al clonar el repo.
+!.husky/
+!.husky/**
+
+# --- Ignorar TODAS las extensiones no admitidas por Apps Script ---
+# GAS solo reconoce .gs, .html y el manifiesto appsscript.json.
+*.*
+!*.gs
+!*.html
+!*.json
+!*.md
