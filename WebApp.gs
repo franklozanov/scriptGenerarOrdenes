@@ -141,6 +141,9 @@ function handlePrivilegedOperation_(params) {
 
   if (operation === 'configurarNuevoPin') {
     var userRecord = getUserRecordByUserId_(callingUserId);
+    if (!userRecord.rol) {
+      return { status: 'error', message: 'Su usuario no tiene un rol asignado. Contacte al administrador antes de continuar.', diagnostic: 'MISSING_ROLE' };
+    }
     if (isPinConfigured_(userRecord.pin)) {
       return { status: 'error', message: 'El usuario ya tiene un PIN configurado.', diagnostic: 'PIN_ALREADY_EXISTS' };
     }
@@ -173,7 +176,13 @@ function handlePrivilegedOperation_(params) {
       return { status: 'error', message: 'Usuario objetivo no encontrado.', diagnostic: 'USER_NOT_FOUND' };
     }
 
-    if (params.accionSeguridad === 'desbloquear') {
+    if (params.accionSeguridad === 'aprobar') {
+      if (!targetUser.rol) {
+        return { status: 'error', message: 'No se puede aprobar: el usuario no tiene un rol asignado. Asigne un rol en la hoja Usuarios primero.', diagnostic: 'MISSING_ROLE' };
+      }
+      updateUserSecurityState_(targetUser.userId, 0, "Activo");
+      return { status: 'success', message: 'Acceso aprobado. El usuario ya puede crear su PIN e ingresar.' };
+    } else if (params.accionSeguridad === 'desbloquear') {
       updateUserSecurityState_(targetUser.userId, 0, "Activo");
       return { status: 'success', message: 'Usuario desbloqueado exitosamente.' };
     } else if (params.accionSeguridad === 'resetear_pin') {
@@ -578,6 +587,10 @@ function requireAuthorizedUserStrict_(params) {
 
   if (validUser.estado === "Bloqueado") {
     throw new Error("ACCESO DENEGADO: Usuario bloqueado por superar límite de intentos de PIN fallidos. Contacte al administrador.");
+  }
+
+  if (validUser.estado === "Pendiente") {
+    throw new Error("ACCESO DENEGADO: Su acceso está pendiente de aprobación por el administrador.");
   }
 
   if (validUser.estado !== "Activo") {

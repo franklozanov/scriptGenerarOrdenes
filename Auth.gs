@@ -100,14 +100,29 @@ function isUserAuthorized(userId) {
 
 /**
  * Valida que el usuario esté autorizado en una solicitud de WebApp.
+ * A diferencia de requireAuthorizedUserStrict_, no exige PIN ni Estado "Activo"
+ * (la usa configurarNuevoPin, donde el usuario todavía no tiene PIN configurado
+ * y puede estar en su primer ingreso). Sí rechaza usuarios bloqueados y con
+ * estado "Pendiente" de aprobación, para que ningún flujo de auto-registro de
+ * PIN pueda sortear un bloqueo o una alta todavía no aprobada por un admin.
  * @param {Object} params - Parámetros de la solicitud
  * @returns {string} UserID validado
- * @throws {Error} Si falta userId o no está autorizado
+ * @throws {Error} Si falta userId, no existe, está bloqueado/pendiente o no está autorizado
  */
 function requireAuthorizedUser_(params) {
   var callingUserId = params.userId || '';
   if (!callingUserId) {
     throw new Error('MISSING_USER_ID: No se proporcionó userId en la solicitud.');
+  }
+  var user = getUserRecordByUserId_(callingUserId);
+  if (!user) {
+    throw new Error('ACCESO DENEGADO: El usuario con ID ' + callingUserId + ' no está registrado en el sistema.');
+  }
+  if (user.estado === 'Bloqueado') {
+    throw new Error('ACCESO DENEGADO: Usuario bloqueado por intentos fallidos de PIN. Contacte al administrador.');
+  }
+  if (user.estado === 'Pendiente') {
+    throw new Error('ACCESO DENEGADO: Su acceso está pendiente de aprobación por el administrador.');
   }
   if (!isUserAuthorized(callingUserId)) {
     throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + callingUserId + '.');

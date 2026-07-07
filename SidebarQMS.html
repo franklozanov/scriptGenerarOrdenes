@@ -237,6 +237,7 @@
               <select id="sec_userSelect" style="width:100%; padding:6px; font-size:13px; margin:4px 0 12px; border:1px solid #ccc; border-radius:4px;"></select>
               
               <div style="display:flex; gap:10px;">
+                <button class="btn-secondary-small" style="flex:1;" onclick="adminSecurityAction('aprobar')">Aprobar acceso</button>
                 <button class="btn-secondary-small" style="flex:1;" onclick="adminSecurityAction('desbloquear')">Desbloquear</button>
                 <button class="btn-secondary-small" style="flex:1; color:#c5221f;" onclick="adminSecurityAction('resetear_pin')">Resetear PIN</button>
               </div>
@@ -2819,7 +2820,9 @@
         return;
       }
 
-      let actionDesc = action === 'desbloquear' ? 'desbloquear al usuario' : 'resetear el PIN del usuario';
+      let actionDesc = action === 'desbloquear' ? 'desbloquear al usuario'
+        : action === 'aprobar' ? 'aprobar el acceso del usuario'
+        : 'resetear el PIN del usuario';
       
       try {
         const pin = await promptSecurityPin(`Ingrese su PIN de Admin para ${actionDesc}:`);

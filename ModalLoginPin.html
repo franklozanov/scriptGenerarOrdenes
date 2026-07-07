@@ -236,6 +236,18 @@
         return;
       }
 
+      if (candidato.estado === 'Pendiente') {
+        setSubtitle('Hola, ' + nombre + '.');
+        setBody('<p style="color:#dc2626; font-size:13px;">⏳ Su acceso está pendiente de aprobación por el administrador.</p>');
+        return;
+      }
+
+      if (!candidato.rol) {
+        setSubtitle('Hola, ' + nombre + '.');
+        setBody('<p style="color:#dc2626; font-size:13px;">Su usuario no tiene un rol asignado. Contacte al administrador antes de continuar.</p>');
+        return;
+      }
+
       if (!isPinConfiguredClient_(candidato.pin)) {
         iniciarCreacionPin(nombre, candidato);
       } else {
