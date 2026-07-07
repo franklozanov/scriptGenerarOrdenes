@@ -79,9 +79,29 @@ function getInitialData(includeBase64) {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v2');
     
-    // Obtener usuario actual para sus permisos (se hace siempre, no desde caché)
+    // Obtener usuario actual para sus permisos (se hace siempre, no desde caché).
+    // Si el usuario ya validó su identidad en el modal de login (ModalLoginPin,
+    // ver completarLoginYAbrirPanel en SidebarLogic.gs) y su email tiene varios
+    // UserID asociados, se respeta el UserID elegido en ese modal en vez de
+    // volver a resolver por email (que solo devolvería el primer match).
     var activeEmail = Session.getActiveUser().getEmail();
-    var validUser = getUserRecordByEmail_(activeEmail);
+    var validUser = null;
+    try {
+      var sesionCache = CacheService.getUserCache().get('qmsSesionValidada');
+      if (sesionCache) {
+        var sesionInfo = JSON.parse(sesionCache);
+        var candidatos = getUserRecordsByEmail_(activeEmail);
+        var perteneceAlEmail = candidatos.some(function(c) { return c.userId === sesionInfo.userId; });
+        if (perteneceAlEmail) {
+          validUser = getUserRecordByUserId_(sesionInfo.userId);
+        }
+      }
+    } catch (e) {
+      Logger.log("getInitialData: no se pudo leer qmsSesionValidada de la caché: " + e.message);
+    }
+    if (!validUser) {
+      validUser = getUserRecordByEmail_(activeEmail);
+    }
     var userPermissions = {};
     if (validUser && validUser.rol) {
       userPermissions = getUserPermissions(validUser.rol);
@@ -149,7 +169,7 @@ function getInitialData(includeBase64) {
             var nombreCompleto = userData[j][colNombreCompletoIdx].toString().trim();
             if (userId && nombreCompleto) {
               var claveVal = colClaveIdx !== undefined && colClaveIdx !== null && userData[j][colClaveIdx] !== undefined ? userData[j][colClaveIdx].toString().trim() : "";
-              var pinStatus = (claveVal === "" || claveVal === "PENDIENTE") ? "PENDIENTE" : "CONFIGURADO";
+              var pinStatus = isPinConfigured_(claveVal) ? "CONFIGURADO" : "PENDIENTE";
               users.push({
                 userId: userId,
                 nombreCompleto: nombreCompleto,

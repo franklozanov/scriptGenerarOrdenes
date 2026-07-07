@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autorización Requerida</title>
+
+  <!-- FASE 6: Design System Centralizado (incluye estilos de .pin-inputs-container, .modern-pin-input, .btn, etc.) -->
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+
+  <!-- Scripts Globales (escapeHtml, showToast, etc.) -->
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lp-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+      height: 100%;
+      justify-content: center;
+      padding: 24px 20px;
+      overflow-y: auto;
+    }
+
+    .lp-container h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+
+    .lp-container p#lp-subtitle {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      max-width: 280px;
+    }
+
+    #lp-body {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .lp-error {
+      min-height: 18px;
+      font-size: 12px;
+      color: #dc2626;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .lp-user-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .lp-user-option {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+
+    .lp-user-option:hover {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+
+    .lp-user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .lp-user-role {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .lp-actions {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      max-width: 280px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="lp-container">
+    <h3>Autorización Requerida</h3>
+    <p id="lp-subtitle">Verificando identidad...</p>
+    <div id="lp-body"></div>
+    <div class="lp-actions">
+      <button type="button" class="btn btn-secondary cancel-btn" id="lp-cancel-btn">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Data island: el HtmlService inyecta el JSON aquí en evaluate(). Se usa un
+       script type="application/json" (en vez de <?!= ?> directo dentro del
+       <script> JS de abajo) para que el parser de ESLint pueda analizar el
+       bloque de JavaScript sin tropezar con el scriptlet de plantilla. -->
+  <script type="application/json" id="lp-identidad-data"><?!= identidad ?></script>
+
+  <script>
+    var identidad = JSON.parse(document.getElementById('lp-identidad-data').textContent);
+    var webAppUrl = identidad.webAppUrl || '';
+
+    document.getElementById('lp-cancel-btn').addEventListener('click', function () {
+      google.script.host.close();
+    });
+
+    function setSubtitle(text) {
+      document.getElementById('lp-subtitle').textContent = text;
+    }
+
+    function setBody(html) {
+      document.getElementById('lp-body').innerHTML = html;
+    }
+
+    function nombreDe(candidato) {
+      return candidato.nombreCompleto || candidato.nombreCorto || candidato.userId;
+    }
+
+    // === PASO 1: identidad ===
+    function init() {
+      if (identidad.status === 'none') {
+        setSubtitle('No pudimos identificarlo en el sistema.');
+        setBody('<p style="color:#dc2626; font-size:13px;">El correo de su sesión de Google (' +
+          escapeHtml(identidad.activeEmail || '') + ') no está registrado en la hoja de Usuarios. Contacte al administrador.</p>');
+        return;
+      }
+      if (identidad.status === 'multiple') {
+        renderSelectorUsuario(identidad.candidates);
+        return;
+      }
+      seleccionarUsuario(identidad.candidates[0]);
+    }
+
+    function renderSelectorUsuario(candidatos) {
+      setSubtitle('Su correo está asociado a varios usuarios. Seleccione con cuál desea ingresar:');
+      var html = '<div class="lp-user-list">';
+      candidatos.forEach(function (c, idx) {
+        html += '<button type="button" class="lp-user-option" data-idx="' + idx + '">' +
+          '<span class="lp-user-name">' + escapeHtml(nombreDe(c)) + '</span>' +
+          '<span class="lp-user-role">' + escapeHtml(c.rol || '') + '</span>' +
+          '</button>';
+      });
+      html += '</div>';
+      setBody(html);
+      document.querySelectorAll('.lp-user-option').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          seleccionarUsuario(candidatos[parseInt(btn.dataset.idx, 10)]);
+        });
+      });
+    }
+
+    // === PASO 2: saludo + gate de PIN para el usuario elegido ===
+    function seleccionarUsuario(candidato) {
+      var nombre = nombreDe(candidato);
+
+      if (candidato.estado === 'Bloqueado') {
+        setSubtitle('Hola, ' + nombre + '.');
+        setBody('<p style="color:#dc2626; font-size:13px;">⛔ Su usuario está bloqueado por intentos fallidos de PIN. Contacte al administrador.</p>');
+        return;
+      }
+
+      if (!isPinConfiguredClient_(candidato.pin)) {
+        iniciarCreacionPin(nombre, candidato);
+      } else {
+        setSubtitle('Hola, ' + nombre + '. Ingrese su PIN para continuar:');
+        renderPinInputs(function (pin, inputs) {
+          validarPin(pin, inputs, candidato);
+        });
+      }
+    }
+
+    // === Entrada de PIN de 4 dígitos (reutilizable para crear y validar) ===
+    function renderPinInputs(onComplete) {
+      setBody(
+        '<div class="pin-inputs-container">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '</div>' +
+        '<div class="lp-error" id="lp-error"></div>'
+      );
+
+      var inputs = document.querySelectorAll('.modern-pin-input');
+      function currentValue() { return Array.prototype.map.call(inputs, function (i) { return i.value; }).join(''); }
+
+      inputs.forEach(function (input, index) {
+        input.addEventListener('input', function () {
+          input.value = input.value.replace(/[^0-9]/g, '');
+          if (input.value.length === 1 && index < inputs.length - 1) inputs[index + 1].focus();
+          if (currentValue().length === 4) setTimeout(function () { onComplete(currentValue(), inputs); }, 100);
+        });
+
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Backspace' && input.value === '' && index > 0) {
+            inputs[index - 1].focus();
+            inputs[index - 1].value = '';
+          }
+        });
+
+        input.addEventListener('paste', function (e) {
+          e.preventDefault();
+          var pasted = (e.clipboardData || window.clipboardData).getData('text');
+          var digits = pasted.replace(/[^0-9]/g, '').substring(0, 4);
+          if (digits.length === 0) return;
+          for (var i = 0; i < digits.length; i++) {
+            if (index + i < inputs.length) inputs[index + i].value = digits[i];
+          }
+          inputs[Math.min(index + digits.length - 1, inputs.length - 1)].focus();
+          if (currentValue().length === 4) setTimeout(function () { onComplete(currentValue(), inputs); }, 100);
+        });
+      });
+
+      setTimeout(function () { inputs[0].focus(); }, 50);
+      return inputs;
+    }
+
+    function clearPinInputs(inputs) {
+      inputs.forEach(function (i) { i.value = ''; i.disabled = false; });
+      inputs[0].focus();
+    }
+
+    function setPinInputsDisabled(inputs, disabled) {
+      inputs.forEach(function (i) { i.disabled = disabled; });
+    }
+
+    function showPinError(msg) {
+      var el = document.getElementById('lp-error');
+      if (el) el.textContent = msg || '';
+    }
+
+    // === Validar PIN existente ===
+    function validarPin(pin, inputs, candidato) {
+      setPinInputsDisabled(inputs, true);
+      showPinError('Validando...');
+
+      fetch(webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify({ operation: 'validarAccesoSesion', userId: candidato.userId, pinFirma: pin })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.status === 'success') {
+            finalizarLogin(candidato.userId);
+            return;
+          }
+          if (data.message && data.message.indexOf('bloqueado') !== -1) {
+            setBody('<p style="color:#dc2626; font-size:13px;">⛔ ' + escapeHtml(data.message) + '</p>');
+            return;
+          }
+          showPinError(data.message || 'PIN incorrecto.');
+          clearPinInputs(inputs);
+        })
+        .catch(function (err) {
+          showPinError('Error de conexión: ' + (err && err.message ? err.message : err));
+          clearPinInputs(inputs);
+        });
+    }
+
+    // === Creación de PIN en dos pasos (usuario sin PIN configurado) ===
+    function iniciarCreacionPin(nombre, candidato) {
+      setSubtitle('Hola, ' + nombre + '. No tiene un PIN configurado. Cree su nuevo PIN (4 dígitos):');
+      renderPinInputs(function (pin1, inputs1) {
+        setPinInputsDisabled(inputs1, true);
+        setSubtitle('Reingrese su nuevo PIN para confirmar:');
+        renderPinInputs(function (pin2, inputs2) {
+          if (pin1 !== pin2) {
+            showPinError('Los PIN no coinciden. Intente de nuevo.');
+            iniciarCreacionPin(nombre, candidato);
+            return;
+          }
+          confirmarNuevoPin(pin1, inputs2, nombre, candidato);
+        });
+      });
+    }
+
+    function confirmarNuevoPin(pin, inputs, nombre, candidato) {
+      setPinInputsDisabled(inputs, true);
+      showPinError('Configurando PIN...');
+
+      fetch(webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify({ operation: 'configurarNuevoPin', userId: candidato.userId, nuevoPin: pin })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.status === 'success') {
+            finalizarLogin(candidato.userId);
+            return;
+          }
+          showPinError(data.message || 'No se pudo configurar el PIN.');
+          iniciarCreacionPin(nombre, candidato);
+        })
+        .catch(function (err) {
+          showPinError('Error de conexión: ' + (err && err.message ? err.message : err));
+          iniciarCreacionPin(nombre, candidato);
+        });
+    }
+
+    // === Éxito: abrir el Sidebar QMS ya autenticado y cerrar este modal ===
+    function finalizarLogin(userId) {
+      setSubtitle('✅ Identidad verificada. Abriendo panel...');
+      setBody('');
+      document.getElementById('lp-cancel-btn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function () { google.script.host.close(); })
+        .withFailureHandler(function (err) {
+          setSubtitle('Error al abrir el panel: ' + (err && err.message ? err.message : err));
+          document.getElementById('lp-cancel-btn').disabled = false;
+        })
+        .completarLoginYAbrirPanel(userId);
+    }
+
+    init();
+  </script>
+</body>
+</html>

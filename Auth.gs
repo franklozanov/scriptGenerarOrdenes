@@ -131,6 +131,19 @@ function hashPin_(pin) {
 }
 
 /**
+ * Determina si un valor crudo de la columna 'Clave' corresponde a un PIN ya configurado.
+ * Solo un hash SHA-256 genuino (64 caracteres hexadecimales) cuenta como configurado;
+ * "", "PENDIENTE" o cualquier resto de contraseña en texto plano (datos heredados antes
+ * de ejecutar migrarSeguridadPIN()) se consideran PENDIENTES, para forzar el flujo de
+ * creación de PIN en vez de una validación que nunca podría tener éxito.
+ * @param {string} claveRaw - Valor crudo de la columna 'Clave'
+ * @returns {boolean} True si es un hash SHA-256 válido (PIN configurado)
+ */
+function isPinConfigured_(claveRaw) {
+  return /^[a-f0-9]{64}$/i.test(claveRaw || "");
+}
+
+/**
  * Actualiza el estado de seguridad de un usuario (Intentos Fallidos y Estado).
  * @param {string} userId - UserID del usuario
  * @param {number} intentos - Número de intentos fallidos

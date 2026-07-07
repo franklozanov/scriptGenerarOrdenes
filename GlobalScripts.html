@@ -255,6 +255,18 @@
   }
 
   /**
+   * Determina si un valor crudo de 'Clave' corresponde a un PIN ya configurado.
+   * Debe reflejar exactamente la misma regla que isPinConfigured_ en Auth.gs:
+   * solo un hash SHA-256 (64 hex) cuenta como configurado; cualquier otro valor
+   * (vacío, "PENDIENTE" o texto plano heredado) requiere el flujo de creación.
+   * @param {string} pin - Valor crudo de la columna 'Clave'
+   * @returns {boolean} True si es un hash SHA-256 válido (PIN configurado)
+   */
+  function isPinConfiguredClient_(pin) {
+    return /^[a-f0-9]{64}$/i.test(pin || "");
+  }
+
+  /**
    * Solicita crear un nuevo PIN en dos etapas.
    * @param {Object} [targetUser] - Objeto de usuario si se firma a nombre de otro.
    * @returns {Promise<string>} Promesa que resuelve con el nuevo PIN configurado o rechaza.
@@ -319,7 +331,7 @@
     if (targetUser) {
       isPending = (targetUser.pinStatus === "PENDIENTE" || targetUser.pinStatus === "");
     } else if (sysData && sysData.currentUser) {
-      isPending = (sysData.currentUser.pin === "PENDIENTE" || sysData.currentUser.pin === "");
+      isPending = !isPinConfiguredClient_(sysData.currentUser.pin);
     }
     
     if (isPending) {

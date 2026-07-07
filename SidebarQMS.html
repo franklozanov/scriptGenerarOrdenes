@@ -656,9 +656,10 @@
     }
 
     // Gate de inicio de sesión: se ejecuta antes de habilitar la UI del sidebar.
-    // - Usuario bloqueado (5 intentos fallidos) -> pantalla de bloqueo, sin gastar más intentos.
-    // - PIN no configurado ("" / "PENDIENTE") -> dispara la creación de PIN existente.
-    // - PIN configurado -> lo solicita y lo valida contra el backend (con reintentos).
+    // La identidad y el PIN ya se validaron en ModalLoginPin.html (ver abrirPanelQMS/
+    // completarLoginYAbrirPanel en SidebarLogic.gs) ANTES de que este Sidebar se abriera,
+    // así que aquí solo queda aplicar los permisos. Se conservan los chequeos defensivos
+    // de usuario no registrado / bloqueado por si el Sidebar se abre por alguna otra vía.
     async function runLoginGate(data) {
       var overlayText = document.getElementById("loading-text");
       var user = data.currentUser;
@@ -673,34 +674,7 @@
         return;
       }
 
-      var pinPendiente = (user.pin === "" || user.pin === "PENDIENTE");
-
-      while (true) {
-        try {
-          if (pinPendiente) {
-            await setupSecurityPin();
-            finishLoginGate(data);
-            return;
-          }
-
-          var pin = await promptSecurityPin("Ingrese su PIN para iniciar sesión");
-          var res = await postWebApp({ operation: "validarAccesoSesion", userId: user.userId, pinFirma: pin });
-
-          if (res.status === "success") {
-            finishLoginGate(data);
-            return;
-          }
-
-          showAlert(res.message, "error");
-          if (res.message && res.message.indexOf("bloqueado") !== -1) {
-            overlayText.textContent = "⛔ Usuario bloqueado por intentos fallidos de PIN. Contacte al administrador.";
-            return;
-          }
-          // PIN incorrecto pero aún no bloqueado: se vuelve a pedir (continúa el while).
-        } catch (e) {
-          // Modal de PIN cancelado por el usuario: se vuelve a solicitar, no se permite continuar sin validar.
-        }
-      }
+      finishLoginGate(data);
     }
 
     function finishLoginGate(data) {

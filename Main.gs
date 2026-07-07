@@ -103,7 +103,7 @@ function onOpenMain(email) {
   // Fase 3: Migración a Sidebar SPA — Configuración y Opciones Admin migradas al Panel
   // Principal QMS (pestaña ⚙️ Configuración), que aplica sus propios permisos por rol.
   var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
-  mainMenu.addItem('🎛️ Abrir Panel Principal QMS', 'abrirSidebarQMS');
+  mainMenu.addItem('🎛️ Abrir Panel Principal QMS', 'abrirPanelQMS');
   mainMenu.addToUi();
   Logger.log("Menús de UI creados exitosamente.");
   
@@ -239,25 +239,41 @@ function clearPermissionsCache() {
 
 /**
  * Busca al usuario en la hoja 'Usuarios' por su correo electrónico.
- * (Implementación de la función faltante)
+ * Devuelve solo la primera coincidencia (comportamiento histórico, usado por la
+ * mayoría de llamadores). Si varios UserID comparten el mismo correo (ej. equipo
+ * compartido), use getUserRecordsByEmail_ para obtener todas las coincidencias.
  * @param {string} email - Correo del usuario activo.
- * @returns {Object|null} Objeto con {email, rol} o null si no se encuentra.
+ * @returns {Object|null} Objeto con datos del usuario o null si no se encuentra.
  */
 function getUserRecordByEmail_(email) {
-  if (!email) return null;
-  
+  var registros = getUserRecordsByEmail_(email);
+  return registros.length > 0 ? registros[0] : null;
+}
+
+/**
+ * Busca en la hoja 'Usuarios' TODAS las filas cuyo correo coincida con el dado.
+ * Necesario para el flujo de login (ModalLoginPin) cuando un mismo correo (ej. un
+ * puesto de trabajo compartido) está asociado a varios UserID distintos: en ese
+ * caso se debe pedir al usuario elegir con cuál identidad desea firmar/operar.
+ * @param {string} email - Correo del usuario activo.
+ * @returns {Object[]} Arreglo de objetos de usuario (vacío si no hay coincidencias).
+ */
+function getUserRecordsByEmail_(email) {
+  var resultados = [];
+  if (!email) return resultados;
+
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Usuarios');
     if (!sheet) {
       Logger.log("❌ Error: No se encontró la hoja 'Usuarios'");
-      return null;
+      return resultados;
     }
-    
+
     var data = sheet.getDataRange().getValues();
-    if (data.length < 2) return null; // No hay registros
-    
+    if (data.length < 2) return resultados; // No hay registros
+
     var headers = data[0];
-    
+
     var userIdCol = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
     var emailCol = getColumnIndexByNameCaseInsensitive(headers, 'Correo', false) || getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
     var rolCol = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
@@ -266,7 +282,7 @@ function getUserRecordByEmail_(email) {
     var cortoCol = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
     var claveCol = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
     var intentosCol = getColumnIndexByNameCaseInsensitive(headers, 'IntentosFallidos', false);
-    
+
     var userIdIdx = userIdCol ? userIdCol - 1 : 0;
     var emailIdx = emailCol ? emailCol - 1 : 0;
     var rolIdx = rolCol ? rolCol - 1 : 1;
@@ -275,11 +291,12 @@ function getUserRecordByEmail_(email) {
     var cortoIdx = cortoCol ? cortoCol - 1 : null;
     var claveIdx = claveCol ? claveCol - 1 : null;
     var intentosIdx = intentosCol ? intentosCol - 1 : null;
-    
+
+    var targetEmail = email.toLowerCase();
     for (var i = 1; i < data.length; i++) {
       var rowEmail = data[i][emailIdx] ? data[i][emailIdx].toString().trim().toLowerCase() : '';
-      if (rowEmail === email.toLowerCase()) {
-        return {
+      if (rowEmail === targetEmail) {
+        resultados.push({
           userId: data[i][userIdIdx] ? data[i][userIdIdx].toString().trim() : '',
           email: data[i][emailIdx].toString().trim(),
           rol: data[i][rolIdx].toString().trim(),
@@ -288,12 +305,12 @@ function getUserRecordByEmail_(email) {
           nombreCorto: cortoIdx !== null && data[i][cortoIdx] ? data[i][cortoIdx].toString().trim() : '',
           pin: claveIdx !== null && data[i][claveIdx] !== undefined ? data[i][claveIdx].toString().trim() : "",
           intentosFallidos: intentosIdx !== null && data[i][intentosIdx] !== undefined ? parseInt(data[i][intentosIdx]) || 0 : 0
-        };
+        });
       }
     }
   } catch (e) {
-    Logger.log("Error en getUserRecordByEmail_: " + e.message);
+    Logger.log("Error en getUserRecordsByEmail_: " + e.message);
   }
-  
-  return null;
+
+  return resultados;
 }

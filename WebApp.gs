@@ -141,7 +141,7 @@ function handlePrivilegedOperation_(params) {
 
   if (operation === 'configurarNuevoPin') {
     var userRecord = getUserRecordByUserId_(callingUserId);
-    if (userRecord.pin && userRecord.pin !== "PENDIENTE") {
+    if (isPinConfigured_(userRecord.pin)) {
       return { status: 'error', message: 'El usuario ya tiene un PIN configurado.', diagnostic: 'PIN_ALREADY_EXISTS' };
     }
     if (!params.nuevoPin || params.nuevoPin.toString().length !== 4) {
