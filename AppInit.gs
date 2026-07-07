@@ -49,7 +49,17 @@ function initializeApp(ui) {
   if (response === ui.Button.YES) {
     createMissingSheets(ui);
     fixHeaders(ui);
-    ui.alert('✅ Inicialización completada. Estructura corregida.\n\nIMPORTANTE: Si está actualizando desde una versión anterior, ejecute la función "migrarAdjuntoOrdenANuevasColumnas" desde el menú Script Editor.');
+    
+    // Asegurar estructura y dropdowns de Matrices K (Prioridad y Activa)
+    try {
+      if (typeof ensureMatricesConfigSheet_ === 'function') {
+        ensureMatricesConfigSheet_();
+      }
+    } catch (e) {
+      Logger.log("⚠️ Error inicializando MatricesConfig desde initializeApp: " + e.message);
+    }
+    
+    ui.alert('✅ Inicialización completada. Estructura y validaciones corregidas.\n\nIMPORTANTE: Si está actualizando desde una versión anterior, ejecute la función "migrarAdjuntoOrdenANuevasColumnas" desde el menú Script Editor.');
 
     // Registrar inicialización en Logs si existe
     logInitialization();
