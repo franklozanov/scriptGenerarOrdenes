@@ -107,6 +107,38 @@
       max-width: 280px;
       margin-top: 20px;
     }
+
+    .lp-admin-override-link {
+      display: block;
+      margin-top: 14px;
+      font-size: 12px;
+      color: #2563eb;
+      text-decoration: underline;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .lp-admin-override-form {
+      width: 100%;
+      max-width: 280px;
+      margin-top: 10px;
+    }
+
+    .lp-admin-override-form input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .lp-admin-override-form button {
+      margin-top: 8px;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -154,6 +186,11 @@
 
     function nombreDe(candidato) {
       return candidato.nombreCompleto || candidato.nombreCorto || candidato.userId;
+    }
+
+    function esRolAdmin_(rol) {
+      var u = (rol || '').toString().toUpperCase();
+      return u === 'ADMIN' || u === 'ADMINISTRADOR' || u === 'ADMINISTRADOR DE SISTEMA';
     }
 
     // === PASO 1: identidad ===
@@ -206,7 +243,78 @@
         renderPinInputs(function (pin, inputs) {
           validarPin(pin, inputs, candidato);
         });
+        if (esRolAdmin_(candidato.rol)) {
+          renderAdminOverrideLink(candidato);
+        }
       }
+    }
+
+    // === Recuperación exclusiva ADMIN: clave de administrador en vez del PIN ===
+    function renderAdminOverrideLink(candidato) {
+      var link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'lp-admin-override-link';
+      link.textContent = '¿Olvidó su PIN? Usar clave de administrador';
+      link.addEventListener('click', function () {
+        renderAdminOverrideForm(candidato);
+      });
+      document.querySelector('.lp-container').insertBefore(link, document.querySelector('.lp-actions'));
+    }
+
+    function renderAdminOverrideForm(candidato) {
+      document.querySelectorAll('.lp-admin-override-link, .lp-admin-override-form').forEach(function (el) { el.remove(); });
+
+      var form = document.createElement('div');
+      form.className = 'lp-admin-override-form';
+      form.innerHTML =
+        '<input type="password" class="lp-admin-override-input" placeholder="Clave de administrador">' +
+        '<button type="button" class="btn btn-secondary lp-admin-override-submit">Validar clave de administrador</button>' +
+        '<div class="lp-error" id="lp-override-error"></div>';
+      document.querySelector('.lp-container').insertBefore(form, document.querySelector('.lp-actions'));
+
+      var input = form.querySelector('.lp-admin-override-input');
+      var submitBtn = form.querySelector('.lp-admin-override-submit');
+
+      function submitOverride() {
+        var clave = input.value;
+        if (!clave) return;
+        validarClaveAdmin(clave, input, submitBtn, candidato);
+      }
+
+      submitBtn.addEventListener('click', submitOverride);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') submitOverride();
+      });
+      input.focus();
+    }
+
+    function validarClaveAdmin(clave, input, submitBtn, candidato) {
+      input.disabled = true;
+      submitBtn.disabled = true;
+      var errEl = document.getElementById('lp-override-error');
+      if (errEl) errEl.textContent = 'Validando...';
+
+      fetch(webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify({ operation: 'validarAccesoSesion', userId: candidato.userId, pinFirma: '__ADMIN_OVERRIDE__:' + clave })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.status === 'success') {
+            finalizarLogin(candidato.userId);
+            return;
+          }
+          if (errEl) errEl.textContent = data.message || 'Clave de administrador incorrecta.';
+          input.disabled = false;
+          submitBtn.disabled = false;
+          input.value = '';
+          input.focus();
+        })
+        .catch(function (err) {
+          if (errEl) errEl.textContent = 'Error de conexión: ' + (err && err.message ? err.message : err);
+          input.disabled = false;
+          submitBtn.disabled = false;
+        });
     }
 
     // === Entrada de PIN de 4 dígitos (reutilizable para crear y validar) ===
