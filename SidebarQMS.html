@@ -241,6 +241,20 @@
               </div>
             </div>
 
+            <!-- Persistencia de sesión (evita re-pedir PIN al reabrir el panel) -->
+            <div id="session-persist-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Persistencia de Sesión</div>
+              <p style="font-size:12px; margin-bottom:8px;">Minutos que la sesión permanece activa para reabrir el panel sin volver a pedir PIN.</p>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="number" id="sp_minutos" class="form-input" style="width:100px; padding:4px;" min="0" max="1440" placeholder="30">
+                <button class="btn-primary-small" onclick="sp_guardar()">Guardar</button>
+              </div>
+              <div id="sp_status" style="font-size:12px; margin-top:8px; color:#64748b;">
+                0 = pedir PIN en cada apertura. Las firmas electrónicas (impresión, autorización QA, aprobaciones) siempre piden PIN, sin importar este valor.
+              </div>
+              <button class="btn-secondary-small" style="margin-top:10px;" onclick="sp_cerrarSesion()">🔒 Cerrar sesión ahora</button>
+            </div>
+
             <!-- Panel: Autoaprobación temporal de solicitudes (requiere GESTIONAR_AUTOAPROBACION) -->
             <div id="unlock-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
               <div class="section-title" style="margin-top:0;">Desbloqueo de Sistema (Edición Manual)</div>
@@ -594,7 +608,7 @@
           document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
           btn.classList.add('active');
           document.getElementById(btn.dataset.target).classList.add('active');
-          if (btn.dataset.target === 'tab-config') mtz_cargarLista();
+          if (btn.dataset.target === 'tab-config') { mtz_cargarLista(); sp_cargarConfig(); }
         });
       });
 
@@ -1151,6 +1165,68 @@
         hideLoading();
         showError('Error de comunicación: ' + err.message);
       }
+    }
+
+    // --- Persistencia de Sesión ---
+    async function sp_cargarConfig() {
+      try {
+        const res = await postWebApp({ operation: 'getSessionPersistConfig', userId: sysData.currentUser.userId });
+        if (res.status === 'success') {
+          document.getElementById('sp_minutos').value = (res.minutos !== undefined && res.minutos !== null) ? res.minutos : 30;
+        }
+      } catch (err) {
+        console.warn('No se pudo cargar la config de persistencia de sesión:', err.message);
+      }
+    }
+
+    async function sp_guardar() {
+      const minutos = parseInt(document.getElementById('sp_minutos').value, 10);
+      if (isNaN(minutos) || minutos < 0 || minutos > 1440) {
+        showError('Ingrese un número entre 0 y 1440 minutos.');
+        return;
+      }
+
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese su PIN de administrador para cambiar la persistencia de sesión:', { allowAdminOverride: true });
+      } catch (e) {
+        return;
+      }
+
+      showLoading('Guardando configuración...');
+      try {
+        const res = await postWebApp({
+          operation: 'setSessionPersist',
+          minutos: minutos,
+          userId: sysData.currentUser.userId,
+          pinFirma: pinFirma
+        });
+        hideLoading();
+        if (res.status === 'success') {
+          showToast(res.message || 'Persistencia de sesión actualizada.', 'success');
+        } else {
+          showError('Error: ' + res.message);
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error de comunicación: ' + err.message);
+      }
+    }
+
+    async function sp_cerrarSesion() {
+      const confirmado = await showConfirm('Cerrar sesión', 'La próxima vez que abras el panel se te pedirá el PIN de nuevo. ¿Continuar?');
+      if (!confirmado) return;
+      showLoading('Cerrando sesión...');
+      google.script.run
+        .withSuccessHandler(function () {
+          hideLoading();
+          showToast('Sesión cerrada. Se pedirá PIN en la próxima apertura.', 'success');
+        })
+        .withFailureHandler(function (err) {
+          hideLoading();
+          showError('No se pudo cerrar la sesión: ' + err.message);
+        })
+        .cerrarSesionQMS();
     }
 
     // --- Gestión de Plantillas ---

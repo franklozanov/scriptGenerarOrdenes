@@ -66,6 +66,15 @@ var PERMISOS = {
 // --- CLAVE DE CONFIGURACIÓN DE AUTOAPROBACIÓN TEMPORAL (ScriptProperties) ---
 var AUTO_APPROVAL_PROP_KEY = 'AUTO_APPROVAL_CONFIG';
 
+// --- CLAVE DE CONFIGURACIÓN DE PERSISTENCIA DE SESIÓN (ScriptProperties) ---
+// Minutos que una sesión validada por PIN permanece vigente para REABRIR el panel
+// sin volver a pedir PIN. 0 = pedir PIN en cada apertura. No afecta las firmas
+// electrónicas 21 CFR Part 11 (impresión, autorización QA, aprobaciones), que
+// siempre re-piden PIN sin importar este valor.
+var SESSION_PERSIST_PROP_KEY = 'SESSION_PERSIST_MINUTES';
+var SESSION_PERSIST_DEFAULT_MIN = 30;
+var SESSION_PERSIST_MAX_MIN = 1440; // 24 h
+
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 

@@ -87,7 +87,11 @@ function getInitialData(includeBase64) {
     var activeEmail = Session.getActiveUser().getEmail();
     var validUser = null;
     try {
-      var sesionCache = CacheService.getUserCache().get('qmsSesionValidada');
+      // Fuente de verdad: UserProperties (persistente, TTL controlado por el admin vía
+      // getSessionPersistMinutes). Fallback a UserCache por compatibilidad.
+      var sesionCache = null;
+      try { sesionCache = PropertiesService.getUserProperties().getProperty('qmsSesionValidada'); } catch (ePropRead) {}
+      if (!sesionCache) sesionCache = CacheService.getUserCache().get('qmsSesionValidada');
       if (sesionCache) {
         var sesionInfo = JSON.parse(sesionCache);
         var candidatos = getUserRecordsByEmail_(activeEmail);

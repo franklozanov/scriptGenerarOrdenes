@@ -20,14 +20,17 @@ function onOpen() {
     Logger.log("Email detectado inicialmente: '" + activeEmail + "'");
     
     if (!activeEmail || activeEmail === "") {
-      Logger.log("onOpen: Correo no detectado. Creando menú de autorización nativa.");
-      SpreadsheetApp.getUi().createMenu('🔐 Iniciar Sesión')
-        .addItem('Autorizar Acceso', 'autorizarUsuarioExterno')
+      Logger.log("onOpen: Correo no detectado (AuthMode.LIMITED). Creando menú de acceso.");
+      // onOpen es un trigger simple: corre en AuthMode.LIMITED y suele no entregar el
+      // correo. El clic en este menú ejecuta iniciarSesionYAbrirPanel en AuthMode.FULL,
+      // donde sí se obtiene el correo, y de ahí pasa directo al flujo de PIN + panel.
+      SpreadsheetApp.getUi().createMenu('🔐 Iniciar Sesión QMS')
+        .addItem('🎛️ Iniciar Sesión y Abrir Panel', 'iniciarSesionYAbrirPanel')
         .addToUi();
-        
+
       SpreadsheetApp.getActiveSpreadsheet().toast(
-        'Por favor, haz clic en "🔐 Iniciar Sesión" en el menú superior para cargar los permisos de la aplicación.', 
-        'Autorización Requerida', 
+        'Haz clic en "🔐 Iniciar Sesión QMS" en el menú superior para ingresar al sistema.',
+        'Acceso al Sistema',
         10
       );
       return;
@@ -44,30 +47,36 @@ function onOpen() {
 }
 
 /**
- * Función ejecutada manualmente por usuarios externos desde el menú.
- * Fuerza a Google a validar los permisos OAuth y captura el correo real.
+ * Punto de entrada UNIFICADO ejecutado por clic de menú (AuthMode.FULL, donde el correo
+ * sí está disponible). Captura la identidad de Google, reconstruye el menú "Gestionar OA"
+ * y abre directamente el flujo de acceso (PIN + panel, o panel directo si la sesión sigue
+ * vigente). Reemplaza al antiguo autorizarUsuarioExterno, que solo reconstruía el menú y
+ * dejaba al usuario con un paso muerto adicional antes de poder entrar.
  */
-function autorizarUsuarioExterno() {
+function iniciarSesionYAbrirPanel() {
   try {
-    Logger.log("Iniciando autorizarUsuarioExterno...");
+    Logger.log("Iniciando iniciarSesionYAbrirPanel...");
     var activeEmail = Session.getActiveUser().getEmail();
-    
+
     if (!activeEmail || activeEmail === "") {
-      Logger.log("❌ Falla en autorizarUsuarioExterno: No se pudo capturar el correo.");
+      Logger.log("❌ Falla en iniciarSesionYAbrirPanel: No se pudo capturar el correo.");
       SpreadsheetApp.getUi().alert(
-        '❌ Error de Autorización', 
-        'No se pudo obtener la autorización de Google. El sistema no puede identificar su cuenta de correo de forma segura.', 
+        '❌ Error de Autorización',
+        'No se pudo obtener la autorización de Google. El sistema no puede identificar su cuenta de correo de forma segura.',
         SpreadsheetApp.getUi().ButtonSet.OK
       );
       return;
     }
-    
-    Logger.log("Identidad verificada manualmente: " + activeEmail);
-    SpreadsheetApp.getActiveSpreadsheet().toast('Identidad verificada: ' + activeEmail + '. Cargando sistema...', 'Éxito', 3);
+
+    Logger.log("Identidad verificada: " + activeEmail);
+    // Reconstruir el menú "Gestionar OA" (valida usuario/permisos y oculta hojas)
     onOpenMain(activeEmail);
+    // Abrir directamente el flujo de acceso: si la sesión sigue vigente entra al panel,
+    // si no, muestra el modal de PIN. Un solo clic lleva de "sin identidad" a "panel".
+    abrirPanelQMS();
   } catch (e) {
-    Logger.log("❌ ERROR en autorizarUsuarioExterno: " + e.message);
-    SpreadsheetApp.getUi().alert("Error", "Fallo al autorizar: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    Logger.log("❌ ERROR en iniciarSesionYAbrirPanel: " + e.message);
+    SpreadsheetApp.getUi().alert("Error", "Fallo al iniciar sesión: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -103,7 +112,7 @@ function onOpenMain(email) {
   // Fase 3: Migración a Sidebar SPA — Configuración y Opciones Admin migradas al Panel
   // Principal QMS (pestaña ⚙️ Configuración), que aplica sus propios permisos por rol.
   var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
-  mainMenu.addItem('🎛️ Abrir Panel Principal QMS', 'abrirPanelQMS');
+  mainMenu.addItem('🎛️ Iniciar Sesión y Abrir Panel QMS', 'abrirPanelQMS');
   mainMenu.addToUi();
   Logger.log("Menús de UI creados exitosamente.");
   

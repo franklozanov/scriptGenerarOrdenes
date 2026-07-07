@@ -529,6 +529,21 @@ function handlePrivilegedOperation_(params) {
     return procesarSetAutoApproval(params, callingUserId);
   }
 
+  if (operation === 'getSessionPersistConfig') {
+    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
+      return { status: 'error', message: 'No tiene permisos para ver esta configuración.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    return { status: 'success', minutos: getSessionPersistMinutes() };
+  }
+
+  if (operation === 'setSessionPersist') {
+    // El gate de PIN ya corrió en requireAuthorizedUserStrict_ (handlePrivilegedOperation_).
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede cambiar la persistencia de sesión.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    return procesarSetSessionPersist(params, callingUserId);
+  }
+
   if (operation === 'setSystemUnlock') {
     if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
       return { status: 'error', message: 'No tiene permisos de administración.', diagnostic: 'PERMISSION_DENIED' };

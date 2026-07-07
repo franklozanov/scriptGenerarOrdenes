@@ -46,6 +46,16 @@ function abrirSidebarQMS() {
  * real) de bloqueo de acceso a los datos durante la autenticación.
  */
 function abrirPanelQMS() {
+  // Si la sesión validada por PIN sigue vigente (dentro de la ventana de persistencia
+  // configurada por el admin), se salta el modal de PIN y se abre el panel directamente.
+  // Las firmas 21 CFR Part 11 (impresión, autorización QA, aprobaciones) NO se ven
+  // afectadas: siguen pidiendo PIN por su cuenta al ejecutarse.
+  var sesion = sesionSigueVigente_();
+  if (sesion.vigente) {
+    abrirSidebarQMS();
+    return;
+  }
+
   var template = HtmlService.createTemplateFromFile('ModalLoginPin');
   template.identidad = JSON.stringify(resolverIdentidadSesion());
   var html = template.evaluate()
@@ -97,8 +107,114 @@ function completarLoginYAbrirPanel(userId) {
     throw new Error("ACCESO DENEGADO: El UserID indicado no corresponde a la sesión activa.");
   }
 
-  CacheService.getUserCache().put('qmsSesionValidada', JSON.stringify({ userId: userId, ts: Date.now() }), 300);
+  // Marca de sesión validada por PIN. Se persiste en UserProperties con timestamp propio
+  // (no en UserCache, cuyo TTL máximo es 6 h) para que la ventana de persistencia la
+  // controle el admin sin ese tope. La vigencia se evalúa contra getSessionPersistMinutes()
+  // en sesionSigueVigente_. Se conserva también en UserCache por compatibilidad con
+  // lecturas previas, pero UserProperties es la fuente de verdad.
+  var marca = JSON.stringify({ userId: userId, ts: Date.now() });
+  try { PropertiesService.getUserProperties().setProperty('qmsSesionValidada', marca); } catch (e) {
+    Logger.log('completarLoginYAbrirPanel: no se pudo escribir UserProperties: ' + e.message);
+  }
+  try { CacheService.getUserCache().put('qmsSesionValidada', marca, 21600); } catch (e) {}
+
   abrirSidebarQMS();
+}
+
+// -------------------------------------------------------
+// PERSISTENCIA DE SESIÓN (evita re-pedir PIN al reabrir el panel)
+// -------------------------------------------------------
+
+/**
+ * Lee la marca de sesión validada del usuario actual (UserProperties, con fallback a
+ * UserCache) y determina si sigue vigente según la ventana configurada por el admin.
+ * Verifica además que el userId marcado siga perteneciendo al correo de la sesión activa
+ * (defensa: mismo criterio que getInitialData en Cache.gs).
+ * @returns {Object} { vigente: boolean, userId: string }
+ */
+function sesionSigueVigente_() {
+  try {
+    var minutos = getSessionPersistMinutes();
+    if (!minutos || minutos <= 0) return { vigente: false, userId: '' };
+
+    var raw = '';
+    try { raw = PropertiesService.getUserProperties().getProperty('qmsSesionValidada'); } catch (e) {}
+    if (!raw) {
+      try { raw = CacheService.getUserCache().get('qmsSesionValidada'); } catch (e) {}
+    }
+    if (!raw) return { vigente: false, userId: '' };
+
+    var info = JSON.parse(raw);
+    if (!info || !info.userId || !info.ts) return { vigente: false, userId: '' };
+
+    var minutosTranscurridos = (Date.now() - info.ts) / 60000;
+    if (minutosTranscurridos > minutos) return { vigente: false, userId: info.userId };
+
+    var activeEmail = Session.getActiveUser().getEmail();
+    var candidatos = getUserRecordsByEmail_(activeEmail);
+    var pertenece = candidatos.some(function(c) { return c.userId === info.userId; });
+    if (!pertenece) return { vigente: false, userId: '' };
+
+    return { vigente: true, userId: info.userId };
+  } catch (e) {
+    Logger.log('sesionSigueVigente_: ' + e.message);
+    return { vigente: false, userId: '' };
+  }
+}
+
+/**
+ * Devuelve los minutos de persistencia de sesión configurados. Solo lectura, callable
+ * desde el cliente para poblar la UI. Default SESSION_PERSIST_DEFAULT_MIN si no hay valor.
+ * @returns {number} Entero >= 0.
+ */
+function getSessionPersistMinutes() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(SESSION_PERSIST_PROP_KEY);
+    if (raw === null || raw === '') return SESSION_PERSIST_DEFAULT_MIN;
+    var n = parseInt(raw, 10);
+    if (isNaN(n) || n < 0) return SESSION_PERSIST_DEFAULT_MIN;
+    return Math.min(n, SESSION_PERSIST_MAX_MIN);
+  } catch (e) {
+    return SESSION_PERSIST_DEFAULT_MIN;
+  }
+}
+
+/**
+ * Guarda los minutos de persistencia de sesión. Operación privilegiada: requiere
+ * permiso de administrador y firma PIN (validada en la Web App antes de llamar aquí).
+ * @param {Object} params - { minutos }
+ * @param {string} userId - UserID validado que ejecuta el cambio.
+ * @returns {Object} Resultado con la config persistida.
+ */
+function procesarSetSessionPersist(params, userId) {
+  enforcePermission(userId, PERMISOS.MENU_ADMIN);
+
+  var minutos = parseInt(params.minutos, 10);
+  if (isNaN(minutos) || minutos < 0) throw new Error('Los minutos deben ser un número entero mayor o igual a 0.');
+  if (minutos > SESSION_PERSIST_MAX_MIN) throw new Error('El máximo permitido es ' + SESSION_PERSIST_MAX_MIN + ' minutos (24 h).');
+
+  PropertiesService.getScriptProperties().setProperty(SESSION_PERSIST_PROP_KEY, String(minutos));
+
+  var userIdentity = getUserIdentityStringByUserId_(userId);
+  logChange(
+    'CONFIG_SESION_PERSISTENCIA',
+    'Persistencia de sesión configurada en ' + minutos + ' minuto(s)' + (minutos === 0 ? ' (siempre pedir PIN)' : ''),
+    userIdentity
+  );
+
+  return { status: 'success', message: 'Persistencia de sesión: ' + minutos + ' min.', minutos: minutos };
+}
+
+/**
+ * Borra la marca de sesión validada del usuario actual, forzando que la próxima
+ * apertura del panel pida PIN de nuevo. Útil en puestos de trabajo compartidos.
+ * Callable desde el cliente (google.script.run).
+ * @returns {Object} { ok: true }
+ */
+function cerrarSesionQMS() {
+  try { PropertiesService.getUserProperties().deleteProperty('qmsSesionValidada'); } catch (e) {}
+  try { CacheService.getUserCache().remove('qmsSesionValidada'); } catch (e) {}
+  return { ok: true };
 }
 
 /**
