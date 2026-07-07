@@ -2,7 +2,6 @@
   "name": "scriptgenerarordenes",
   "version": "1.0.0",
   "description": "",
-  "main": "Index.html_1.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky"
