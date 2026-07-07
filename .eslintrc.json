@@ -5,6 +5,7 @@
     "es2022": true
   },
   "globals": {
+    "ADMIN_OVERRIDE_PREFIX_": "readonly",
     "ADMIN_PASS": "readonly",
     "AUTO_APPROVAL_PROP_KEY": "readonly",
     "MATRICES_CONFIG_HEADERS": "readonly",
@@ -36,6 +37,8 @@
     "enforcePermission": "readonly",
     "ensureConsecutivoImpColumn_": "readonly",
     "ensureMatricesConfigSheet_": "readonly",
+    "escapeHtml": "readonly",
+    "esRolAdmin_": "readonly",
     "evaluateAutoApproval_": "readonly",
     "extractDriveId": "readonly",
     "finalizeFinalPdfPostSave": "readonly",
@@ -60,6 +63,7 @@
     "initializeModalDragResize": "readonly",
     "internalUpdateTraceability": "readonly",
     "isPinConfigured_": "readonly",
+    "isPinConfiguredClient_": "readonly",
     "isReimpresionType_": "readonly",
     "logChange": "readonly",
     "migrarSeguridadPIN": "readonly",
@@ -109,14 +113,12 @@
     "no-unused-vars": ["warn", { "vars": "local", "args": "none" }]
   },
   "ignorePatterns": [
-    "node_modules/"
-  ],
-  "overrides": [
-    {
-      "files": ["*.html"],
-      "rules": {
-        "no-undef": "off"
-      }
-    }
+    "node_modules/",
+    "Index.html",
+    "ModalAprobarImpresion.html",
+    "ModalAutorizarQA.html",
+    "ModalCargaOrdenes.html",
+    "ModalRegistroNovedad.html",
+    "Index.html_1.js"
   ]
 }
