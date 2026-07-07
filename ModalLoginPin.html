@@ -120,9 +120,11 @@
   </div>
 
   <!-- Data island: el HtmlService inyecta el JSON aquí en evaluate(). Se usa un
-       script type="application/json" (en vez de <?!= ?> directo dentro del
-       <script> JS de abajo) para que el parser de ESLint pueda analizar el
-       bloque de JavaScript sin tropezar con el scriptlet de plantilla. -->
+       script de tipo application/json en vez de imprimir el scriptlet de
+       plantilla directo dentro del bloque de JavaScript de abajo, para que
+       tanto ESLint como el propio compilador de plantillas de Apps Script
+       (que escanea todo el archivo en busca de delimitadores de scriptlet,
+       incluso dentro de comentarios) no tropiecen con él. -->
   <script type="application/json" id="lp-identidad-data"><?!= identidad ?></script>
 
   <script>
