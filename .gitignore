@@ -20,3 +20,11 @@
 !*.html
 !*.json
 !*.md
+
+# --- SEGURIDAD: credenciales de clasp NUNCA deben versionarse ---
+# .clasprc.json contiene tokens OAuth. La whitelist de arriba permite *.json,
+# así que hay que re-ignorar explícitamente cualquier credencial de clasp.
+.clasprc.json
+*.clasprc.json
+clasp.json.creds
+.clasp-credentials.json
