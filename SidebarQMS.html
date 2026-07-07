@@ -1062,9 +1062,9 @@
           ${renderField('Descripcion', 'Descripción', data.Descripcion || '', 'full-width')}
           ${renderField('NoAnalisis', 'No Análisis K', data.NoAnalisis || '', '', 'onchange="co_validarAnalisis(this)"')}
           ${renderField('Fabricante', 'Fabricante', data.Fabricante || '')}
-          ${renderField('Lote', 'Lote', data.Lote || '', '', 'oninput="co_compararCampo(this, \\'lote\\')"')}
-          ${renderField('Exp', 'Exp (MM/YYYY)', data.Exp || '', '', 'oninput="co_compararCampo(this, \\'exp\\')"')}
-          ${renderField('Cantidad', 'Cantidad', data.Cantidad || '', '', 'oninput="co_compararCampo(this, \\'cantidad\\')"')}
+          ${renderField('Lote', 'Lote', data.Lote || '', '', "oninput='co_compararCampo(this, \"lote\")'")}
+          ${renderField('Exp', 'Exp (MM/YYYY)', data.Exp || '', '', "oninput='co_compararCampo(this, \"exp\")'")}
+          ${renderField('Cantidad', 'Cantidad', data.Cantidad || '', '', "oninput='co_compararCampo(this, \"cantidad\")'")}
           <div class="file-upload-box full-width">
             <div>📄 OA: <input type="file" accept="application/pdf" data-field="FileOA"></div>
             <div style="margin-top:4px;">📄 COA: <input type="file" accept="application/pdf" data-field="FileCOA"></div>
