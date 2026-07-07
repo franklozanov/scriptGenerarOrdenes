@@ -518,10 +518,18 @@
   </div>
 
   <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
-  
+
+  <!-- Data island: abrirSidebarQMS() (SidebarLogic.gs) ya resolvió y precargó
+       getInitialData() en el servidor ANTES de mostrar este Sidebar (aprovechando
+       el tiempo en que el usuario estaba validando su PIN en ModalLoginPin.html
+       para precalentar el caché), así se evita un round-trip completo apenas se
+       abre el panel. Si por algún motivo no vino data (ej. falló en el servidor),
+       el script de abajo hace el fallback a la llamada asíncrona de siempre. -->
+  <script type="application/json" id="sidebar-initial-data"><?!= initialData ?></script>
+
   <script>
     // Variables globales
-    var sysData = null; 
+    var sysData = null;
     var co_cardCount = 0;
     var cardMemoryData = {}; // Memoria temporal para validaciones on-edit
     
@@ -574,18 +582,33 @@
       // para que ya esté cargado o en caché del navegador cuando el usuario imprima.
       imp_preloadPdfLib();
 
-      // Cargar datos iniciales. Primero getInitialData, luego el gate de inicio de
-      // sesión (PIN) antes de habilitar la UI, y por último getTemplatesBase64Async.
-      google.script.run
-        .withSuccessHandler(function(data) {
-          sysData = data;
-          runLoginGate(data);
-        })
-        .withFailureHandler(function(err) {
-          showAlert("Error de carga inicial: " + err.message, "error");
-          document.getElementById("loading-overlay").classList.add("hidden");
-        })
-        .getInitialData(false);
+      // Cargar datos iniciales. Se usan los datos precargados por el servidor
+      // (ver abrirSidebarQMS en SidebarLogic.gs) si vinieron; si no, se cae al
+      // fetch asíncrono de siempre. Luego el gate de inicio de sesión (PIN)
+      // antes de habilitar la UI, y por último getTemplatesBase64Async.
+      var preloadedDataEl = document.getElementById('sidebar-initial-data');
+      var preloadedData = null;
+      try {
+        preloadedData = preloadedDataEl ? JSON.parse(preloadedDataEl.textContent) : null;
+      } catch (e) {
+        preloadedData = null;
+      }
+
+      if (preloadedData) {
+        sysData = preloadedData;
+        runLoginGate(preloadedData);
+      } else {
+        google.script.run
+          .withSuccessHandler(function(data) {
+            sysData = data;
+            runLoginGate(data);
+          })
+          .withFailureHandler(function(err) {
+            showAlert("Error de carga inicial: " + err.message, "error");
+            document.getElementById("loading-overlay").classList.add("hidden");
+          })
+          .getInitialData(false);
+      }
 
       // Event Listener Global para Pegar (para Carga Órdenes)
       document.addEventListener('paste', co_handlePaste);

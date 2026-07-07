@@ -8,10 +8,30 @@
  * No debe invocarse directamente desde el menú: primero debe pasar por el gate
  * de identidad/PIN en abrirPanelQMS(). Se deja pública porque también se llama
  * desde completarLoginYAbrirPanel() una vez validado el PIN.
+ *
+ * Precarga getInitialData() en el servidor e inyecta el resultado directamente
+ * en la plantilla (como ya hacen ModalCargaOrdenes/ModalAutorizarQA/etc.), en
+ * vez de dejar que el Sidebar lo pida por su cuenta recién al mostrarse. Esto
+ * elimina un round-trip completo del camino crítico entre "PIN validado" y
+ * "panel utilizable" — y como abrirPanelQMS() ya dispara una precarga del mismo
+ * caché mientras el usuario ingresa su PIN (ver ModalLoginPin.html), esta
+ * llamada normalmente ya encuentra el caché de hojas 'Usuarios'/'templates'
+ * caliente. Si getInitialData() fallara igual, se degrada de forma segura: el
+ * Sidebar abre sin datos precargados y hace su propio fetch asíncrono de
+ * respaldo (ver SidebarQMS.html).
  */
 function abrirSidebarQMS() {
-  var html = HtmlService.createTemplateFromFile('SidebarQMS')
-      .evaluate()
+  var template = HtmlService.createTemplateFromFile('SidebarQMS');
+
+  var initialData = null;
+  try {
+    initialData = getInitialData(false);
+  } catch (e) {
+    Logger.log("abrirSidebarQMS: no se pudo precargar getInitialData, el Sidebar la pedirá por su cuenta: " + e.message);
+  }
+  template.initialData = initialData ? JSON.stringify(initialData) : 'null';
+
+  var html = template.evaluate()
       .setTitle('Panel Principal QMS')
       .setWidth(300);
   SpreadsheetApp.getUi().showSidebar(html);

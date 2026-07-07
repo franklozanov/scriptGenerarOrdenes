@@ -131,6 +131,15 @@
     var identidad = JSON.parse(document.getElementById('lp-identidad-data').textContent);
     var webAppUrl = identidad.webAppUrl || '';
 
+    // Precalentar en segundo plano el caché de getInitialData() (hojas 'Usuarios'
+    // y 'templates') MIENTRAS el usuario ve el saludo y escribe su PIN — así,
+    // cuando la validación resulte exitosa y se abra el Sidebar (abrirSidebarQMS
+    // en SidebarLogic.gs), este ya encuentra ese caché caliente y abre casi de
+    // inmediato en vez de tener que leer las hojas desde cero en ese momento.
+    // Es solo una precarga silenciosa: nunca muestra nada ni afecta el gate de
+    // PIN, que sigue siendo la única puerta de entrada al panel.
+    google.script.run.getInitialData(false);
+
     document.getElementById('lp-cancel-btn').addEventListener('click', function () {
       google.script.host.close();
     });
