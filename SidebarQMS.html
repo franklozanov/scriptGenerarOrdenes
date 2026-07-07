@@ -156,6 +156,57 @@
               <div id="diagnostics-results-consecutivo" style="margin-top:10px; font-size:12px; display:none; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;"></div>
             </div>
 
+            <!-- Gestión de Matrices K -->
+            <div id="matrices-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+              <div class="section-title" style="margin-top:0;">Gestión de Matrices K</div>
+              <p style="font-size:12px; margin-bottom:8px;">Crear, editar o eliminar Matrices K externas. Requiere PIN de administrador.</p>
+              <button class="btn-action" onclick="mtz_abrirForm()">
+                <span class="icon">➕</span> Nueva Matriz
+              </button>
+
+              <div id="matrices-lista" style="margin-top:12px; font-size:12px;"></div>
+
+              <!-- Mini form embebido (oculto por defecto) -->
+              <div id="form-nueva-matriz" style="display:none; margin-top:10px; background:#f1f5f9; padding:10px; border-radius:6px; border:1px solid #cbd5e1;">
+                <input type="hidden" id="mtz_rowIndex" value="">
+
+                <label style="font-size:12px; font-weight:600;">Nombre Matriz:</label>
+                <input type="text" id="mtz_nombreMatriz" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. Matriz K 2026">
+
+                <label style="font-size:12px; font-weight:600;">ID Archivo (o enlace):</label>
+                <input type="text" id="mtz_idArchivo" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="ID o URL de Google Sheets">
+
+                <label style="font-size:12px; font-weight:600;">Nombre de Pestaña:</label>
+                <input type="text" id="mtz_nombrePestana" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. Hoja 1">
+
+                <label style="font-size:12px; font-weight:600;">Fila de Encabezados:</label>
+                <input type="number" id="mtz_filaEncabezados" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="1" min="1">
+
+                <label style="font-size:12px; font-weight:600;">Columna Llave (No. Análisis):</label>
+                <input type="text" id="mtz_columnaLlave" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. No. ANALISIS">
+
+                <label style="font-size:12px; font-weight:600;">Columna Lote:</label>
+                <input type="text" id="mtz_columnaLote" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. LOTE">
+
+                <label style="font-size:12px; font-weight:600;">Columna Cantidad:</label>
+                <input type="text" id="mtz_columnaCantidad" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. CANTIDAD PENDIENTE">
+
+                <label style="font-size:12px; font-weight:600;">Columna Vencimiento:</label>
+                <input type="text" id="mtz_columnaVencimiento" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. EXP">
+
+                <label style="font-size:12px; font-weight:600;">Columna Fabricante (opcional):</label>
+                <input type="text" id="mtz_columnaFabricante" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. FABRICANTE">
+
+                <label style="font-size:12px; font-weight:600;">Prioridad:</label>
+                <input type="number" id="mtz_prioridad" class="form-input" style="width:100%; margin-bottom:12px; padding:4px;" placeholder="1" min="1">
+
+                <div style="display:flex; gap:8px;">
+                  <button class="btn-primary-small" style="flex:1;" onclick="mtz_guardar()">Guardar</button>
+                  <button class="btn-secondary-small" style="flex:1;" onclick="document.getElementById('form-nueva-matriz').style.display='none'">Cancelar</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Gestión de Plantillas -->
             <div id="templates-panel" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
               <div class="section-title" style="margin-top:0;">Gestión de Plantillas / Variables</div>
@@ -543,6 +594,7 @@
           document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
           btn.classList.add('active');
           document.getElementById(btn.dataset.target).classList.add('active');
+          if (btn.dataset.target === 'tab-config') mtz_cargarLista();
         });
       });
 
@@ -945,6 +997,161 @@
     function cfg_diagnosticarMatrices() { return cfg_runDiagnostic('diagnosticarMatrices', 'diagnostics-results'); }
     function cfg_diagnosticarPlantillas() { return cfg_runDiagnostic('diagnosticarPlantillas', 'diagnostics-results-plantillas'); }
     function cfg_diagnosticarConsecutivoImp() { return cfg_runDiagnostic('diagnosticarConsecutivoImp', 'diagnostics-results-consecutivo'); }
+
+    // --- Gestión de Matrices K ---
+    let mtz_cache = [];
+
+    function mtz_limpiarForm() {
+      document.getElementById('mtz_rowIndex').value = '';
+      document.getElementById('mtz_nombreMatriz').value = '';
+      document.getElementById('mtz_idArchivo').value = '';
+      document.getElementById('mtz_nombrePestana').value = '';
+      document.getElementById('mtz_filaEncabezados').value = '1';
+      document.getElementById('mtz_columnaLlave').value = '';
+      document.getElementById('mtz_columnaLote').value = '';
+      document.getElementById('mtz_columnaCantidad').value = '';
+      document.getElementById('mtz_columnaVencimiento').value = '';
+      document.getElementById('mtz_columnaFabricante').value = '';
+      document.getElementById('mtz_prioridad').value = '1';
+    }
+
+    function mtz_abrirForm() {
+      mtz_limpiarForm();
+      document.getElementById('form-nueva-matriz').style.display = 'block';
+    }
+
+    function mtz_editar(rowIndex) {
+      const m = mtz_cache.find(x => x.rowIndex === rowIndex);
+      if (!m) return;
+      document.getElementById('mtz_rowIndex').value = m.rowIndex;
+      document.getElementById('mtz_nombreMatriz').value = m.nombreMatriz || '';
+      document.getElementById('mtz_idArchivo').value = m.idArchivo || '';
+      document.getElementById('mtz_nombrePestana').value = m.nombrePestana || '';
+      document.getElementById('mtz_filaEncabezados').value = m.filaEncabezados || '1';
+      document.getElementById('mtz_columnaLlave').value = m.columnaLlave || '';
+      document.getElementById('mtz_columnaLote').value = m.columnaLote || '';
+      document.getElementById('mtz_columnaCantidad').value = m.columnaCantidad || '';
+      document.getElementById('mtz_columnaVencimiento').value = m.columnaVencimiento || '';
+      document.getElementById('mtz_columnaFabricante').value = m.columnaFabricante || '';
+      document.getElementById('mtz_prioridad').value = m.prioridad || '1';
+      document.getElementById('form-nueva-matriz').style.display = 'block';
+    }
+
+    async function mtz_cargarLista() {
+      const cont = document.getElementById('matrices-lista');
+      if (!cont) return;
+      cont.innerHTML = '⏳ Cargando matrices...';
+      try {
+        const res = await postWebApp({ operation: 'getMatricesConfig', userId: sysData.currentUser.userId });
+        if (res.status !== 'success') {
+          cont.innerHTML = `❌ ${res.message || 'Error al cargar matrices.'}`;
+          return;
+        }
+        mtz_cache = res.data || [];
+        if (mtz_cache.length === 0) {
+          cont.innerHTML = '<p style="color:#64748b;">No hay matrices configuradas.</p>';
+          return;
+        }
+        let html = '<ul style="list-style:none; padding:0; margin:0;">';
+        mtz_cache.forEach(m => {
+          const activaIcon = (m.activa || '').toLowerCase() === 'si' ? '✅' : '⚪';
+          html += `<li style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #e2e8f0;">
+            <span>${activaIcon} <strong>${escapeHtml(m.nombreMatriz || '(sin nombre)')}</strong> (fila ${m.rowIndex})</span>
+            <span>
+              <button class="btn-secondary-small" onclick="mtz_editar(${m.rowIndex})">Editar</button>
+              <button class="btn-secondary-small" onclick="mtz_eliminar(${m.rowIndex})">Eliminar</button>
+            </span>
+          </li>`;
+        });
+        html += '</ul>';
+        cont.innerHTML = html;
+      } catch (err) {
+        cont.innerHTML = `❌ Error de red: ${err.message}`;
+      }
+    }
+
+    async function mtz_guardar() {
+      const rowIndex = document.getElementById('mtz_rowIndex').value ? parseInt(document.getElementById('mtz_rowIndex').value, 10) : null;
+      const config = {
+        nombreMatriz:       document.getElementById('mtz_nombreMatriz').value.trim(),
+        idArchivo:          document.getElementById('mtz_idArchivo').value.trim(),
+        nombrePestana:      document.getElementById('mtz_nombrePestana').value.trim(),
+        filaEncabezados:    document.getElementById('mtz_filaEncabezados').value.trim(),
+        columnaLlave:       document.getElementById('mtz_columnaLlave').value.trim(),
+        columnaLote:        document.getElementById('mtz_columnaLote').value.trim(),
+        columnaCantidad:    document.getElementById('mtz_columnaCantidad').value.trim(),
+        columnaVencimiento: document.getElementById('mtz_columnaVencimiento').value.trim(),
+        columnaFabricante:  document.getElementById('mtz_columnaFabricante').value.trim(),
+        prioridad:          document.getElementById('mtz_prioridad').value.trim()
+      };
+
+      if (!config.nombreMatriz || !config.idArchivo || !config.columnaLlave || !config.columnaLote || !config.columnaCantidad) {
+        showError('Nombre Matriz, ID Archivo, Columna Llave, Columna Lote y Columna Cantidad son obligatorios.');
+        return;
+      }
+
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese su PIN de administrador para guardar la Matriz:', { allowAdminOverride: true });
+      } catch (e) {
+        return; // Cancelado por el usuario
+      }
+
+      showLoading('Guardando y validando matriz...');
+      try {
+        const res = await postWebApp({
+          operation: 'guardarMatrizConfig',
+          config: config,
+          rowIndex: rowIndex,
+          userId: sysData.currentUser.userId,
+          pinFirma: pinFirma
+        });
+        hideLoading();
+        if (res.status === 'success') {
+          const v = res.validacion || {};
+          showToast(v.mensaje || 'Matriz guardada.', v.ok ? 'success' : 'warning');
+          document.getElementById('form-nueva-matriz').style.display = 'none';
+          mtz_cargarLista();
+        } else {
+          showError('Error: ' + res.message);
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error de comunicación: ' + err.message);
+      }
+    }
+
+    async function mtz_eliminar(rowIndex) {
+      const confirmado = await showConfirm('Eliminar Matriz', '¿Eliminar esta Matriz? Esta acción no se puede deshacer.');
+      if (!confirmado) return;
+
+      let pinFirma;
+      try {
+        pinFirma = await promptSecurityPin('Ingrese su PIN de administrador para eliminar la Matriz:', { allowAdminOverride: true });
+      } catch (e) {
+        return;
+      }
+
+      showLoading('Eliminando matriz...');
+      try {
+        const res = await postWebApp({
+          operation: 'eliminarMatrizConfig',
+          rowIndex: rowIndex,
+          userId: sysData.currentUser.userId,
+          pinFirma: pinFirma
+        });
+        hideLoading();
+        if (res.status === 'success') {
+          showToast('Matriz eliminada.', 'success');
+          mtz_cargarLista();
+        } else {
+          showError('Error: ' + res.message);
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error de comunicación: ' + err.message);
+      }
+    }
 
     // --- Gestión de Plantillas ---
     function cfg_abrirModalPlantilla() {

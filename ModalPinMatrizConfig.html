@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edición Protegida</title>
+
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mp-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+      height: 100%;
+      justify-content: center;
+      padding: 24px 20px;
+      overflow-y: auto;
+    }
+
+    .mp-container h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+
+    .mp-context-box {
+      width: 100%;
+      max-width: 300px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      text-align: left;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .mp-context-box strong { color: #0f172a; }
+
+    .mp-container p#mp-subtitle {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      max-width: 300px;
+    }
+
+    #mp-body {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .mp-error {
+      min-height: 18px;
+      font-size: 12px;
+      color: #dc2626;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .mp-user-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .mp-user-option {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+
+    .mp-user-option:hover {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+
+    .mp-user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .mp-user-role {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .mp-actions {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      max-width: 280px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="mp-container">
+    <h3>🔒 Edición Protegida</h3>
+    <div class="mp-context-box" id="mp-context-box"></div>
+    <p id="mp-subtitle">Verificando identidad...</p>
+    <div id="mp-body"></div>
+    <div class="mp-actions">
+      <button type="button" class="btn btn-secondary cancel-btn" id="mp-cancel-btn">Cancelar</button>
+    </div>
+  </div>
+
+  <script type="application/json" id="mp-identidad-data"><?!= identidad ?></script>
+  <script type="application/json" id="mp-contexto-data"><?!= contexto ?></script>
+
+  <script>
+    var identidad = JSON.parse(document.getElementById('mp-identidad-data').textContent);
+    var contexto = JSON.parse(document.getElementById('mp-contexto-data').textContent);
+    var webAppUrl = identidad.webAppUrl || '';
+
+    document.getElementById('mp-context-box').innerHTML =
+      '<div><strong>Columna:</strong> ' + escapeHtml(contexto.nombreColumna) + '</div>' +
+      '<div><strong>Fila:</strong> ' + escapeHtml(String(contexto.fila)) + '</div>' +
+      '<div><strong>Nuevo valor:</strong> ' + escapeHtml(contexto.valorPropuesto || '(vacío)') + '</div>';
+
+    document.getElementById('mp-cancel-btn').addEventListener('click', function () {
+      google.script.host.close();
+    });
+
+    function setSubtitle(text) {
+      document.getElementById('mp-subtitle').textContent = text;
+    }
+
+    function setBody(html) {
+      document.getElementById('mp-body').innerHTML = html;
+    }
+
+    function nombreDe(candidato) {
+      return candidato.nombreCompleto || candidato.nombreCorto || candidato.userId;
+    }
+
+    function esRolAdmin_(rol) {
+      var u = (rol || '').toString().toUpperCase();
+      return u === 'ADMIN' || u === 'ADMINISTRADOR' || u === 'ADMINISTRADOR DE SISTEMA';
+    }
+
+    // === PASO 1: identidad — solo candidatos ADMIN pueden autorizar esta acción ===
+    function init() {
+      if (identidad.status === 'none') {
+        setSubtitle('No pudimos identificarlo en el sistema.');
+        setBody('<p style="color:#dc2626; font-size:13px;">El correo de su sesión de Google (' +
+          escapeHtml(identidad.activeEmail || '') + ') no está registrado en la hoja de Usuarios.</p>');
+        return;
+      }
+
+      var candidatosAdmin = (identidad.candidates || []).filter(function (c) { return esRolAdmin_(c.rol); });
+
+      if (candidatosAdmin.length === 0) {
+        setSubtitle('Acceso denegado.');
+        setBody('<p style="color:#dc2626; font-size:13px;">Esta edición requiere PIN de un usuario con rol ADMIN. Su usuario no tiene ese rol.</p>');
+        return;
+      }
+
+      if (candidatosAdmin.length === 1) {
+        seleccionarUsuario(candidatosAdmin[0]);
+        return;
+      }
+
+      renderSelectorUsuario(candidatosAdmin);
+    }
+
+    function renderSelectorUsuario(candidatos) {
+      setSubtitle('Seleccione con qué identidad ADMIN desea autorizar este cambio:');
+      var html = '<div class="mp-user-list">';
+      candidatos.forEach(function (c, idx) {
+        html += '<button type="button" class="mp-user-option" data-idx="' + idx + '">' +
+          '<span class="mp-user-name">' + escapeHtml(nombreDe(c)) + '</span>' +
+          '<span class="mp-user-role">' + escapeHtml(c.rol || '') + '</span>' +
+          '</button>';
+      });
+      html += '</div>';
+      setBody(html);
+      document.querySelectorAll('.mp-user-option').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          seleccionarUsuario(candidatos[parseInt(btn.dataset.idx, 10)]);
+        });
+      });
+    }
+
+    // === PASO 2: gate de PIN ===
+    function seleccionarUsuario(candidato) {
+      var nombre = nombreDe(candidato);
+
+      if (candidato.estado === 'Bloqueado') {
+        setSubtitle('Hola, ' + nombre + '.');
+        setBody('<p style="color:#dc2626; font-size:13px;">⛔ Su usuario está bloqueado por intentos fallidos de PIN.</p>');
+        return;
+      }
+
+      setSubtitle('Hola, ' + nombre + '. Ingrese su PIN de administrador para autorizar este cambio:');
+      renderPinInputs(function (pin, inputs) {
+        validarPinYConfirmar(pin, inputs, candidato);
+      });
+    }
+
+    // === Entrada de PIN de 4 dígitos ===
+    function renderPinInputs(onComplete) {
+      setBody(
+        '<div class="pin-inputs-container">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+        '</div>' +
+        '<div class="mp-error" id="mp-error"></div>'
+      );
+
+      var inputs = document.querySelectorAll('.modern-pin-input');
+      function currentValue() { return Array.prototype.map.call(inputs, function (i) { return i.value; }).join(''); }
+
+      inputs.forEach(function (input, index) {
+        input.addEventListener('input', function () {
+          input.value = input.value.replace(/[^0-9]/g, '');
+          if (input.value.length === 1 && index < inputs.length - 1) inputs[index + 1].focus();
+          if (currentValue().length === 4) setTimeout(function () { onComplete(currentValue(), inputs); }, 100);
+        });
+
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Backspace' && input.value === '' && index > 0) {
+            inputs[index - 1].focus();
+            inputs[index - 1].value = '';
+          }
+        });
+      });
+
+      setTimeout(function () { inputs[0].focus(); }, 50);
+      return inputs;
+    }
+
+    function clearPinInputs(inputs) {
+      inputs.forEach(function (i) { i.value = ''; i.disabled = false; });
+      inputs[0].focus();
+    }
+
+    function setPinInputsDisabled(inputs, disabled) {
+      inputs.forEach(function (i) { i.disabled = disabled; });
+    }
+
+    function showPinError(msg) {
+      var el = document.getElementById('mp-error');
+      if (el) el.textContent = msg || '';
+    }
+
+    // === Validar PIN (vía el mismo endpoint que el login normal) y, si es válido, confirmar la edición ===
+    function validarPinYConfirmar(pin, inputs, candidato) {
+      setPinInputsDisabled(inputs, true);
+      showPinError('Validando PIN...');
+
+      fetch(webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify({ operation: 'validarAccesoSesion', userId: candidato.userId, pinFirma: pin })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.status !== 'success') {
+            if (data.message && data.message.indexOf('bloqueado') !== -1) {
+              setBody('<p style="color:#dc2626; font-size:13px;">⛔ ' + escapeHtml(data.message) + '</p>');
+              return;
+            }
+            showPinError(data.message || 'PIN incorrecto.');
+            clearPinInputs(inputs);
+            return;
+          }
+          showPinError('PIN válido. Aplicando y validando matriz...');
+          confirmarEdicion(candidato.userId, pin);
+        })
+        .catch(function (err) {
+          showPinError('Error de conexión: ' + (err && err.message ? err.message : err));
+          clearPinInputs(inputs);
+        });
+    }
+
+    function confirmarEdicion(userId, pinFirma) {
+      fetch(webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          operation: 'confirmarEdicionMatrizConfig',
+          userId: userId,
+          pinFirma: pinFirma,
+          fila: contexto.fila,
+          columna: contexto.columna,
+          valorPropuesto: contexto.valorPropuesto
+        })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.status === 'success') {
+            var r = data.resultado || {};
+            setSubtitle(r.ok ? '✅ Cambio aplicado y validado.' : '⚠️ Cambio aplicado, pero la validación encontró un problema.');
+            setBody('<p style="font-size:13px;">' + escapeHtml(r.mensaje || '') + '</p>');
+          } else {
+            setSubtitle('❌ No se pudo aplicar el cambio.');
+            setBody('<p style="color:#dc2626; font-size:13px;">' + escapeHtml(data.message || 'Error desconocido.') + '</p>');
+          }
+          document.getElementById('mp-cancel-btn').textContent = 'Cerrar';
+        })
+        .catch(function (err) {
+          setSubtitle('❌ Error de conexión.');
+          setBody('<p style="color:#dc2626; font-size:13px;">' + escapeHtml(err && err.message ? err.message : String(err)) + '</p>');
+          document.getElementById('mp-cancel-btn').textContent = 'Cerrar';
+        });
+    }
+
+    init();
+  </script>
+</body>
+</html>

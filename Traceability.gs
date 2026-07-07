@@ -228,11 +228,28 @@ function onEditInstalled(e) {
     // --- VERIFICACIÓN DE DESBLOQUEO TEMPORAL DE ADMIN ---
     var isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
 
+    // --- CASO ESPECIAL: Sys_MatricesConfig requiere PIN de administrador, no solo reversión ---
+    // A diferencia del resto de hojas bloqueadas, aquí la edición manual no se descarta en
+    // silencio: se revierte igual (defensa en profundidad) pero además se abre un modal que
+    // pide el PIN de un usuario ADMIN. Si el PIN es válido, el propio modal reaplica el valor
+    // de forma programática y dispara la validación estructural contra la hoja externa
+    // (ver validarYActualizarFilaMatriz_ en MatrizConfig.gs).
+    if (sheetName === SYS_MATRICES_SHEET_NAME) {
+      if (isUnlocked) {
+        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, resolveEditorIdentity_(e));
+        return;
+      }
+      var valorPropuesto = (e.value !== undefined) ? e.value : '';
+      revertManualEdit_(editedRange, e, sheetName, 'hoja protegida: requiere PIN de administrador');
+      abrirModalPinMatrizConfig_(eRow, eCol, valorPropuesto, resolveEditorIdentity_(e));
+      return;
+    }
+
     // --- DEFENSA EN PROFUNDIDAD: revertir ediciones MANUALES a hojas/columnas de sistema ---
     // Las escrituras de la app son programáticas y NO disparan onEdit; aquí solo llega una edición
     // manual. La protección ACL ya bloquea a los colaboradores; esto además revierte ediciones
     // manuales del propietario, que por diseño solo debe modificar estos datos vía la aplicación.
-    var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad', 'Sys_MatricesConfig'];
+    var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad'];
     if (HOJAS_BLOQUEADAS_.indexOf(sheetName) !== -1) {
       if (isUnlocked) {
         logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, resolveEditorIdentity_(e));

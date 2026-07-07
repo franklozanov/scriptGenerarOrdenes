@@ -5,6 +5,12 @@
 //   - CRUD de configuración de matrices desde el backend
 //   - Función principal de lectura de matrices activas ordenadas por prioridad
 // Prioridad de Carga: 2° (depende solo de Config.gs)
+//
+// REGLA DE DISEÑO: toda lectura/escritura de una fila de Sys_MatricesConfig se hace
+// mapeando por NOMBRE de columna (vía los headers reales de la hoja), nunca por índice
+// posicional fijo. Los índices de columna cambian entre entornos/versiones (columnas
+// nuevas se insertan o se añaden al final), así que un row[N] hardcodeado se desalinea
+// silenciosamente con datos ya existentes. Ver getFilaMatrizComoObjeto_/escribirFilaMatriz_.
 // ============================================================
 
 // -------------------------------------------------------
@@ -13,7 +19,9 @@
 
 /**
  * Asegura que la hoja Sys_MatricesConfig exista con los encabezados correctos.
- * Si no existe, la crea. Si ya existe, verifica integridad de encabezados.
+ * Si no existe, la crea. Si ya existe, verifica integridad de encabezados e INSERTA
+ * cualquier columna canónica faltante en su posición lógica correcta (no al final),
+ * para no desalinear las columnas existentes a la derecha del punto de inserción.
  * Es idempotente: puede llamarse múltiples veces sin riesgo.
  * @returns {Sheet} La hoja Sys_MatricesConfig
  */
@@ -32,7 +40,7 @@ function ensureMatricesConfigSheet_() {
       .setFontWeight('bold')
       .setBackground('#263238')
       .setFontColor('#FFFFFF');
-      
+
     // Proteger la hoja para que solo el propietario la edite directamente
     try {
       var protection = sheet.protect().setDescription('Configuración de Matrices K - Solo sistema');
@@ -45,69 +53,140 @@ function ensureMatricesConfigSheet_() {
     sheet.hideSheet();
     Logger.log('✓ MatrizConfig: Hoja ' + SYS_MATRICES_SHEET_NAME + ' creada.');
   } else {
-    // Verificar que tenga todos los encabezados canónicos (resiliencia frente a cambios futuros)
-    var actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var missingHeaders = MATRICES_CONFIG_HEADERS.filter(function(h) {
-      return actualHeaders.indexOf(h) === -1;
+    // Verificar que tenga todos los encabezados canónicos, EN SU POSICIÓN LÓGICA.
+    // Se inserta cada columna faltante en el índice que le corresponde según
+    // MATRICES_CONFIG_HEADERS, para no desalinear los datos ya existentes a su derecha.
+    MATRICES_CONFIG_HEADERS.forEach(function(nombreCol, idx) {
+      var actualHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+      var yaExiste = actualHeaders.some(function(h) { return (h || '').toString().trim().toLowerCase() === nombreCol.toLowerCase(); });
+      if (yaExiste) return;
+
+      var posicionInsercion = idx + 1; // Columna base-1 donde debería quedar
+      if (posicionInsercion > sheet.getLastColumn()) {
+        sheet.getRange(1, posicionInsercion).setValue(nombreCol);
+      } else {
+        sheet.insertColumnBefore(posicionInsercion);
+        sheet.getRange(1, posicionInsercion).setValue(nombreCol);
+      }
+      Logger.log('✓ MatrizConfig: Columna faltante "' + nombreCol + '" insertada en posición ' + posicionInsercion);
     });
 
-    if (missingHeaders.length > 0) {
-      var lastCol = sheet.getLastColumn();
-      sheet.getRange(1, lastCol + 1, 1, missingHeaders.length)
-        .setValues([missingHeaders])
-        .setFontWeight('bold')
-        .setBackground('#263238')
-        .setFontColor('#FFFFFF');
-      Logger.log('✓ MatrizConfig: Encabezados faltantes añadidos: ' + missingHeaders.join(', '));
-    }
+    sheet.getRange(1, 1, 1, MATRICES_CONFIG_HEADERS.length)
+      .setFontWeight('bold')
+      .setBackground('#263238')
+      .setFontColor('#FFFFFF');
   }
 
   // --- RE-APLICAR SIEMPRE ESTILOS, NOTAS Y VALIDACIONES (Aún si ya existe) ---
-  
-  // Notas explicativas en el encabezado
-  var notes = [
-    "Nombre descriptivo para identificar esta Matriz (Ej. 'Matriz 2026')",
-    "ID del archivo de Google Sheets (la cadena larga en la URL entre /d/ y /edit)",
-    "Nombre exacto de la pestaña/hoja interna donde están los datos (Ej. 'Hoja 1')",
-    "Nombre exacto de la columna que contiene el No Análisis K (Ej. 'No Análisis')",
-    "Nombre exacto de la columna que contiene el Lote (Ej. 'Lote')",
-    "Nombre exacto de la columna que contiene la Cantidad Disponible (Ej. 'Cant. Disp.')",
-    "Nombre exacto de la columna que contiene la Fecha de Vencimiento (Ej. 'Exp')",
-    "Nombre exacto de la columna que contiene el Fabricante (Ej. 'Fabricante')",
-    "Orden de prioridad (1 = primera en buscar). Seleccione un número del dropdown.",
-    "Seleccione 'Si' para activarla o 'No' para ignorar esta matriz."
-  ];
-  sheet.getRange(1, 1, 1, notes.length).setNotes([notes]);
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-  // Ajustar anchos de columna para legibilidad
-  sheet.setColumnWidth(1, 160);  // Nombre Matriz
-  sheet.setColumnWidth(2, 260);  // ID Archivo
-  sheet.setColumnWidth(3, 160);  // Nombre de Pestaña
-  sheet.setColumnWidth(4, 160);  // Columna Llave
-  sheet.setColumnWidth(5, 140);  // Columna Lote
-  sheet.setColumnWidth(6, 180);  // Columna Cantidad
-  sheet.setColumnWidth(7, 180);  // Columna Vencimiento
-  sheet.setColumnWidth(8, 160);  // Columna Fabricante
-  sheet.setColumnWidth(9, 90);   // Prioridad
-  sheet.setColumnWidth(10, 80);  // Activa
+  var notasPorColumna = {
+    'Nombre Matriz':       "Nombre descriptivo para identificar esta Matriz (Ej. 'Matriz 2026')",
+    'ID Archivo':          "ID del archivo de Google Sheets (la cadena larga en la URL entre /d/ y /edit)",
+    'Nombre de Pestaña':   "Nombre exacto de la pestaña/hoja interna donde están los datos (Ej. 'Hoja 1')",
+    'Fila de Encabezados': "Número de fila donde están los títulos de columna en la hoja externa (Ej. '1'). Vacío = fila 1.",
+    'Columna Llave':       "Nombre exacto de la columna que contiene el No Análisis K (Ej. 'No Análisis')",
+    'Columna Lote':        "Nombre exacto de la columna que contiene el Lote (Ej. 'Lote')",
+    'Columna Cantidad':    "Nombre exacto de la columna que contiene la Cantidad Disponible (Ej. 'Cant. Disp.')",
+    'Columna Vencimiento': "Nombre exacto de la columna que contiene la Fecha de Vencimiento (Ej. 'Exp')",
+    'Columna Fabricante':  "Nombre exacto de la columna que contiene el Fabricante (Ej. 'Fabricante')",
+    'Prioridad':           "Orden de prioridad (1 = primera en buscar). Seleccione un número del dropdown.",
+    'Activa':              "Seleccione 'Si' para activarla o 'No' para ignorar esta matriz. Se autocompleta al validar exitosamente."
+  };
+  var anchosPorColumna = {
+    'Nombre Matriz': 160, 'ID Archivo': 260, 'Nombre de Pestaña': 160, 'Fila de Encabezados': 130,
+    'Columna Llave': 160, 'Columna Lote': 140, 'Columna Cantidad': 180, 'Columna Vencimiento': 180,
+    'Columna Fabricante': 160, 'Prioridad': 90, 'Activa': 80
+  };
+
+  headers.forEach(function(nombreCol, idx0) {
+    var col = idx0 + 1;
+    var nombreNorm = (nombreCol || '').toString().trim();
+    if (notasPorColumna[nombreNorm]) {
+      sheet.getRange(1, col).setNote(notasPorColumna[nombreNorm]);
+    }
+    if (anchosPorColumna[nombreNorm]) {
+      sheet.setColumnWidth(col, anchosPorColumna[nombreNorm]);
+    }
+  });
 
   // Forzar encabezado de fila
   sheet.setFrozenRows(1);
-  
-  // Data Validations para hasta 100 filas
+
+  // Data Validations para hasta 100 filas (mapeadas por nombre, no por posición)
   var prioridadRules = [];
   for (var i = 1; i <= 20; i++) prioridadRules.push(i.toString());
-  
+
   var valPrioridad = SpreadsheetApp.newDataValidation().requireValueInList(prioridadRules, true).setAllowInvalid(false).build();
   var valActiva = SpreadsheetApp.newDataValidation().requireValueInList(['Si', 'No'], true).setAllowInvalid(false).build();
-  
-  var colPrioridad = getColumnIndexByNameCaseInsensitive(MATRICES_CONFIG_HEADERS, 'Prioridad', false) || 9;
-  var colActiva = getColumnIndexByNameCaseInsensitive(MATRICES_CONFIG_HEADERS, 'Activa', false) || 10;
-  
-  sheet.getRange(2, colPrioridad, 100, 1).setDataValidation(valPrioridad);
-  sheet.getRange(2, colActiva, 100, 1).setDataValidation(valActiva);
+
+  var colPrioridad = getColumnIndexByNameCaseInsensitive(headers, 'Prioridad', false);
+  var colActiva = getColumnIndexByNameCaseInsensitive(headers, 'Activa', false);
+
+  if (colPrioridad) sheet.getRange(2, colPrioridad, 100, 1).setDataValidation(valPrioridad);
+  if (colActiva) sheet.getRange(2, colActiva, 100, 1).setDataValidation(valActiva);
 
   return sheet;
+}
+
+// -------------------------------------------------------
+// SECCIÓN 1B: MAPEO GENÉRICO FILA <-> OBJETO POR NOMBRE DE COLUMNA
+// -------------------------------------------------------
+
+// Mapa entre el nombre de campo del objeto JS y el nombre real de columna en la hoja.
+var MATRIZ_CAMPO_A_COLUMNA_ = {
+  nombreMatriz:       'Nombre Matriz',
+  idArchivo:          'ID Archivo',
+  nombrePestana:      'Nombre de Pestaña',
+  filaEncabezados:    'Fila de Encabezados',
+  columnaLlave:       'Columna Llave',
+  columnaLote:        'Columna Lote',
+  columnaCantidad:    'Columna Cantidad',
+  columnaVencimiento: 'Columna Vencimiento',
+  columnaFabricante:  'Columna Fabricante',
+  prioridad:          'Prioridad',
+  activa:             'Activa'
+};
+
+/**
+ * Lee una fila de Sys_MatricesConfig y la devuelve como objeto, mapeando cada campo
+ * por el NOMBRE real de su columna en la hoja (no por posición). Campos cuya columna
+ * no exista en la hoja quedan como '' (string) para que el llamador aplique su propio default.
+ * @param {Sheet} sheet    - Hoja Sys_MatricesConfig ya asegurada.
+ * @param {string[]} headers - Encabezados reales de la hoja (fila 1).
+ * @param {number} rowIndex - Fila a leer (base 1).
+ * @returns {Object} Objeto con las claves de MATRIZ_CAMPO_A_COLUMNA_, valores en crudo (string trim).
+ * @private
+ */
+function getFilaMatrizComoObjeto_(sheet, headers, rowIndex) {
+  var rowValues = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  var obj = {};
+  Object.keys(MATRIZ_CAMPO_A_COLUMNA_).forEach(function(campo) {
+    var nombreCol = MATRIZ_CAMPO_A_COLUMNA_[campo];
+    var colIdx = getColumnIndexByNameCaseInsensitive(headers, nombreCol, false);
+    obj[campo] = colIdx ? (rowValues[colIdx - 1] || '').toString().trim() : '';
+  });
+  return obj;
+}
+
+/**
+ * Escribe un objeto de configuración de matriz en una fila, mapeando cada campo
+ * presente en `config` a la columna correspondiente por NOMBRE (no por posición).
+ * Campos cuya columna no exista en la hoja se ignoran en silencio.
+ * @param {Sheet} sheet
+ * @param {string[]} headers
+ * @param {number} rowIndex
+ * @param {Object} config - Puede tener cualquier subconjunto de las claves de MATRIZ_CAMPO_A_COLUMNA_.
+ * @private
+ */
+function escribirFilaMatriz_(sheet, headers, rowIndex, config) {
+  Object.keys(config).forEach(function(campo) {
+    var nombreCol = MATRIZ_CAMPO_A_COLUMNA_[campo];
+    if (!nombreCol) return;
+    var colIdx = getColumnIndexByNameCaseInsensitive(headers, nombreCol, false);
+    if (!colIdx) return;
+    sheet.getRange(rowIndex, colIdx).setValue(config[campo]);
+  });
 }
 
 // -------------------------------------------------------
@@ -120,7 +199,7 @@ function ensureMatricesConfigSheet_() {
  *
  * @returns {Array<Object>} Array de objetos con la configuración de cada matriz activa:
  *   {
- *     nombreMatriz, idArchivo, nombrePestana, columnaLlave,
+ *     nombreMatriz, idArchivo, nombrePestana, filaEncabezados, columnaLlave,
  *     columnaLote, columnaCantidad, columnaVencimiento, columnaFabricante,
  *     prioridad, activa
  *   }
@@ -134,28 +213,26 @@ function getMatricesActivasOrdenadas() {
     return [];
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, MATRICES_CONFIG_HEADERS.length).getValues();
-
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var matrices = [];
-  for (var i = 0; i < data.length; i++) {
-    var row = data[i];
-    var activa = (row[9] || '').toString().trim().toLowerCase();
-    if (activa !== 'si') continue; // Solo matrices activas
 
-    var idArchivo = (row[1] || '').toString().trim();
-    // Extraer solo el ID si viene como URL completa de Google Sheets
-    var idExtraido = extractDriveId(idArchivo) || idArchivo;
+  for (var rowIndex = 2; rowIndex <= lastRow; rowIndex++) {
+    var raw = getFilaMatrizComoObjeto_(sheet, headers, rowIndex);
+    if (raw.activa.toLowerCase() !== 'si') continue; // Solo matrices activas
+
+    var idExtraido = extractDriveId(raw.idArchivo) || raw.idArchivo;
 
     matrices.push({
-      nombreMatriz:       (row[0] || '').toString().trim(),
+      nombreMatriz:       raw.nombreMatriz,
       idArchivo:          idExtraido,
-      nombrePestana:      (row[2] || '').toString().trim(),
-      columnaLlave:       (row[3] || '').toString().trim(),
-      columnaLote:        (row[4] || '').toString().trim(),
-      columnaCantidad:    (row[5] || '').toString().trim(),
-      columnaVencimiento: (row[6] || '').toString().trim(),
-      columnaFabricante:  (row[7] || '').toString().trim(),
-      prioridad:          parseInt(row[8], 10) || 99,
+      nombrePestana:      raw.nombrePestana,
+      filaEncabezados:    parseInt(raw.filaEncabezados, 10) || 1,
+      columnaLlave:       raw.columnaLlave,
+      columnaLote:        raw.columnaLote,
+      columnaCantidad:    raw.columnaCantidad,
+      columnaVencimiento: raw.columnaVencimiento,
+      columnaFabricante:  raw.columnaFabricante,
+      prioridad:          parseInt(raw.prioridad, 10) || 99,
       activa:             true
     });
   }
@@ -180,22 +257,14 @@ function getMatricesConfig() {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  var data = sheet.getRange(2, 1, lastRow - 1, MATRICES_CONFIG_HEADERS.length).getValues();
-  return data.map(function(row, i) {
-    return {
-      rowIndex:           i + 2, // Fila real en la hoja (base 1, +1 por header)
-      nombreMatriz:       (row[0] || '').toString().trim(),
-      idArchivo:          (row[1] || '').toString().trim(),
-      nombrePestana:      (row[2] || '').toString().trim(),
-      columnaLlave:       (row[3] || '').toString().trim(),
-      columnaLote:        (row[4] || '').toString().trim(),
-      columnaCantidad:    (row[5] || '').toString().trim(),
-      columnaVencimiento: (row[6] || '').toString().trim(),
-      columnaFabricante:  (row[7] || '').toString().trim(),
-      prioridad:          (row[8] || '').toString().trim(),
-      activa:             (row[9] || '').toString().trim()
-    };
-  });
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var resultado = [];
+  for (var rowIndex = 2; rowIndex <= lastRow; rowIndex++) {
+    var obj = getFilaMatrizComoObjeto_(sheet, headers, rowIndex);
+    obj.rowIndex = rowIndex;
+    resultado.push(obj);
+  }
+  return resultado;
 }
 
 /**
@@ -205,45 +274,146 @@ function getMatricesConfig() {
  *
  * @param {Object} config - Objeto con todos los campos de la matriz.
  * @param {number|null} rowIndex - Fila a actualizar, o null para crear.
- * @returns {Object} { ok: true } o { ok: false, error: "..." }
+ * @returns {Object} { ok: true, rowIndex: number } o { ok: false, error: "..." }
  */
 function guardarMatrizConfig(config, rowIndex) {
   try {
     _validarPermisoConfigMatrices_();
 
     var sheet = ensureMatricesConfigSheet_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
     // Extraer ID del link si el usuario pegó la URL completa
     var idArchivo = (config.idArchivo || '').toString().trim();
     var idExtraido = extractDriveId(idArchivo) || idArchivo;
 
-    var rowData = [
-      (config.nombreMatriz       || '').toString().trim(),
-      idExtraido,
-      (config.nombrePestana      || '').toString().trim(),
-      (config.columnaLlave       || '').toString().trim(),
-      (config.columnaLote        || '').toString().trim(),
-      (config.columnaCantidad    || '').toString().trim(),
-      (config.columnaVencimiento || '').toString().trim(),
-      (config.columnaFabricante  || '').toString().trim(),
-      parseInt(config.prioridad, 10) || 99,
-      (config.activa             || 'Si').toString().trim()
-    ];
+    var datosAEscribir = {
+      nombreMatriz:       (config.nombreMatriz       || '').toString().trim(),
+      idArchivo:          idExtraido,
+      nombrePestana:      (config.nombrePestana      || '').toString().trim(),
+      filaEncabezados:    parseInt(config.filaEncabezados, 10) || 1,
+      columnaLlave:       (config.columnaLlave       || '').toString().trim(),
+      columnaLote:        (config.columnaLote        || '').toString().trim(),
+      columnaCantidad:    (config.columnaCantidad    || '').toString().trim(),
+      columnaVencimiento: (config.columnaVencimiento || '').toString().trim(),
+      columnaFabricante:  (config.columnaFabricante  || '').toString().trim(),
+      prioridad:          parseInt(config.prioridad, 10) || 99,
+      // La activación es siempre resultado de validarYActualizarFilaMatriz_, nunca del guardado directo.
+      activa:             'No'
+    };
 
     var targetRow = (rowIndex && rowIndex > 1) ? rowIndex : sheet.getLastRow() + 1;
-    sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
+    escribirFilaMatriz_(sheet, headers, targetRow, datosAEscribir);
 
     logChange(
       'MATRIZ_CONFIG_GUARDADA',
-      'Matriz "' + rowData[0] + '" ' + (rowIndex ? 'actualizada' : 'creada') + ' en fila ' + targetRow,
+      'Matriz "' + datosAEscribir.nombreMatriz + '" ' + (rowIndex ? 'actualizada' : 'creada') + ' en fila ' + targetRow,
       Session.getActiveUser().getEmail()
     );
 
-    return { ok: true };
+    return { ok: true, rowIndex: targetRow };
   } catch (e) {
     Logger.log('MatrizConfig.guardarMatrizConfig: ' + e.message);
     return { ok: false, error: e.message };
   }
+}
+
+// -------------------------------------------------------
+// SECCIÓN 4: VALIDACIÓN ESTRUCTURAL DE UNA FILA + AUTO-ACTIVACIÓN
+// -------------------------------------------------------
+
+/**
+ * Valida la configuración de una fila específica de Sys_MatricesConfig contra la hoja
+ * externa real: confirma que el archivo abre, que la pestaña existe, y que todas las
+ * columnas configuradas existen como encabezados en la fila indicada por
+ * "Fila de Encabezados". Deja constancia del resultado como nota en la celda de
+ * "ID Archivo" y auto-activa la fila (Activa = "Si") únicamente si todo es correcto;
+ * en cualquier otro caso fuerza Activa = "No" para no dejar una matriz rota participando
+ * en las búsquedas de validarNoAnalisisContraMatrices.
+ *
+ * @param {number} rowIndex - Fila a validar en Sys_MatricesConfig (base 1, incluye header).
+ * @returns {Object} { ok: boolean, mensaje: string }
+ */
+function validarYActualizarFilaMatriz_(rowIndex) {
+  var sheet = ensureMatricesConfigSheet_();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  var mensaje = '';
+  var ok = false;
+
+  try {
+    if (!rowIndex || rowIndex < 2) throw new Error('Índice de fila inválido.');
+
+    var raw = getFilaMatrizComoObjeto_(sheet, headers, rowIndex);
+    var filaEncabezados = parseInt(raw.filaEncabezados, 10) || 1;
+
+    if (!raw.idArchivo) {
+      throw new Error('ID de archivo vacío.');
+    }
+
+    var idExtraido = extractDriveId(raw.idArchivo) || raw.idArchivo;
+
+    var ssExterna;
+    try {
+      ssExterna = SpreadsheetApp.openById(idExtraido);
+    } catch (eOpen) {
+      throw new Error('Hoja no encontrada o sin acceso: ' + eOpen.message);
+    }
+
+    var sheetExterna = raw.nombrePestana
+      ? ssExterna.getSheetByName(raw.nombrePestana)
+      : ssExterna.getSheets()[0];
+
+    if (!sheetExterna) {
+      throw new Error("Pestaña '" + raw.nombrePestana + "' no encontrada.");
+    }
+
+    var lastCol = sheetExterna.getLastColumn();
+    if (lastCol < 1 || sheetExterna.getLastRow() < filaEncabezados) {
+      throw new Error('La fila de encabezados (' + filaEncabezados + ') está fuera de rango en la hoja externa.');
+    }
+
+    var headersExternos = sheetExterna.getRange(filaEncabezados, 1, 1, lastCol).getValues()[0];
+
+    var checkCols = [raw.columnaLlave, raw.columnaLote, raw.columnaCantidad, raw.columnaVencimiento];
+    if (raw.columnaFabricante) checkCols.push(raw.columnaFabricante);
+
+    var faltantes = [];
+    checkCols.forEach(function(nombreCol) {
+      if (!nombreCol) return;
+      if (!getColumnIndexByNameCaseInsensitive(headersExternos, nombreCol, false)) {
+        faltantes.push(nombreCol);
+      }
+    });
+
+    if (faltantes.length > 0) {
+      throw new Error('Columnas no encontradas: ' + faltantes.join(', '));
+    }
+
+    ok = true;
+    mensaje = '✅ Validado ' + new Date().toLocaleString('es-CO') + ': hoja, pestaña y columnas OK.';
+  } catch (e) {
+    ok = false;
+    mensaje = '❌ ' + e.message;
+  }
+
+  try {
+    escribirFilaMatriz_(sheet, headers, rowIndex, { activa: ok ? 'Si' : 'No' });
+    var colIdArchivo = getColumnIndexByNameCaseInsensitive(headers, 'ID Archivo', false);
+    if (colIdArchivo) sheet.getRange(rowIndex, colIdArchivo).setNote(mensaje);
+  } catch (eWrite) {
+    Logger.log('validarYActualizarFilaMatriz_: error al escribir resultado: ' + eWrite.message);
+  }
+
+  try {
+    logChange(
+      'MATRIZ_CONFIG_VALIDADA',
+      'Validación de matriz en fila ' + rowIndex + ': ' + mensaje,
+      Session.getActiveUser().getEmail()
+    );
+  } catch (eLog) {}
+
+  return { ok: ok, mensaje: mensaje };
 }
 
 /**
@@ -257,7 +427,9 @@ function eliminarMatrizConfig(rowIndex) {
     if (!rowIndex || rowIndex < 2) throw new Error('Índice de fila inválido.');
 
     var sheet = ensureMatricesConfigSheet_();
-    var nombreMatriz = sheet.getRange(rowIndex, 1).getValue();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colNombreMatriz = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Matriz', false);
+    var nombreMatriz = colNombreMatriz ? sheet.getRange(rowIndex, colNombreMatriz).getValue() : '(sin nombre)';
     sheet.deleteRow(rowIndex);
 
     logChange(
@@ -288,4 +460,41 @@ function _validarPermisoConfigMatrices_() {
   if (!tienePermiso) {
     throw new Error('ACCESO DENEGADO: Solo administradores o configuradores pueden modificar las Matrices K.');
   }
+}
+
+// -------------------------------------------------------
+// SECCIÓN 5: MODAL DE PIN PARA EDICIÓN MANUAL EN LA HOJA
+// -------------------------------------------------------
+
+/**
+ * Abre el modal nativo y bloqueante que pide el PIN de un usuario ADMIN antes de
+ * aceptar una edición manual hecha directamente sobre Sys_MatricesConfig. Llamado
+ * desde onEditInstalled (Traceability.gs) justo después de revertir la edición.
+ * Precarga la identidad de sesión (mismo patrón que abrirPanelQMS/resolverIdentidadSesion)
+ * para que el modal ya sepa qué candidato(s) de usuario corresponden al correo activo.
+ *
+ * @param {number} fila             - Fila editada en Sys_MatricesConfig (base 1).
+ * @param {number} columna          - Columna editada (base 1).
+ * @param {any}    valorPropuesto   - Valor que el usuario intentó escribir (ya revertido).
+ * @param {string} identidadEditor  - Identidad legible del editor (solo para contexto/mensaje).
+ */
+function abrirModalPinMatrizConfig_(fila, columna, valorPropuesto, identidadEditor) {
+  var sheet = ensureMatricesConfigSheet_();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var nombreColumna = (headers[columna - 1] || '').toString().trim() || ('Columna ' + columna);
+
+  var template = HtmlService.createTemplateFromFile('ModalPinMatrizConfig');
+  template.identidad = JSON.stringify(resolverIdentidadSesion());
+  template.contexto = JSON.stringify({
+    fila: fila,
+    columna: columna,
+    nombreColumna: nombreColumna,
+    valorPropuesto: valorPropuesto === undefined || valorPropuesto === null ? '' : valorPropuesto.toString(),
+    identidadEditor: identidadEditor || ''
+  });
+
+  var html = template.evaluate()
+      .setWidth(400)
+      .setHeight(480);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Edición Protegida — Matrices K');
 }

@@ -101,6 +101,7 @@ var MATRICES_CONFIG_HEADERS = [
   'Nombre Matriz',      // Nombre descriptivo (ej. "Matriz K 2026")
   'ID Archivo',         // ID extraído del link de Google Sheets externo
   'Nombre de Pestaña', // Nombre exacto del tab interno a consultar
+  'Fila de Encabezados', // Fila donde están los títulos de columna en la hoja externa (vacío = 1)
   'Columna Llave',     // Nombre del encabezado con el No Análisis K
   'Columna Lote',      // Nombre del encabezado de Lote
   'Columna Cantidad',  // Nombre del encabezado de Cantidad Disponible

@@ -423,23 +423,55 @@ function handlePrivilegedOperation_(params) {
   }
 
   if (operation === 'guardarMatrizConfig') {
-    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
-      return { status: 'error', message: 'No tiene permisos para modificar matrices.', diagnostic: 'PERMISSION_DENIED' };
+    // Requiere específicamente rol ADMIN (no basta MENU_CONFIG): guardar una Matriz K
+    // reescribe el ID de un archivo externo consultado en cada validación de orden, por
+    // lo que exige el mismo nivel de autorización que la edición manual en la hoja.
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede crear o modificar matrices.', diagnostic: 'PERMISSION_DENIED' };
     }
     if (!params.config) {
       return { status: 'error', message: 'Falta el parámetro config.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
-    return guardarMatrizConfig(params.config, params.rowIndex || null);
+    var resultadoGuardado = guardarMatrizConfig(params.config, params.rowIndex || null);
+    if (resultadoGuardado.ok && resultadoGuardado.rowIndex) {
+      resultadoGuardado.validacion = validarYActualizarFilaMatriz_(resultadoGuardado.rowIndex);
+    }
+    return resultadoGuardado;
   }
 
   if (operation === 'eliminarMatrizConfig') {
-    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
+    if (!esUsuarioRolAdmin_(callingUserId)) {
       return { status: 'error', message: 'Solo un administrador puede eliminar matrices.', diagnostic: 'PERMISSION_DENIED' };
     }
     if (!params.rowIndex) {
       return { status: 'error', message: 'Falta el parámetro rowIndex.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
     return eliminarMatrizConfig(params.rowIndex);
+  }
+
+  if (operation === 'confirmarEdicionMatrizConfig') {
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede autorizar esta edición.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.fila || !params.columna) {
+      return { status: 'error', message: 'Faltan parámetros fila/columna.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    try {
+      var sheetMatrices = ensureMatricesConfigSheet_();
+      var headersMatrices = sheetMatrices.getRange(1, 1, 1, sheetMatrices.getLastColumn()).getValues()[0];
+      var nombreColumnaEditada = (headersMatrices[params.columna - 1] || '').toString().trim() || ('columna ' + params.columna);
+      sheetMatrices.getRange(params.fila, params.columna).setValue(params.valorPropuesto || '');
+      logChange(
+        'MATRIZ_CONFIG_EDICION_AUTORIZADA',
+        'Edición manual de "' + nombreColumnaEditada +
+          '" en fila ' + params.fila + ' autorizada con PIN de administrador. Nuevo valor: "' + params.valorPropuesto + '"',
+        Session.getActiveUser().getEmail()
+      );
+      var resultadoValidacion = validarYActualizarFilaMatriz_(params.fila);
+      return { status: 'success', resultado: resultadoValidacion };
+    } catch (e) {
+      return { status: 'error', message: 'No se pudo aplicar la edición: ' + e.message };
+    }
   }
 
   if (operation === 'actualizarCampoOrden') {
@@ -536,6 +568,19 @@ function handlePrivilegedOperation_(params) {
 // Prefijo que identifica una firma enviada como clave de administrador (bypass de PIN), en vez
 // de un PIN de 4 dígitos. Ver requireAuthorizedUserStrict_ y GlobalScripts.html:promptSecurityPin.
 var ADMIN_OVERRIDE_PREFIX_ = "__ADMIN_OVERRIDE__:";
+
+/**
+ * Determina si el UserID dado corresponde a un usuario con rol ADMIN (incluye variaciones
+ * de nombre). Mismo criterio que el bypass de clave de administrador en requireAuthorizedUserStrict_.
+ * @param {string} userId
+ * @returns {boolean}
+ */
+function esUsuarioRolAdmin_(userId) {
+  var user = getUserRecordByUserId_(userId);
+  if (!user) return false;
+  var rolUpper = (user.rol || '').toString().toUpperCase();
+  return rolUpper === 'ADMIN' || rolUpper === 'ADMINISTRADOR' || rolUpper === 'ADMINISTRADOR DE SISTEMA';
+}
 
 /**
  * Valida rigurosamente la identidad del usuario y su PIN.

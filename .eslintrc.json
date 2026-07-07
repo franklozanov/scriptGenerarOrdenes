@@ -8,6 +8,7 @@
     "ADMIN_OVERRIDE_PREFIX_": "readonly",
     "ADMIN_PASS": "readonly",
     "AUTO_APPROVAL_PROP_KEY": "readonly",
+    "abrirModalPinMatrizConfig_": "readonly",
     "MATRICES_CONFIG_HEADERS": "readonly",
     "PDFLib": "readonly",
     "PERMISOS": "readonly",
@@ -40,6 +41,7 @@
     "ensureMatricesConfigSheet_": "readonly",
     "escapeHtml": "readonly",
     "esRolAdmin_": "readonly",
+    "esUsuarioRolAdmin_": "readonly",
     "evaluateAutoApproval_": "readonly",
     "extractDriveId": "readonly",
     "finalizeFinalPdfPostSave": "readonly",
@@ -83,6 +85,7 @@
     "registrarSolicitudImpresion": "readonly",
     "requireAuthorizedUserStrict_": "readonly",
     "requireAuthorizedUser_": "readonly",
+    "resolverIdentidadSesion": "readonly",
     "revalidarOrden": "readonly",
     "runConsecutivoImpDiagnostic_": "readonly",
     "saveFinalUnifiedPDF": "readonly",
@@ -99,6 +102,7 @@
     "sysData": "writable",
     "updateUserSecurityState_": "readonly",
     "validarNoAnalisisContraMatrices": "readonly",
+    "validarYActualizarFilaMatriz_": "readonly",
     "withAdminAuth": "readonly"
   },
   "plugins": [
@@ -119,6 +123,7 @@
     "ModalAprobarImpresion.html",
     "ModalAutorizarQA.html",
     "ModalCargaOrdenes.html",
+    "ModalPinMatrizConfig.html",
     "ModalRegistroNovedad.html"
   ]
 }
