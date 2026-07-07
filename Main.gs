@@ -99,48 +99,11 @@ function onOpenMain(email) {
     SpreadsheetApp.getUi().toast('⚠️ Atención: Tu rol "' + validUser.rol + '" no tiene permisos configurados. Verifica la hoja PermisosRoles.', 'Sistema de Permisos', 10);
   }
 
-  // 1. Menú de Administrador (Opciones de seguridad y proxy)
-  var adminMenu;
-  // Fallback de seguridad: El Administrador siempre ve el menú de inicialización (cubriendo variaciones de nombre)
-  var rolUpper = validUser.rol ? validUser.rol.toUpperCase() : '';
-  var isAdminFallback = (rolUpper === 'ADMINISTRADOR' || rolUpper === 'ADMIN' || rolUpper === 'ADMINISTRADOR DE SISTEMA');
-  
-  if (hasPermissionByRol(validUser.rol, PERMISOS.MENU_ADMIN) || isAdminFallback) {
-    adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
-      .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
-  }
-
-  // 2. Menú de Configuración General
-  var configMenu;
-  if (hasPermissionByRol(validUser.rol, PERMISOS.MENU_CONFIG)) {
-    configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
-      .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
-      .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp');
-  }
-
-  // 3. Menú Principal (Gestionar OA) - Construido condicionalmente según permisos
+  // Menú Principal (Gestionar OA)
+  // Fase 3: Migración a Sidebar SPA — Configuración y Opciones Admin migradas al Panel
+  // Principal QMS (pestaña ⚙️ Configuración), que aplica sus propios permisos por rol.
   var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
-  
-  var hasMainMenuItems = false;
-
-  // Fase 3: Migración a Sidebar SPA
   mainMenu.addItem('🎛️ Abrir Panel Principal QMS', 'abrirSidebarQMS');
-  hasMainMenuItems = true;
-
-  if (configMenu) {
-    mainMenu.addSeparator().addSubMenu(configMenu);
-    hasMainMenuItems = true;
-  }
-
-  if (adminMenu) {
-    mainMenu.addSeparator().addSubMenu(adminMenu);
-    hasMainMenuItems = true;
-  }
-  
-  if (!hasMainMenuItems) {
-    mainMenu.addItem('🚫 Sin opciones disponibles', 'mostrarAlertaSinPermisos');
-  }
-  
   mainMenu.addToUi();
   Logger.log("Menús de UI creados exitosamente.");
   
@@ -206,17 +169,6 @@ function hideUnauthorizedSheets_() {
   } catch (e) {
     Logger.log("ERROR en hideUnauthorizedSheets_: " + e.message);
   }
-}
-
-/**
- * Función de fallback cuando el menú no tiene opciones por falta de permisos.
- */
-function mostrarAlertaSinPermisos() {
-  SpreadsheetApp.getUi().alert(
-    'Sin Permisos', 
-    'Tu rol actual no tiene habilitada ninguna acción para este menú.', 
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
 }
 
 // ============================================================

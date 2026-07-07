@@ -5,46 +5,41 @@
 // ============================================================
 
 /**
- * Función de diagnóstico para verificar el estado de las plantillas.
- * Verifica acceso a carpetas dinámicas y plantillas estáticas.
+ * Escanea la hoja 'templates' y verifica acceso a carpetas dinámicas y plantillas estáticas.
+ * @returns {Array<Object>} Lista de resultados por cada plantilla/variable ({status, nombre, mensaje}).
  */
-function diagnosticarPlantillas() {
+function diagnosticarPlantillasConfig() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tplSheet = ss.getSheetByName('templates');
   if (!tplSheet) {
-    SpreadsheetApp.getUi().alert('❌ Error: La hoja "templates" no existe.');
-    return;
+    return [{ status: 'error', nombre: 'templates', mensaje: 'La hoja "templates" no existe.' }];
   }
-  
+
   var tplData = tplSheet.getDataRange().getValues();
-  var report = "📋 DIAGNÓSTICO DE PLANTILLAS\n\n";
-  var errorCount = 0;
-  var successCount = 0;
-  var folderId = "";
-  var folderAnalysisId = "";
-  
+  var resultados = [];
+
   var headers = tplData[0];
-  
+
   // Obtener índices de columnas por nombre
   var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
   var colValorIdx = getColumnIndexByNameCaseInsensitive(headers, 'Valor', false);
   var colTypeIdx = getColumnIndexByNameCaseInsensitive(headers, 'Type', false);
-  
+
   // Si alguna columna no existe, usar índices por defecto
   if (!colClaveIdx) colClaveIdx = 1;
   if (!colValorIdx) colValorIdx = 2;
-  
+
   // Convertir a base-0 para acceso a array
   colClaveIdx = colClaveIdx - 1;
   colValorIdx = colValorIdx - 1;
   if (colTypeIdx) colTypeIdx = colTypeIdx - 1;
-  
+
   for (var i = 1; i < tplData.length; i++) {
     var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
     var rawValue = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
     var value = rawValue ? extractDriveId(rawValue) : "";
     var type = (colTypeIdx !== undefined && colTypeIdx !== null && tplData[i][colTypeIdx]) ? tplData[i][colTypeIdx].toString().trim() : "";
-    
+
     if (!key || key === "Clave") continue;
 
     // Lógica retrocompatible si no hay columna Type
@@ -58,59 +53,71 @@ function diagnosticarPlantillas() {
       if (value) {
         try {
           var folder = DriveApp.getFolderById(value);
-          report += "✓ [Carpeta] " + key + " → " + folder.getName() + "\n";
-          successCount++;
+          resultados.push({ status: 'ok', nombre: key, mensaje: '[Carpeta] → ' + folder.getName() });
         } catch (e) {
-          report += "✗ [Carpeta] " + key + " → ERROR: " + e.message + "\n";
-          errorCount++;
+          resultados.push({ status: 'error', nombre: key, mensaje: '[Carpeta] → ERROR: ' + e.message });
         }
       } else {
-        report += "⚠ [Carpeta] " + key + " → No configurado\n";
-        errorCount++;
+        resultados.push({ status: 'warning', nombre: key, mensaje: '[Carpeta] → No configurado' });
       }
     } else if (type === "File") {
       // Ignoramos TPL_ORDEN porque no es de Drive sino un HTML
       if (key === "TPL_ORDEN") continue;
-      
+
       if (value) {
         try {
           var file = DriveApp.getFileById(value);
-          report += "✓ [Archivo] " + key + " → " + file.getName() + "\n";
-          successCount++;
+          resultados.push({ status: 'ok', nombre: key, mensaje: '[Archivo] → ' + file.getName() });
         } catch (e) {
-          report += "✗ [Archivo] " + key + " → ERROR: " + e.message + "\n";
-          errorCount++;
+          resultados.push({ status: 'error', nombre: key, mensaje: '[Archivo] → ERROR: ' + e.message });
         }
       } else {
-        report += "⚠ [Archivo] " + key + " → No configurado\n";
-        errorCount++;
+        resultados.push({ status: 'warning', nombre: key, mensaje: '[Archivo] → No configurado' });
       }
     } else if (type === "Coordinate") {
       if (rawValue.match(/x:\s*[0-9.]+/i) && rawValue.match(/y:\s*[0-9.]+/i)) {
-          report += "✓ [Coordenada] " + key + " → Formato correcto (" + rawValue + ")\n";
-          successCount++;
+          resultados.push({ status: 'ok', nombre: key, mensaje: '[Coordenada] → Formato correcto (' + rawValue + ')' });
       } else if (!rawValue || rawValue === "N/A" || rawValue === "FALSE") {
-          report += "⚠ [Coordenada] " + key + " → No configurada o inactiva\n";
+          resultados.push({ status: 'warning', nombre: key, mensaje: '[Coordenada] → No configurada o inactiva' });
       } else {
-          report += "✗ [Coordenada] " + key + " → Formato incorrecto. Se esperaba 'x: N, y: N'. Se recibió: " + rawValue + "\n";
-          errorCount++;
+          resultados.push({ status: 'error', nombre: key, mensaje: "[Coordenada] → Formato incorrecto. Se esperaba 'x: N, y: N'. Se recibió: " + rawValue });
       }
     } else {
-       report += "⚠ [Desconocido] " + key + " → Tipo '" + type + "' no soportado\n";
+       resultados.push({ status: 'warning', nombre: key, mensaje: "[Desconocido] → Tipo '" + type + "' no soportado" });
     }
   }
-  
+
+  return resultados;
+}
+
+/**
+ * Función de diagnóstico para verificar el estado de las plantillas (uso manual desde el editor).
+ * Verifica acceso a carpetas dinámicas y plantillas estáticas y muestra un reporte en un alert.
+ */
+function diagnosticarPlantillas() {
+  var resultados = diagnosticarPlantillasConfig();
+  var report = "📋 DIAGNÓSTICO DE PLANTILLAS\n\n";
+  var errorCount = 0;
+  var successCount = 0;
+
+  resultados.forEach(function(r) {
+    var prefix = r.status === 'ok' ? '✓' : (r.status === 'error' ? '✗' : '⚠');
+    report += prefix + ' ' + r.nombre + ' → ' + r.mensaje + '\n';
+    if (r.status === 'ok') successCount++;
+    else if (r.status === 'error') errorCount++;
+  });
+
   report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
   report += "✓ Accesibles: " + successCount + "\n";
   report += "✗ Con errores: " + errorCount + "\n";
-  
+
   if (errorCount > 0) {
     report += "\n⚠️ ACCIÓN REQUERIDA:\n";
     report += "1. Verifique los IDs de las plantillas con error\n";
     report += "2. Asegúrese de que el script tenga permisos\n";
     report += "3. Consulte SOLUCION_PLANTILLAS.md para ayuda";
   }
-  
+
   SpreadsheetApp.getUi().alert(report);
   Logger.log(report);
 }
@@ -267,6 +274,20 @@ function diagnosticarConsecutivoImp() {
     
   } catch (e) {
     SpreadsheetApp.getUi().alert("❌ Error en diagnóstico: " + e.message);
+  }
+}
+
+/**
+ * Verifica la columna ConsecutivoImp en la hoja Ordenes y devuelve el resultado estructurado.
+ * @returns {Array<Object>} Lista de un único resultado ({status, nombre, mensaje}).
+ */
+function diagnosticarConsecutivoImpConfig() {
+  try {
+    var mensaje = runConsecutivoImpDiagnostic_();
+    var status = mensaje.indexOf('⚠️') !== -1 ? 'warning' : 'ok';
+    return [{ status: status, nombre: 'ConsecutivoImp', mensaje: mensaje }];
+  } catch (e) {
+    return [{ status: 'error', nombre: 'ConsecutivoImp', mensaje: e.message }];
   }
 }
 

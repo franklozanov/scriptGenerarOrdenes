@@ -142,6 +142,18 @@
                 <span class="icon">🩺</span> Ejecutar Diagnóstico de Matrices
               </button>
               <div id="diagnostics-results" style="margin-top:10px; font-size:12px; display:none; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;"></div>
+
+              <p style="font-size:12px; margin:16px 0 8px;">Verifica el acceso a plantillas y carpetas de Drive configuradas.</p>
+              <button class="btn-action" onclick="cfg_diagnosticarPlantillas()">
+                <span class="icon">📊</span> Diagnosticar Plantillas
+              </button>
+              <div id="diagnostics-results-plantillas" style="margin-top:10px; font-size:12px; display:none; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;"></div>
+
+              <p style="font-size:12px; margin:16px 0 8px;">Verifica la columna ConsecutivoImp en la hoja Ordenes.</p>
+              <button class="btn-action" onclick="cfg_diagnosticarConsecutivoImp()">
+                <span class="icon">🔍</span> Diagnosticar ConsecutivoImp
+              </button>
+              <div id="diagnostics-results-consecutivo" style="margin-top:10px; font-size:12px; display:none; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;"></div>
             </div>
 
             <!-- Gestión de Plantillas -->
@@ -910,13 +922,13 @@
       }
     }
 
-    // --- Diagnóstico de Matrices ---
-    async function cfg_diagnosticarMatrices() {
-      const resContainer = document.getElementById('diagnostics-results');
+    // --- Diagnósticos (Matrices / Plantillas / ConsecutivoImp) ---
+    async function cfg_runDiagnostic(operation, containerId) {
+      const resContainer = document.getElementById(containerId);
       resContainer.style.display = 'block';
       resContainer.innerHTML = '⏳ Ejecutando diagnóstico... (Puede tardar varios segundos)';
       try {
-        const res = await postWebApp({ operation: 'diagnosticarMatrices', userId: sysData.currentUser.userId });
+        const res = await postWebApp({ operation, userId: sysData.currentUser.userId });
         if (res.status === 'success') {
           let html = '<strong>Resultados:</strong><ul style="margin:4px 0; padding-left:20px;">';
           res.data.forEach(d => {
@@ -932,6 +944,9 @@
         resContainer.innerHTML = `❌ Error de red: ${err.message}`;
       }
     }
+    function cfg_diagnosticarMatrices() { return cfg_runDiagnostic('diagnosticarMatrices', 'diagnostics-results'); }
+    function cfg_diagnosticarPlantillas() { return cfg_runDiagnostic('diagnosticarPlantillas', 'diagnostics-results-plantillas'); }
+    function cfg_diagnosticarConsecutivoImp() { return cfg_runDiagnostic('diagnosticarConsecutivoImp', 'diagnostics-results-consecutivo'); }
 
     // --- Gestión de Plantillas ---
     function cfg_abrirModalPlantilla() {
