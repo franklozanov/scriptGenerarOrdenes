@@ -447,6 +447,24 @@ function fixHeaders(ui) {
       
       sheet.getRange(1, startCol, 1, missingHeaders.length).setValues([missingHeaders]);
       Logger.log("✓ Encabezados faltantes agregados al final en la hoja " + sheetName + ": " + missingHeaders.join(", "));
+      
+      // Si la hoja es PermisosRoles, inicializar los nuevos permisos en 'true' para los administradores
+      if (sheetName === 'PermisosRoles' && sheet.getLastRow() > 1) {
+        var rolesData = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+        for (var r = 0; r < rolesData.length; r++) {
+          var roleName = (rolesData[r][0] || '').toString().toUpperCase();
+          if (roleName === 'ADMIN' || roleName === 'ADMINISTRADOR' || roleName === 'ADMINISTRADOR DE SISTEMA') {
+            var trues = [];
+            for (var k = 0; k < missingHeaders.length; k++) trues.push(true);
+            sheet.getRange(r + 2, startCol, 1, missingHeaders.length).setValues([trues]);
+          } else {
+            // Para los demás, por seguridad es false
+            var falses = [];
+            for (var k = 0; k < missingHeaders.length; k++) falses.push(false);
+            sheet.getRange(r + 2, startCol, 1, missingHeaders.length).setValues([falses]);
+          }
+        }
+      }
     }
   }
 }
