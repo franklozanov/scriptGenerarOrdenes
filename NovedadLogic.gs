@@ -484,8 +484,13 @@ function procesarCargaOrdenesMasivas(params, userId) {
           if (colVerifExp)       row[colVerifExp - 1]       = resultadoValidacion.verifExp;
           if (colCantDispAFecha) row[colCantDispAFecha - 1] = resultadoValidacion.cantDispAFecha;
           if (colDecision)       row[colDecision - 1]       = resultadoValidacion.decision;
-          // Fabricante viene de la Matriz K, no del Excel del usuario
-          if (colFabricante)     row[colFabricante - 1]     = resultadoValidacion.fabricante;
+          
+          // Fabricante: Prioridad a lo que el usuario modificó en el form (record.Fabricante), si no usar el de Matriz K
+          if (colFabricante) {
+            row[colFabricante - 1] = (record.Fabricante && record.Fabricante.trim() !== '') 
+              ? record.Fabricante.trim() 
+              : resultadoValidacion.fabricante;
+          }
 
           if (resultadoValidacion.decision !== VALORES_DECISION.OK) {
             ordenesConAlerta.push({
@@ -506,9 +511,26 @@ function procesarCargaOrdenesMasivas(params, userId) {
       // Procesar archivo OA si viene
       if (record.fileOABase64 && folderDocOrdenes) {
         try {
-          var decodedOA = Utilities.base64Decode(record.fileOABase64);
-          var blobOA = Utilities.newBlob(decodedOA, 'application/pdf', record.fileOAName || record.NoOrden + '_OA.pdf');
-          folderDocOrdenes.createFile(blobOA);
+          var targetFileNameOA = record.fileOAName || record.NoOrden + '_OA.pdf';
+          var existingOA = folderDocOrdenes.getFilesByName(targetFileNameOA);
+          var skipOA = false;
+          
+          if (existingOA.hasNext()) {
+            if (params.overwriteConfirmed === 'skipUpload') {
+              skipOA = true;
+            } else if (params.overwriteConfirmed === true) {
+              while (existingOA.hasNext()) {
+                existingOA.next().setTrashed(true);
+              }
+            }
+          }
+          
+          if (!skipOA) {
+            var decodedOA = Utilities.base64Decode(record.fileOABase64);
+            var blobOA = Utilities.newBlob(decodedOA, 'application/pdf', targetFileNameOA);
+            folderDocOrdenes.createFile(blobOA);
+          }
+          
           row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.CARGADO;
           oaCargado = true;
         } catch (e) {
@@ -522,9 +544,26 @@ function procesarCargaOrdenesMasivas(params, userId) {
       // Procesar archivo COA si viene
       if (record.fileCOABase64 && folderDocAnalisis) {
         try {
-          var decodedCOA = Utilities.base64Decode(record.fileCOABase64);
-          var blobCOA = Utilities.newBlob(decodedCOA, 'application/pdf', record.fileCOAName || record.NoOrden + '_COA.pdf');
-          folderDocAnalisis.createFile(blobCOA);
+          var targetFileNameCOA = record.fileCOAName || record.NoOrden + '_COA.pdf';
+          var existingCOA = folderDocAnalisis.getFilesByName(targetFileNameCOA);
+          var skipCOA = false;
+          
+          if (existingCOA.hasNext()) {
+            if (params.overwriteConfirmed === 'skipUpload') {
+              skipCOA = true;
+            } else if (params.overwriteConfirmed === true) {
+              while (existingCOA.hasNext()) {
+                existingCOA.next().setTrashed(true);
+              }
+            }
+          }
+          
+          if (!skipCOA) {
+            var decodedCOA = Utilities.base64Decode(record.fileCOABase64);
+            var blobCOA = Utilities.newBlob(decodedCOA, 'application/pdf', targetFileNameCOA);
+            folderDocAnalisis.createFile(blobCOA);
+          }
+          
           row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.CARGADO;
           coaCargado = true;
         } catch (e) {

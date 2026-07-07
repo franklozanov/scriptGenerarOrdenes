@@ -57,6 +57,14 @@
     .card-body input.form-input:focus, select.form-input:focus, textarea.form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
     .card-body .full-width { grid-column: span 2; }
     
+    .field-wrapper { position: relative; }
+    .field-wrapper.full-width { grid-column: span 2; }
+    .field-msg { font-size: 10px; margin-top: 3px; display: none; padding-left: 2px; }
+    .field-msg.error { display: block; color: #ef4444; }
+    .field-msg.success { display: block; color: #10b981; }
+    .input-error { border-color: #ef4444 !important; }
+    .input-success { border-color: #10b981 !important; }
+    
     .file-upload-box { border: 1px dashed #cbd5e1; padding: 10px; border-radius: 6px; text-align: center; font-size: 11px; margin-top: 6px; background: #f8fafc; transition: all 0.2s; }
     .file-upload-box:hover { border-color: #94a3b8; background: #f1f5f9; }
     .file-upload-box input { max-width: 100%; font-size: 11px; }
@@ -221,7 +229,7 @@
         </div>
         
         <div class="bottom-actions">
-          <button class="btn-primary-small" onclick="co_guardarDatos()" style="width:100%;">Guardar Órdenes</button>
+          <button id="btn_guardar_ordenes" class="btn-primary-small" onclick="co_guardarDatos(this)" style="width:100%;">Guardar Órdenes</button>
         </div>
       </div>
       
@@ -456,9 +464,12 @@
   <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
   
   <script>
-    var sysData = null;
-    var base64Data = {};
-
+    // Variables globales
+    var sysData = null; 
+    var co_cardCount = 0;
+    var cardMemoryData = {}; // Memoria temporal para validaciones on-edit
+    
+    // Al cargar el DOM
     document.addEventListener("DOMContentLoaded", function() {
       // Configurar tabs
       document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -917,6 +928,15 @@
       const card = document.createElement('div');
       card.className = 'order-card';
       card.id = 'card_' + co_cardCount;
+      cardMemoryData[card.id] = null; // Inicializar memoria de matriz
+
+      const renderField = (field, placeholder, val, extraClass='', extraAttrs='') => `
+        <div class="field-wrapper ${extraClass}">
+          <input type="${field==='Cantidad' ? 'number' : 'text'}" class="form-input" data-field="${field}" placeholder="${placeholder}" value="${val}" ${extraAttrs}>
+          <div class="field-msg"></div>
+        </div>
+      `;
+
       card.innerHTML = `
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
@@ -926,14 +946,15 @@
           <button class="btn-icon" onclick="co_deleteCard(this)">\u274C</button>
         </div>
         <div class="card-body">
-          <input type="text" class="form-input" data-field="Proceso" placeholder="Proceso" value="${data.Proceso || ''}">
-          <input type="text" class="form-input" data-field="Codigo" placeholder="Código" value="${data.Codigo || ''}">
-          <input type="text" class="form-input full-width" data-field="Descripcion" placeholder="Descripción" value="${data.Descripcion || ''}">
-          <input type="text" class="form-input" data-field="Lote" placeholder="Lote" value="${data.Lote || ''}">
-          <input type="text" class="form-input" data-field="Exp" placeholder="Exp" value="${data.Exp || ''}">
-          <input type="number" class="form-input" data-field="Cantidad" placeholder="Cantidad" value="${data.Cantidad || ''}" onchange="co_validarTarjetaInline(this)">
-          <input type="text" class="form-input" data-field="NoAnalisis" placeholder="NoAnálisis" value="${data.NoAnalisis || ''}" onchange="co_validarTarjetaInline(this)">
-          <input type="text" class="form-input full-width" data-field="NoOrden" placeholder="NoOrden" value="${data.NoOrden || ''}">
+          ${renderField('NoOrden', 'NoOrden (Requerido)', data.NoOrden || '', 'full-width', 'onchange="co_validarOrden(this)"')}
+          ${renderField('Proceso', 'Proceso', data.Proceso || '')}
+          ${renderField('Codigo', 'Código', data.Codigo || '')}
+          ${renderField('Descripcion', 'Descripción', data.Descripcion || '', 'full-width')}
+          ${renderField('NoAnalisis', 'No Análisis K', data.NoAnalisis || '', '', 'onchange="co_validarAnalisis(this)"')}
+          ${renderField('Fabricante', 'Fabricante', data.Fabricante || '')}
+          ${renderField('Lote', 'Lote', data.Lote || '', '', 'oninput="co_compararCampo(this, \\'lote\\')"')}
+          ${renderField('Exp', 'Exp (MM/YYYY)', data.Exp || '', '', 'oninput="co_compararCampo(this, \\'exp\\')"')}
+          ${renderField('Cantidad', 'Cantidad', data.Cantidad || '', '', 'oninput="co_compararCampo(this, \\'cantidad\\')"')}
           <div class="file-upload-box full-width">
             <div>📄 OA: <input type="file" accept="application/pdf" data-field="FileOA"></div>
             <div style="margin-top:4px;">📄 COA: <input type="file" accept="application/pdf" data-field="FileCOA"></div>
@@ -945,13 +966,18 @@
     }
 
     function co_deleteCard(btn) {
-      btn.closest('.order-card').remove();
+      const card = btn.closest('.order-card');
+      if (card) {
+        delete cardMemoryData[card.id];
+        card.remove();
+      }
       co_updateInfo();
     }
 
     function co_clearCards() {
       document.getElementById('cardsContainer').innerHTML = '';
       co_cardCount = 0;
+      cardMemoryData = {};
       co_updateInfo();
     }
 
@@ -1014,8 +1040,14 @@
         });
         
         if (Object.values(record).some(val => val !== '')) {
-          record._fileOA = fileInputs[0] && fileInputs[0].files.length > 0 ? fileInputs[0].files[0] : null;
-          record._fileCOA = fileInputs[1] && fileInputs[1].files.length > 0 ? fileInputs[1].files[0] : null;
+          const fOA = fileInputs[0] && fileInputs[0].files.length > 0 ? fileInputs[0].files[0] : null;
+          const fCOA = fileInputs[1] && fileInputs[1].files.length > 0 ? fileInputs[1].files[0] : null;
+          
+          if (fOA && fOA.type !== 'application/pdf') throw new Error(`El archivo de OA no es PDF (Orden ${record.NoOrden || 'Sin número'})`);
+          if (fCOA && fCOA.type !== 'application/pdf') throw new Error(`El archivo de COA no es PDF (Orden ${record.NoOrden || 'Sin número'})`);
+          
+          record._fileOA = fOA;
+          record._fileCOA = fCOA;
           records.push(record);
         }
       });
@@ -1031,40 +1063,144 @@
       });
     }
 
-    async function co_validarTarjetaInline(inputEl) {
+    async function co_validarOrden(inputEl) {
       const card = inputEl.closest('.order-card');
       if (!card) return;
-      const noAnalisisInput = card.querySelector('input[data-field="NoAnalisis"]');
-      const loteInput = card.querySelector('input[data-field="Lote"]');
-      const expInput = card.querySelector('input[data-field="Exp"]');
-      const cantidadInput = card.querySelector('input[data-field="Cantidad"]');
+      const noOrden = inputEl.value.trim();
+      const msgEl = inputEl.nextElementSibling;
+      if (!noOrden) {
+        inputEl.classList.remove('input-error', 'input-success');
+        msgEl.className = 'field-msg';
+        return;
+      }
       
-      const noAnalisis = noAnalisisInput ? noAnalisisInput.value.trim() : '';
-      if (!noAnalisis) return; // Si no hay NoAnalisis, no hay cómo validar
-      
-      const lote = loteInput ? loteInput.value.trim() : '';
-      const exp = expInput ? expInput.value.trim() : '';
-      const cantidad = cantidadInput ? cantidadInput.value.trim() : '0';
-      
-      const badgeContainer = card.querySelector('.card-header div[id^="badge_"]');
-      if (badgeContainer) badgeContainer.innerHTML = '<span style="font-size:11px; color:#6b7280;">Validando...</span>';
+      msgEl.className = 'field-msg';
+      msgEl.innerText = 'Verificando duplicados...';
+      msgEl.style.display = 'block';
+      msgEl.style.color = '#6b7280';
       
       try {
-        const res = await postWebApp({
-          operation: 'validarMatrizKEnLinea',
-          noAnalisis: noAnalisis,
-          lote: lote,
-          exp: exp,
-          cantidad: cantidad,
-          userId: sysData.currentUser.userId
-        });
-        
-        if (res.status === 'success' && res.data && badgeContainer) {
-          const decision = (res.data.decision || '').trim();
-          co_pintarBadgeDecision(badgeContainer, decision);
+        const res = await postWebApp({ operation: 'validarOrdenDuplicada', noOrden: noOrden, userId: sysData.currentUser.userId });
+        if (res.status === 'success' && res.duplicada) {
+          inputEl.classList.add('input-error');
+          inputEl.classList.remove('input-success');
+          msgEl.className = 'field-msg error';
+          msgEl.innerText = '❌ La orden ya existe';
+        } else {
+          inputEl.classList.remove('input-error');
+          inputEl.classList.add('input-success');
+          msgEl.className = 'field-msg success';
+          msgEl.innerText = '✅ Orden válida';
         }
       } catch (e) {
-        if (badgeContainer) badgeContainer.innerHTML = '<span style="font-size:11px; color:#ef4444;">Error de red</span>';
+        msgEl.innerText = 'Error de red';
+      }
+    }
+
+    async function co_validarAnalisis(inputEl) {
+      const card = inputEl.closest('.order-card');
+      if (!card) return;
+      const noAnalisis = inputEl.value.trim();
+      const msgEl = inputEl.nextElementSibling;
+      const fabricanteInput = card.querySelector('input[data-field="Fabricante"]');
+      
+      if (!noAnalisis) {
+        inputEl.classList.remove('input-error', 'input-success');
+        msgEl.className = 'field-msg';
+        cardMemoryData[card.id] = null;
+        if(fabricanteInput) fabricanteInput.value = '';
+        return;
+      }
+      
+      msgEl.className = 'field-msg';
+      msgEl.innerText = 'Buscando en matrices...';
+      msgEl.style.display = 'block';
+      msgEl.style.color = '#6b7280';
+      
+      try {
+        const res = await postWebApp({ operation: 'consultarAnalisisMatriz', noAnalisis: noAnalisis, userId: sysData.currentUser.userId });
+        if (res.status === 'success' && res.data.encontrado) {
+          inputEl.classList.remove('input-error');
+          inputEl.classList.add('input-success');
+          msgEl.className = 'field-msg success';
+          msgEl.innerText = '✅ Encontrado en ' + res.data.matrizConsultada;
+          
+          cardMemoryData[card.id] = res.data; // Guardar temporalmente
+          if(fabricanteInput) fabricanteInput.value = res.data.fabricante || 'N/A';
+          
+          // Re-validar campos existentes si ya tenían algo escrito
+          const loteInput = card.querySelector('input[data-field="Lote"]');
+          const expInput = card.querySelector('input[data-field="Exp"]');
+          const cantInput = card.querySelector('input[data-field="Cantidad"]');
+          if(loteInput && loteInput.value) co_compararCampo(loteInput, 'lote');
+          if(expInput && expInput.value) co_compararCampo(expInput, 'exp');
+          if(cantInput && cantInput.value) co_compararCampo(cantInput, 'cantidad');
+          
+        } else {
+          inputEl.classList.add('input-error');
+          inputEl.classList.remove('input-success');
+          msgEl.className = 'field-msg error';
+          msgEl.innerText = '❌ No encontrado en matrices K';
+          cardMemoryData[card.id] = null;
+          if(fabricanteInput) fabricanteInput.value = '';
+        }
+      } catch (e) {
+        msgEl.className = 'field-msg error';
+        msgEl.innerText = 'Error de red al consultar matriz';
+      }
+    }
+
+    function co_compararCampo(inputEl, campoTipo) {
+      const card = inputEl.closest('.order-card');
+      if (!card) return;
+      const mem = cardMemoryData[card.id];
+      const val = inputEl.value.trim();
+      const msgEl = inputEl.nextElementSibling;
+      
+      if (!val) {
+        inputEl.classList.remove('input-error', 'input-success');
+        msgEl.className = 'field-msg';
+        return;
+      }
+      
+      if (!mem) {
+        inputEl.classList.remove('input-success');
+        inputEl.classList.add('input-error');
+        msgEl.className = 'field-msg error';
+        msgEl.innerText = '❌ Ingrese primero un No Análisis K válido';
+        return;
+      }
+
+      let errorMsg = null;
+      if (campoTipo === 'lote') {
+        if (val.toLowerCase() !== (mem.lote||'').toString().trim().toLowerCase()) {
+          errorMsg = 'Dato en matriz: ' + (mem.lote || '(Vacío)');
+        }
+      } else if (campoTipo === 'exp') {
+        const regex = /^(0[1-9]|1[0-2])\/\d{4}$/;
+        if (!regex.test(val)) {
+          errorMsg = 'Formato inválido. Use MM/YYYY';
+        } else if (val !== (mem.exp||'').toString().trim()) {
+          errorMsg = 'Dato en matriz: ' + (mem.exp || '(Vacío)');
+        }
+      } else if (campoTipo === 'cantidad') {
+        const solicitada = parseFloat(val);
+        const disp = parseFloat(mem.cantidad);
+        if (isNaN(solicitada) || isNaN(disp) || solicitada > disp) {
+          errorMsg = 'Cant. sol (' + val + ') > disp (' + (mem.cantidad || '0') + ')';
+        }
+      }
+
+      if (errorMsg) {
+        inputEl.classList.add('input-error');
+        inputEl.classList.remove('input-success');
+        msgEl.className = 'field-msg error';
+        msgEl.innerText = '❌ Error: ' + errorMsg;
+      } else {
+        inputEl.classList.remove('input-error');
+        inputEl.classList.add('input-success');
+        msgEl.className = 'field-msg success';
+        msgEl.innerText = '✅ Correcto';
       }
     }
 
@@ -1135,18 +1271,70 @@
       }
     }
 
-    async function co_guardarDatos() {
-      var records = co_collectData();
+    async function co_guardarDatos(btn) {
+      if (btn) btn.disabled = true;
+      const reenableBtn = () => { if (btn) btn.disabled = false; };
+
+      const errores = document.querySelectorAll('.input-error');
+      if (errores.length > 0) {
+        showError('Hay campos con errores (marcados en rojo). Por favor, corríjalos antes de guardar.');
+        reenableBtn();
+        return;
+      }
+      
+      var records = [];
+      try {
+        records = co_collectData();
+      } catch (e) {
+        showError(e.message);
+        reenableBtn();
+        return;
+      }
+      
       if (records.length === 0) {
         showError('No hay datos para cargar. Agregue órdenes.');
+        reenableBtn();
         return;
+      }
+      
+      // Pre-flight check: Validar si los documentos adjuntos ya existen en Drive
+      let filesToCheck = [];
+      records.forEach(r => {
+        if (r._fileOA) filesToCheck.push({ name: r._fileOA.name || r.NoOrden + '_OA.pdf', type: 'OA' });
+        if (r._fileCOA) filesToCheck.push({ name: r._fileCOA.name || r.NoOrden + '_COA.pdf', type: 'COA' });
+      });
+      
+      let overwriteConfirmed = false;
+      if (filesToCheck.length > 0) {
+        showLoading('Validando archivos en servidor...');
+        try {
+          const resCheck = await postWebApp({ operation: 'checkFilesExist', files: filesToCheck, userId: sysData.currentUser.userId });
+          if (resCheck.status === 'success' && resCheck.data.exists) {
+            hideLoading();
+            const existList = resCheck.data.fileNames.slice(0, 3).join(', ') + (resCheck.data.fileNames.length > 3 ? '...' : '');
+            const msg = `Los siguientes archivos ya existen en Drive: ${existList}. ¿Desea sobrescribirlos? Si elige Cancelar, se mantendrán los archivos actuales y la orden quedará como Cargada.`;
+            const confirmed = await showConfirm('Archivos Existentes', msg);
+            if (confirmed) {
+              overwriteConfirmed = true;
+            } else {
+              overwriteConfirmed = 'skipUpload'; // Pasar bandera al backend
+            }
+          }
+        } catch(e) {
+           hideLoading();
+           showError('Error validando archivos: ' + e.message);
+           reenableBtn();
+           return;
+        }
       }
       
       let pin;
       try {
-        pin = await getSecurityPinOrSetup('Ingrese su PIN para autorizar la carga masiva:');
+        hideLoading(); // Por si quedó cargando
+        pin = await getSecurityPinOrSetup('Ingrese su PIN para autorizar la carga:');
       } catch (e) {
         showToast(e.message, 'warning');
+        reenableBtn();
         return;
       }
 
@@ -1168,12 +1356,19 @@
         records.forEach(r => { delete r._fileOA; delete r._fileCOA; });
         
         var currentUserId = sysData.currentUser.userId;
-        var params = { operation: 'cargarOrdenesMasivas', records: records, pinFirma: pin, userId: currentUserId };
+        var params = { 
+          operation: 'cargarOrdenesMasivas', 
+          records: records, 
+          pinFirma: pin, 
+          userId: currentUserId,
+          overwriteConfirmed: overwriteConfirmed
+        };
 
         showLoading('Cargando órdenes en la hoja...');
         google.script.run
           .withSuccessHandler(function(result) {
             hideLoading();
+            reenableBtn();
             if (result.status === 'success') {
               showAlert(result.message || 'Órdenes cargadas.', 'success');
               co_clearCards();
@@ -1184,11 +1379,13 @@
           })
           .withFailureHandler(function(error) {
             hideLoading();
+            reenableBtn();
             showError('Error de comunicación: ' + error.message);
           })
           .procesarCargaOrdenesMasivas(params, currentUserId);
-                }).catch(err => {
+      }).catch(err => {
         hideLoading();
+        reenableBtn();
         showError('Error al procesar archivos: ' + err.message);
       });
     }

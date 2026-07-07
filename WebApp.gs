@@ -243,19 +243,77 @@ function handlePrivilegedOperation_(params) {
     return procesarCargaOrdenesMasivas(params, callingUserId);
   }
 
-  if (operation === 'validarMatrizKEnLinea') {
+  if (operation === 'consultarAnalisisMatriz') {
     if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) {
-      return { status: 'error', message: 'No tiene permisos.' };
+      return { status: 'error', message: 'No tiene permisos.', diagnostic: 'PERMISSION_DENIED' };
     }
     if (!params.noAnalisis) return { status: 'error', message: 'Falta NoAnalisis.' };
     
-    var val = validarNoAnalisisContraMatrices(params.noAnalisis, {
-      lote: params.lote || '',
-      cantidad: parseFloat(params.cantidad) || 0,
-      exp: params.exp || ''
+    var dataMatriz = obtenerDatosMatrizPorAnalisis(params.noAnalisis);
+    return { status: 'success', data: dataMatriz };
+  }
+
+  if (operation === 'validarOrdenDuplicada') {
+    if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) {
+      return { status: 'error', message: 'No tiene permisos.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (!params.noOrden) return { status: 'error', message: 'Falta NoOrden.' };
+    
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Ordenes");
+    if (!sheet) return { status: 'error', message: 'Hoja Ordenes no encontrada.' };
+    
+    var data = sheet.getDataRange().getValues();
+    var colOrdenIdx = getColumnIndexByNameCaseInsensitive(data[0], 'No. Orden', false);
+    if (!colOrdenIdx) return { status: 'error', message: 'Columna No. Orden no encontrada.' };
+    
+    colOrdenIdx -= 1; // Ajuste para array 0-index
+    var duplicada = false;
+    var searchOrden = params.noOrden.toString().trim();
+    
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colOrdenIdx] && data[i][colOrdenIdx].toString().trim() === searchOrden) {
+        duplicada = true;
+        break;
+      }
+    }
+    return { status: 'success', duplicada: duplicada };
+  }
+
+  if (operation === 'checkFilesExist') {
+    if (!hasPermission(callingUserId, PERMISOS.CARGAR_ORDENES)) return { status: 'error', message: 'Sin permisos' };
+    var filesToCheck = params.files || []; // [{ name: '...', type: 'OA' }]
+    var result = { exists: false, fileNames: [] };
+    
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetTemplates = ss.getSheetByName('templates');
+    var folderOAId = '', folderCOAId = '';
+    
+    if (sheetTemplates) {
+      var tData = sheetTemplates.getDataRange().getValues();
+      for (var i=1; i<tData.length; i++) {
+        var key = tData[i][0] ? tData[i][0].toString().trim() : '';
+        var val = tData[i][1] ? extractDriveId(tData[i][1].toString().trim()) : '';
+        if (key === 'DOC_ORDENES') folderOAId = val;
+        if (key === 'DOC_ANALISIS') folderCOAId = val;
+      }
+    }
+    
+    var folderOA = folderOAId ? DriveApp.getFolderById(folderOAId) : null;
+    var folderCOA = folderCOAId ? DriveApp.getFolderById(folderCOAId) : null;
+    
+    filesToCheck.forEach(function(f) {
+      var folder = f.type === 'OA' ? folderOA : folderCOA;
+      if (folder) {
+        var files = folder.getFilesByName(f.name);
+        if (files.hasNext()) {
+          result.exists = true;
+          result.fileNames.push(f.name);
+        }
+      }
     });
     
-    return { status: 'success', data: val };
+    return { status: 'success', data: result };
   }
 
   if (operation === 'validarTarjetasMasivo') {

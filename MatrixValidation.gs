@@ -94,6 +94,43 @@ function validarNoAnalisisContraMatrices(noAnalisisK, datosOrden) {
   return resultado;
 }
 
+/**
+ * Consulta la matriz K por No. Análisis y devuelve sus datos en crudo 
+ * para la validación dinámica en línea (frontend).
+ *
+ * @param {string} noAnalisisK
+ * @returns {Object} Datos encontrados en la matriz K
+ */
+function obtenerDatosMatrizPorAnalisis(noAnalisisK) {
+  if (!noAnalisisK || noAnalisisK.toString().trim() === '') {
+    return { encontrado: false, error: 'No Análisis vacío' };
+  }
+
+  var matrices = getMatricesActivasOrdenadas();
+  if (matrices.length === 0) {
+    return { encontrado: false, error: 'No hay matrices activas configuradas' };
+  }
+
+  for (var i = 0; i < matrices.length; i++) {
+    var matriz = matrices[i];
+    var fila = buscarFilaEnMatriz_(noAnalisisK, matriz);
+    
+    if (fila) {
+      // Leer valores exactos como están en la matriz
+      return {
+        encontrado: true,
+        matrizConsultada: matriz.nombreMatriz,
+        lote: leerCelda_(fila, matriz.columnaLote),
+        exp: leerCelda_(fila, matriz.columnaVencimiento),
+        cantidad: leerCeldaNumero_(fila, matriz.columnaCantidad),
+        fabricante: leerCelda_(fila, matriz.columnaFabricante)
+      };
+    }
+  }
+
+  return { encontrado: false };
+}
+
 // -------------------------------------------------------
 // BÚSQUEDA EN MATRIZ EXTERNA
 // -------------------------------------------------------
