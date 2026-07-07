@@ -592,12 +592,35 @@ function procesarCargaOrdenesMasivas(params, userId) {
     if (newRows.length > 0) {
       sheetOrdenes.getRange(startRow, 1, newRows.length, numColumns).setValues(newRows);
       Logger.log("procesarCargaOrdenesMasivas: Insertadas " + newRows.length + " filas en hoja Ordenes");
+
+      // Sembrar HistorialImpresion en cada orden recién creada: antes nacían sin ningún
+      // rastro propio hasta su primer evento de impresión/novedad/QA.
+      for (var rIdx = 0; rIdx < newRows.length; rIdx++) {
+        var noOrdenFila = colNoOrden ? (newRows[rIdx][colNoOrden - 1] || '').toString().trim() : '';
+        appendHistorialImpresion_(sheetOrdenes, startRow + rIdx, headersOrdenes,
+          'Orden creada por carga masiva' + (noOrdenFila ? ' (NoOrden: ' + noOrdenFila + ')' : '') + ' · ' + nombreCorto);
+      }
     }
 
-    // Registrar en Logs
+    // Registrar en Logs. A diferencia de antes (solo el conteo total), se listan los
+    // NoOrden individuales cargados en esta operación para poder rastrear cuál orden
+    // específica fue afectada por una carga masiva, sin tener que adivinar por fecha.
     var userIdentity = getUserIdentityStringByUserId_(userId);
-    var logDescripcion = 'Carga masiva de órdenes: ' + newRows.length + ' órdenes cargadas por ' + nombreCorto;
-    logChange('CARGA_MASIVA_ORDENES', logDescripcion, userIdentity);
+    var correlationId = Utilities.getUuid().substring(0, 8);
+    var noOrdenesInsertados = newRows.map(function(row) {
+      return colNoOrden ? (row[colNoOrden - 1] || '').toString().trim() : '';
+    }).filter(function(v) { return v !== ''; });
+    var ordenRefResumen = noOrdenesInsertados.length > 20
+      ? noOrdenesInsertados.slice(0, 20).join(', ') + ' y ' + (noOrdenesInsertados.length - 20) + ' más'
+      : noOrdenesInsertados.join(', ');
+
+    var logDescripcion = 'Carga masiva de órdenes: ' + newRows.length + ' órdenes cargadas por ' + nombreCorto +
+      (ordenesConAlerta.length > 0 ? ' (' + ordenesConAlerta.length + ' con discrepancias en Matriz K)' : '');
+    logChange('CARGA_MASIVA_ORDENES', logDescripcion, userIdentity, {
+      ordenRef: ordenRefResumen,
+      campo: 'NoOrden (filas nuevas)',
+      correlationId: correlationId
+    });
 
     return {
       status: 'success',
@@ -740,7 +763,13 @@ function procesarAutorizacionQA(params, userId) {
     if (ordenesIgnoradas.length > 0) {
       logDescripcion += ' (Ignoradas: ' + ordenesIgnoradas.join(', ') + ')';
     }
-    logChange('AUTORIZACION_QA', logDescripcion, userIdentity);
+    logChange('AUTORIZACION_QA', logDescripcion, userIdentity, {
+      ordenRef: ordenesAutorizadas.join(', '),
+      campo: 'STATUS',
+      valorAnterior: 'Solicitada',
+      valorNuevo: 'Autorizada',
+      correlationId: Utilities.getUuid().substring(0, 8)
+    });
     
     Logger.log("procesarAutorizacionQA: Se autorizaron " + ordenesAutorizadas.length + " órdenes. Ignoradas: " + ordenesIgnoradas.length);
     

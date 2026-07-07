@@ -16,6 +16,7 @@
     "STATIC_TEMPLATE_CHUNK_SIZE_": "readonly",
     "STATIC_TEMPLATE_KEYS_": "readonly",
     "SYS_MATRICES_SHEET_NAME": "readonly",
+    "TIPOS_CAMBIO": "readonly",
     "VALORES_DECISION": "readonly",
     "VALORES_DOCUMENTO": "readonly",
     "VALORES_ESTADO_CARGA": "readonly",

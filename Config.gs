@@ -27,6 +27,27 @@ var VALORES_STATUS = {
   CERRADA: "Cerrada"
 };
 
+// --- TIPOS DE CAMBIO DE AUDITORÍA (hoja Logs, columna TipoCambio) ---
+// Lista central para evitar que cada archivo invente su propio tag de texto libre
+// (con el riesgo de typos/variantes). Usado hoy en Traceability.gs; se recomienda
+// adoptarlo de forma incremental en el resto de call sites de logChange().
+var TIPOS_CAMBIO = {
+  EDICION_CELDA: "EDICION_CELDA",
+  EDICION_MASIVA: "EDICION_MASIVA",
+  EDICION_MANUAL_NOVEDAD: "EDICION_MANUAL_NOVEDAD",
+  EDICION_MASIVA_NOVEDAD: "EDICION_MASIVA_NOVEDAD",
+  EDICION_ADMIN_LIBRE: "EDICION_ADMIN_LIBRE",
+  REVERSION_EDICION_MANUAL: "REVERSION_EDICION_MANUAL",
+  RESET_CARGA_OA: "RESET_CARGA_OA",
+  RESET_CARGA_COA: "RESET_CARGA_COA",
+  ASIGNACION_PENDIENTE_OA: "ASIGNACION_PENDIENTE_OA",
+  ASIGNACION_PENDIENTE_COA: "ASIGNACION_PENDIENTE_COA",
+  ERROR_SISTEMA: "ERROR_SISTEMA",
+  SOLICITUD_COMPLETADA: "SOLICITUD_COMPLETADA",
+  CAMBIO_ESTRUCTURAL: "CAMBIO_ESTRUCTURAL",
+  IMPRESION_ORDEN: "IMPRESION_ORDEN"
+};
+
 // --- PERMISOS RBAC (Role-Based Access Control) ---
 // Claves de permisos del sistema
 var PERMISOS = {
@@ -58,7 +79,7 @@ const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder', 'FileFolderLink'],
   'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'NoPags', 'Reimpresion', 'TotalPags', 'ImpresoPor', 'Reimpreso', 'HistorialImpresion', 'STATUS', 'VerifLote', 'VerifCant. Disponible', 'VerifExp', 'CantDispAFecha', 'Decision'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol', 'Clave', 'Estado', 'IntentosFallidos'],
-  'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
+  'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio', 'OrdenRef', 'CampoAfectado', 'ValorAnterior', 'ValorNuevo', 'CorrelationId'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
   'PermisosRoles': ['Rol', 'MENU_ADMIN', 'MENU_CONFIG', 'CARGAR_ORDENES', 'SUBIR_DOCUMENTOS', 'REGISTRAR_NOVEDAD', 'IMPRIMIR_ORDEN', 'SOLICITAR_REIMPRESION', 'APROBAR_REIMPRESION', 'AUTORIZAR_QA', 'GESTIONAR_AUTOAPROBACION'],
   'SolicitudesImpresion': ['ID_Solicitud', 'Fecha', 'NoOrden', 'SolicitadoPor', 'TipoSolicitud', 'Motivo', 'Plantillas', 'Estado', 'FirmaQA']

@@ -1268,6 +1268,10 @@ function procesarAprobacionImpresionQA(params, userId) {
     var procesadas = 0;
     var noEncontradas = 0;
     var yaProcesadas = 0;
+    // ID de correlación compartido entre todas las solicitudes de este mismo lote de
+    // aprobación/rechazo, para poder agrupar en Logs las filas que pertenecen a la
+    // misma acción del usuario QA (antes cada fila quedaba sin relación entre sí).
+    var correlationId = Utilities.getUuid().substring(0, 8);
 
     for (var i = 1; i < data.length; i++) {
       var idSolicitud = colIdSolicitud ? (data[i][colIdSolicitud - 1] || '').toString() : '';
@@ -1286,8 +1290,14 @@ function procesarAprobacionImpresionQA(params, userId) {
 
         // Registrar en Logs y en el historial consolidado de la orden
         var noOrden = colNoOrden ? (data[i][colNoOrden - 1] || '').toString() : '';
-        logChange('APROBACION_IMPRESION_QA', 'Solicitud ' + idSolicitud + ' para orden ' + noOrden + ' fue ' + accion.toLowerCase(), userIdentity);
-        appendHistorialByOrderNo_(noOrden, "QA " + accion + " solicitud " + idSolicitud + " · " + userIdentity);
+        logChange('APROBACION_IMPRESION_QA', 'Solicitud ' + idSolicitud + ' para orden ' + noOrden + ' fue ' + accion.toLowerCase(), userIdentity, {
+          ordenRef: noOrden,
+          campo: 'Estado (' + idSolicitud + ')',
+          valorAnterior: estadoActual,
+          valorNuevo: accion,
+          correlationId: correlationId
+        });
+        appendHistorialByOrderNo_(noOrden, "QA " + accion + " solicitud " + idSolicitud + " · " + userIdentity + " · ref:" + correlationId);
       }
     }
 
