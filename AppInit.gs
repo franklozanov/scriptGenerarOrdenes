@@ -362,9 +362,20 @@ function fixHeaders(ui) {
     }
     
     if (!headersMatch) {
-      // Corregir encabezados
-      sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
-      Logger.log("✓ Encabezados corregidos en hoja: " + sheetName);
+      var lastCol = Math.max(1, sheet.getLastColumn());
+      var nextEmptyCol = lastCol + 1;
+      
+      // Encontrar cuáles faltan exactamente y agregarlos al final
+      var added = false;
+      for (var i = 0; i < missingHeaders.length; i++) {
+        sheet.getRange(1, nextEmptyCol).setValue(missingHeaders[i]);
+        nextEmptyCol++;
+        added = true;
+      }
+      
+      if (added) {
+        Logger.log("✓ Encabezados faltantes (" + missingHeaders.join(", ") + ") agregados al final en hoja: " + sheetName);
+      }
     }
   }
 }
