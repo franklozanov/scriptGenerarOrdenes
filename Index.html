@@ -734,13 +734,13 @@
           window.globalUsers = data.users;
           
           function onUserValidated(userObj) {
-            window.currentUserIdentity = userObj.userId + " - " + (userObj.nombreCorto || userObj.nombreCompleto);
+            window.currentUserIdentity = userObj.userId + " - " + userObj.nombreCompleto;
             
             // Ocultar select y mostrar badge
             const userContainer = document.getElementById('userName').parentElement;
             userContainer.innerHTML = `<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 1.2em;">👤</span> 
-              <span>Ingresaste como: <strong>${userObj.nombreCorto || userObj.nombreCompleto}</strong></span>
+              <span>Ingresaste como: <strong>${userObj.nombreCompleto}</strong></span>
             </div>`;
             
             if (typeof Swal !== 'undefined') {
