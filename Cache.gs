@@ -75,6 +75,9 @@ function getInitialData() {
   try {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v2');
+    var activeEmail = "";
+    try { activeEmail = Session.getActiveUser().getEmail() || ""; } catch(e) {}
+    
     if (cached) {
       try { 
         var parsedData = JSON.parse(cached); 
@@ -89,6 +92,7 @@ function getInitialData() {
         if (!parsedData.webAppUrl) {
           try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
         }
+        parsedData.activeEmail = activeEmail;
         return parsedData; 
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
@@ -276,10 +280,8 @@ function getInitialData() {
 
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl };
-    
-    // La lista ya fue ordenada por FormOrder numérico en el bloque anterior.
-    // No usamos el arreglo quemado 'sortOrder' para permitir control total desde la hoja.
+    var activeEmail = Session.getActiveUser().getEmail();
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, activeEmail: activeEmail };
     
     var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
