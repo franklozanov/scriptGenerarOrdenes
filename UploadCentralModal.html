@@ -454,6 +454,7 @@
     var uploadUsersList = document.getElementById('uploadUsersList');
 
     function getSelectedUploadUser() {
+      if (window.currentUserIdentity) return window.currentUserIdentityObj;
       var selectedName = uploadUserName.value.trim();
       for (var i = 0; i < globalUsers.length; i++) {
         if (globalUsers[i].nombreCompleto === selectedName) {
@@ -503,15 +504,61 @@
         .withSuccessHandler(function(data) {
           globalWebAppUrl = data.webAppUrl;
           globalUsers = data.users || [];
-          uploadUsersList.innerHTML = globalUsers.map(function(user) {
-            return '<option value="' + user.nombreCompleto + '">';
-          }).join('');
+          
           if (globalUsers.length === 0) {
             hideLoading();
             showError('No hay usuarios configurados en la hoja Usuarios.');
             return;
           }
-          loadPendingOrders();
+
+          function onUserValidated(userObj) {
+            window.currentUserIdentity = userObj.userId + " - " + (userObj.nombreCorto || userObj.nombreCompleto);
+            window.currentUserIdentityObj = userObj;
+            
+            // Reemplazar input por badge
+            var userContainer = uploadUserName.parentElement;
+            userContainer.innerHTML = '<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">' +
+              '<span style="font-size: 1.2em;">👤</span>' +
+              '<span>Ingresaste como: <strong>' + (userObj.nombreCorto || userObj.nombreCompleto) + '</strong></span>' +
+            '</div>';
+            
+            if (typeof Swal !== 'undefined') {
+              Swal.fire({
+                toast: true, position: 'top-end', icon: 'success',
+                title: 'Usuario validado', text: 'Bienvenido, ' + userObj.nombreCompleto,
+                showConfirmButton: false, timer: 3000, timerProgressBar: true
+              });
+            }
+            validateForm();
+            loadPendingOrders();
+          }
+
+          var myEmail = data.activeEmail ? data.activeEmail.toLowerCase().trim() : "";
+          var matchedUsers = globalUsers.filter(function(u) { return u.email && u.email.toLowerCase().trim() === myEmail; });
+
+          if (matchedUsers.length === 1) {
+            onUserValidated(matchedUsers[0]);
+          } else if (matchedUsers.length > 1) {
+            var optionsHtml = matchedUsers.map(function(u, idx) { return '<option value="' + idx + '">' + u.nombreCompleto + ' (' + u.rol + ')</option>'; }).join('');
+            Swal.fire({
+              title: 'Selecciona tu Perfil',
+              html: '<p style="font-size: 0.9em; color: #475569; margin-bottom: 15px;">Tu correo está asociado a múltiples perfiles. ¿Con cuál deseas ingresar?</p>' +
+                    '<select id="swal-user-select" class="swal2-select" style="width: 100%; max-width: 100%; padding: 8px;">' + optionsHtml + '</select>',
+              icon: 'info', confirmButtonText: 'Ingresar', allowOutsideClick: false, allowEscapeKey: false,
+              preConfirm: function() { return matchedUsers[document.getElementById('swal-user-select').value]; }
+            }).then(function(result) {
+              if (result.isConfirmed) { onUserValidated(result.value); }
+            });
+          } else {
+             document.body.innerHTML = 
+               '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: \'Inter\', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">' +
+                 '<div style="font-size: 48px; margin-bottom: 16px;">🚫</div>' +
+                 '<h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>' +
+                 '<p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>' + (myEmail || 'Desconocido') + '</strong> no tiene un usuario asignado en el sistema.</p>' +
+                 '<div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.</div>' +
+               '</div>';
+             return;
+          }
         })
         .withFailureHandler(function(error) {
           hideLoading();
@@ -819,7 +866,6 @@
       var referenceNo = referenceSelect.value;
       var selectedUser = getSelectedUploadUser();
       
-      // Validar usuario
       if (!selectedUser) {
         statusIndicator.textContent = '❌ Usuario';
         statusIndicator.className = 'status-indicator error';
