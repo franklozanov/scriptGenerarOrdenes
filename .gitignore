@@ -4,3 +4,5 @@ Agent Rules/
 plans/
 .claude/
 .husky/
+*.txt
+.claspignore
