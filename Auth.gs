@@ -207,3 +207,25 @@ function establecerUsuarioActivo(userId) {
   var user = getUserRecordByUserId_(userId);
   return { status: 'SUCCESS', user: user };
 }
+
+/**
+ * [INACTIVA] Helper para validar identidad antes de abrir cualquier modal operativo.
+ * Esta función ya NO se usa como guardián en los openers de modales.
+ * La validación de identidad ahora ocurre INLINE dentro de cada modal HTML
+ * al cargarse (vía getInitialData() → activeEmail → match con hoja Usuarios).
+ * Se mantiene como referencia pero no debe llamarse desde openPrintDialog,
+ * abrirModalSubidaGeneral ni abrirModalRegistroNovedad.
+ *
+ * @returns {boolean} True si la sesión es válida y tiene permisos
+ */
+/*
+function checkAuthAndRunModal_() {
+  var authStatus = validarIdentidadSesion();
+  if (authStatus.status === 'SUCCESS') {
+    return true;
+  } else {
+    abrirModalValidacion();
+    return false;
+  }
+}
+*/
