@@ -680,7 +680,6 @@
         }
         return btoa(binary);
       }
-
       function openSavedPdfPreview(saveResult) {
         const viewerUrl = saveResult.viewerUrl
           || ('https://drive.google.com/file/d/' + saveResult.fileId + '/view');
@@ -692,149 +691,149 @@
 
       window.onload = () => {
         google.script.run.withSuccessHandler(data => {
-          console.log('🚀 Inicializando modal - data recibida:', data);
-          globalTemplates = data.templates;
+          try {
+            console.log('🚀 Inicializando modal - data recibida:', data);
+            globalTemplates = data.templates;
 
-          // Store preloaded static template base64 strings in memory
-          data.templates.forEach(t => {
-            if (t.base64) {
-              preloadedStaticPdfs[t.key] = t.base64;
-              console.log(`✓ Precargada en memoria: ${t.key}`);
-            }
-          });
-
-          document.getElementById('tplList').innerHTML = data.templates.map(t => {
-            let defVal = "1"; // Valor por defecto general
-            if (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") {
-              defVal = "0";
-            } else if (t.key === "TPL_CONTROLES") {
-              defVal = "2";
-            }
-            
-            const noAccess = t.hasAccess === false;
-            const rowStyle = noAccess ? 'opacity: 0.5;' : '';
-            const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
-            const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2;">${t.description}</div>` : '';
-            return `
-              <div class="tpl-row" style="${rowStyle} display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
-                <div style="display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px;">
-                  <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b;">${t.name}</span>
-                  ${descriptionHtml}
-                </div>
-                <div class="counter-control" style="flex-shrink: 0;">
-                  <button type="button" class="counter-btn" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
-                  <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
-                  <button type="button" class="counter-btn" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
-                </div>
-              </div>
-            `;
-          }).join('');
-
-          // Guardar usuarios globalmente para acceder después
-          window.globalUsers = data.users;
-          
-          function onUserValidated(userObj) {
-            window.currentUserIdentity = userObj.userId + " - " + userObj.nombreCompleto;
-            
-            // Ocultar select y mostrar badge
-            const userContainer = document.getElementById('userName').parentElement;
-            userContainer.innerHTML = `<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 1.2em;">👤</span> 
-              <span>Ingresaste como: <strong>${userObj.nombreCompleto}</strong></span>
-            </div>`;
-            
-            if (typeof Swal !== 'undefined') {
-              Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: 'Usuario validado',
-                text: 'Bienvenido, ' + userObj.nombreCompleto,
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true
-              });
-            }
-            updateGoButtonState();
-          }
-
-          const myEmail = data.activeEmail ? data.activeEmail.toLowerCase().trim() : "";
-          const matchedUsers = data.users.filter(u => u.email && u.email.toLowerCase().trim() === myEmail);
-
-          if (matchedUsers.length === 1) {
-            onUserValidated(matchedUsers[0]);
-          } else if (matchedUsers.length > 1) {
-            let optionsHtml = matchedUsers.map((u, idx) => `<option value="${idx}">${u.nombreCompleto} (${u.rol})</option>`).join('');
-            Swal.fire({
-              title: 'Selecciona tu Perfil',
-              html: `<p style="font-size: 0.9em; color: #475569; margin-bottom: 15px;">Tu correo está asociado a múltiples perfiles. ¿Con cuál deseas ingresar?</p>
-                     <select id="swal-user-select" class="swal2-select" style="width: 100%; max-width: 100%; padding: 8px;">
-                       ${optionsHtml}
-                     </select>`,
-              icon: 'info',
-              confirmButtonText: 'Ingresar',
-              allowOutsideClick: false,
-              allowEscapeKey: false,
-              preConfirm: () => {
-                const select = document.getElementById('swal-user-select');
-                return matchedUsers[select.value];
-              }
-            }).then((result) => {
-              if (result.isConfirmed) {
-                onUserValidated(result.value);
+            // Store preloaded static template base64 strings in memory
+            data.templates.forEach(t => {
+              if (t.base64) {
+                preloadedStaticPdfs[t.key] = t.base64;
+                console.log(`✓ Precargada en memoria: ${t.key}`);
               }
             });
-          } else {
-             // Bloquear UI
-             document.body.innerHTML = `
-               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Inter', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">
-                 <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
-                 <h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>
-                 <p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>${myEmail || 'Desconocido'}</strong> no tiene un usuario asignado en el sistema.</p>
-                 <div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">
-                   Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.
-                 </div>
-               </div>
-             `;
-             return;
-          }
 
-          const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
-          if (noAccessCount > 0) {
-            const status = document.getElementById('status');
-            status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
-            status.className = "error-text";
-          }
+            document.getElementById('tplList').innerHTML = data.templates.map(t => {
+              let defVal = "1"; // Valor por defecto general
+              if (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") {
+                defVal = "0";
+              } else if (t.key === "TPL_CONTROLES") {
+                defVal = "2";
+              }
+              
+              const noAccess = t.hasAccess === false;
+              const rowStyle = noAccess ? 'opacity: 0.5;' : '';
+              const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
+              const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2;">${t.description}</div>` : '';
+              return `
+                <div class="tpl-row" style="${rowStyle} display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
+                  <div style="display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px;">
+                    <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b;">${t.name}</span>
+                    ${descriptionHtml}
+                  </div>
+                  <div class="counter-control" style="flex-shrink: 0;">
+                    <button type="button" class="counter-btn" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
+                    <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
+                    <button type="button" class="counter-btn" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
+                  </div>
+                </div>
+              `;
+            }).join('');
 
-          document.getElementById('loader').style.display = 'none';
-          updateGoButtonState();
-          
-          // Add event listener for background preloading on orderNo input
-          const orderNoInput = document.getElementById('orderNo');
-          const debouncedPreload = debounce((value) => {
-            if (value.trim().length >= 3) { // Only preload if at least 3 characters
-              preloadOrderData(value);
+            // Guardar usuarios globalmente para acceder después
+            window.globalUsers = data.users;
+            
+            function onUserValidated(userObj) {
+              window.currentUserIdentity = userObj.userId + " - " + userObj.nombreCompleto;
+              
+              // Ocultar select y mostrar badge
+              const userContainer = document.getElementById('userName').parentElement;
+              userContainer.innerHTML = `<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2em;">👤</span> 
+                <span>Ingresaste como: <strong>${userObj.nombreCompleto}</strong></span>
+              </div>`;
+              updateGoButtonState();
+            }
+
+            const myEmail = data.activeEmail ? data.activeEmail.toLowerCase().trim() : "";
+            const matchedUsers = data.users.filter(u => u.email && u.email.toLowerCase().trim() === myEmail);
+
+            if (matchedUsers.length === 1) {
+              onUserValidated(matchedUsers[0]);
+              document.getElementById('loader').style.display = 'none';
+            } else if (matchedUsers.length > 1) {
+              // Múltiples perfiles: mostrar selector nativo dentro del loader (sin Swal)
+              const loader = document.getElementById('loader');
+              const optionsHtml = matchedUsers.map((u, idx) =>
+                `<option value="${idx}">${u.nombreCompleto} (${u.rol || 'Sin rol'})</option>`
+              ).join('');
+              loader.innerHTML = `
+                <div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:'Inter',sans-serif;">
+                  <div style="font-size:2rem; margin-bottom:12px;">👥</div>
+                  <h3 style="margin:0 0 8px 0; color:#0f172a; font-size:1rem;">Selecciona tu perfil</h3>
+                  <p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>
+                  <select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white;">
+                    ${optionsHtml}
+                  </select>
+                  <button id="profileConfirmBtn" style="width:100%; padding:10px; background:#1976d2; color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer;">
+                    Ingresar
+                  </button>
+                </div>`;
+              document.getElementById('profileConfirmBtn').addEventListener('click', function() {
+                const idx = document.getElementById('profileSelect').value;
+                onUserValidated(matchedUsers[idx]);
+                document.getElementById('loader').style.display = 'none';
+                updateGoButtonState();
+              });
+              // Salimos aquí para que el loader espere a la confirmación
+              return;
             } else {
-              resetPreloadState();
-              setPreloadBanner('', '');
+               // Bloquear UI
+               document.body.innerHTML = `
+                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Inter', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">
+                   <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
+                   <h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>
+                   <p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>${myEmail || 'Desconocido'}</strong> no tiene un usuario asignado en el sistema.</p>
+                   <div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">
+                     Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.
+                   </div>
+                 </div>
+               `;
+               return;
             }
-          }, 600);
-          
-          orderNoInput.addEventListener('input', (e) => {
-            if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
-              resetPreloadState();
-              setPreloadBanner('', '');
+
+            const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
+            if (noAccessCount > 0) {
+              const status = document.getElementById('status');
+              status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
+              status.className = "error-text";
             }
+
+            // Ocultar loader como fallback final (si no se cortó el flujo antes)
+            document.getElementById('loader').style.display = 'none';
             updateGoButtonState();
-            debouncedPreload(e.target.value);
-          });
-          
-          orderNoInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              document.getElementById('goBtn').click();
-            }
-          });
+            
+            // Add event listener for background preloading on orderNo input
+            const orderNoInput = document.getElementById('orderNo');
+            const debouncedPreload = debounce((value) => {
+              if (value.trim().length >= 3) { // Only preload if at least 3 characters
+                preloadOrderData(value);
+              } else {
+                resetPreloadState();
+                setPreloadBanner('', '');
+              }
+            }, 600);
+            
+            orderNoInput.addEventListener('input', (e) => {
+              if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
+                resetPreloadState();
+                setPreloadBanner('', '');
+              }
+              updateGoButtonState();
+              debouncedPreload(e.target.value);
+            });
+            
+            orderNoInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('goBtn').click();
+              }
+            });
+
+          } catch (e) {
+            document.getElementById('loader').innerHTML = `<span class="error-text">Error interno al cargar: ${e.message}</span>`;
+            console.error(e);
+          }
         }).withFailureHandler(e => {
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
         }).getInitialData();
