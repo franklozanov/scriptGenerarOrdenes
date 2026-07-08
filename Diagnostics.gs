@@ -285,7 +285,7 @@ function diagnosticarConsecutivoImp() {
  * cercanas a la 387 (donde el navegador reporta el SyntaxError), marcando
  * cualquier byte no-ASCII o de control.
  */
-function diagnosticarHtmlCompilado_() {
+function diagnosticarHtmlCompilado() {
   var html = HtmlService.createTemplateFromFile('Index').evaluate().getContent();
   var lines = html.split('\n');
   Logger.log('TOTAL LINEAS DEL HTML COMPILADO: ' + lines.length);
