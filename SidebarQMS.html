@@ -309,6 +309,17 @@
             </div>
           </div>
         </div>
+
+        <!-- FOOTER: Identidad y Cerrar Sesión (Visible en todas las tabs principales) -->
+        <div style="margin-top: auto; position: sticky; bottom: 0; background: #fff; padding: 12px 20px; border-top: 1px solid #e2e8f0; z-index: 10; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -2px 4px rgba(0,0,0,0.02);">
+          <div id="sidebar-user-info" style="font-size: 11px; color: #475569; text-align: center; font-weight: 500;">
+            Cargando usuario...
+          </div>
+          <button class="btn-secondary-small" style="width: 100%; color: #c5221f; padding: 8px; display: flex; align-items: center; justify-content: center;" onclick="sp_cerrarSesion()">
+            <span class="icon" style="margin-right: 6px; font-size: 14px; width: auto;">🔒</span> Cerrar sesión
+          </button>
+        </div>
+
       </div>
     </div>
 
@@ -770,6 +781,11 @@
     function finishLoginGate(data) {
       applyPermissions(data.userPermissions);
       document.getElementById("loading-overlay").classList.add("hidden");
+
+      var userInfo = document.getElementById("sidebar-user-info");
+      if (userInfo && data.currentUser) {
+        userInfo.innerHTML = '👤 ' + data.currentUser.userId + ' - <strong>' + (data.currentUser.nombreCorto || data.currentUser.nombreCompleto) + '</strong>';
+      }
 
       // Ahora cargar las plantillas en segundo plano
       google.script.run
