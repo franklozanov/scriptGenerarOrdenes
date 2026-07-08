@@ -406,6 +406,8 @@
     <script>
       let globalTemplates = [];
       let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
+      let staticPreloadErrors = [];
+      let isStaticPreloading = false;
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
 
       // Función debounce() ahora viene de GlobalScripts.html
