@@ -281,29 +281,6 @@ function handlePrivilegedOperation_(params) {
     }
   }
 
-  if (operation === 'diagnosticarPlantillas') {
-    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
-      return { status: 'error', message: 'No tiene permisos.', diagnostic: 'PERMISSION_DENIED' };
-    }
-    try {
-      var resultadosPlantillas = diagnosticarPlantillasConfig();
-      return { status: 'success', data: resultadosPlantillas };
-    } catch (e) {
-      return { status: 'error', message: 'Fallo al ejecutar diagnóstico: ' + e.message };
-    }
-  }
-
-  if (operation === 'diagnosticarConsecutivoImp') {
-    if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
-      return { status: 'error', message: 'No tiene permisos.', diagnostic: 'PERMISSION_DENIED' };
-    }
-    try {
-      var resultadosConsecutivo = diagnosticarConsecutivoImpConfig();
-      return { status: 'success', data: resultadosConsecutivo };
-    } catch (e) {
-      return { status: 'error', message: 'Fallo al ejecutar diagnóstico: ' + e.message };
-    }
-  }
 
   if (operation === 'agregarPlantilla') {
     if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN)) {
