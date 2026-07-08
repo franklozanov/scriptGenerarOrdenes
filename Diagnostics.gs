@@ -267,8 +267,67 @@ function diagnosticarConsecutivoImp() {
     }
     
     SpreadsheetApp.getUi().alert("Diagnóstico ConsecutivoImp\n\n" + report);
-    
+
   } catch (e) {
     SpreadsheetApp.getUi().alert("❌ Error en diagnóstico: " + e.message);
   }
+}
+
+/**
+ * DIAGNÓSTICO TEMPORAL: captura el HTML EXACTO que Apps Script genera para
+ * el modal de impresión (Index.html con Theme/GlobalScripts ya insertados),
+ * el mismo string que Google pasa a document.write() en el navegador.
+ *
+ * Ejecutar desde el editor de Apps Script. Revisar el resultado en:
+ *   Registro de ejecución (Ver > Registros / Ctrl+Enter)
+ *
+ * Muestra: total de líneas y un análisis carácter-por-carácter de las líneas
+ * cercanas a la 387 (donde el navegador reporta el SyntaxError), marcando
+ * cualquier byte no-ASCII o de control.
+ */
+function diagnosticarHtmlCompilado_() {
+  var html = HtmlService.createTemplateFromFile('Index').evaluate().getContent();
+  var lines = html.split('\n');
+  Logger.log('TOTAL LINEAS DEL HTML COMPILADO: ' + lines.length);
+  Logger.log('LONGITUD TOTAL (chars): ' + html.length);
+
+  // Analizar un rango alrededor de la línea 387 reportada por el navegador
+  var from = 380, to = 395;
+  for (var i = from; i <= to && i <= lines.length; i++) {
+    var line = lines[i - 1] || '';
+    Logger.log('--- LINEA ' + i + ' (len=' + line.length + ') ---');
+    Logger.log(line);
+    // Marcar caracteres no-ASCII / de control en esta línea
+    var flags = [];
+    for (var c = 0; c < line.length; c++) {
+      var code = line.charCodeAt(c);
+      if (code > 127 || (code < 32 && code !== 9 && code !== 13)) {
+        flags.push('col ' + c + ': U+' + code.toString(16).toUpperCase().padStart(4, '0') + ' (' + line[c] + ')');
+      }
+    }
+    if (flags.length) Logger.log('   ⚠ NO-ASCII: ' + flags.join(' | '));
+  }
+
+  // Escaneo global: reportar TODAS las líneas con caracteres de control crudos
+  // (los verdaderos culpables de "Invalid or unexpected token" en document.write)
+  Logger.log('=== ESCANEO GLOBAL DE CARACTERES DE CONTROL (excepto tab/cr/lf) ===');
+  var found = 0;
+  for (var j = 0; j < lines.length; j++) {
+    var ln = lines[j];
+    for (var k = 0; k < ln.length; k++) {
+      var cc = ln.charCodeAt(k);
+      if (cc < 32 && cc !== 9 && cc !== 13) {
+        Logger.log('CONTROL CHAR en linea ' + (j + 1) + ' col ' + k + ': U+' + cc.toString(16).toUpperCase().padStart(4, '0'));
+        found++;
+      }
+      // U+2028 / U+2029 rompen strings JS
+      if (cc === 0x2028 || cc === 0x2029) {
+        Logger.log('LINE/PARA SEPARATOR en linea ' + (j + 1) + ' col ' + k + ': U+' + cc.toString(16).toUpperCase());
+        found++;
+      }
+    }
+  }
+  Logger.log(found === 0 ? 'No se hallaron caracteres de control problemáticos.' : ('TOTAL problemáticos: ' + found));
+
+  return 'Listo. Revisa el Registro de ejecución (Ctrl+Enter).';
 }
