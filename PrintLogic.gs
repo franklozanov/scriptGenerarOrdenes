@@ -31,22 +31,11 @@ function openPrintDialog() {
 
 /**
  * Obtiene la configuración de impresión desde la hoja templates.
- * Utiliza caché para optimizar rendimiento (21600 segundos = 6 horas).
  * 
  * @returns {Object} Configuración con IDs de carpetas y coordenadas de campos
  * @private
  */
 function getPrintConfig_() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('printConfig_v1');
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (e) {
-      Logger.log("Error parsing printConfig_v1: " + e.message);
-    }
-  }
-
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tplSheet = ss.getSheetByName('templates');
   if (!tplSheet) throw new Error("La hoja 'templates' no existe.");
@@ -85,12 +74,6 @@ function getPrintConfig_() {
     if (k === "COORD_FABRICANTE" && v) config.coords["Fabricante"] = parseXY(v);
     if (k === "COORD_EXP" && v) config.coords["Exp"] = parseXY(v);
     if (k === "COORD_NoANALISIS" && v) config.coords["NoAnalisis"] = parseXY(v);
-  }
-
-  try {
-    cache.put('printConfig_v1', JSON.stringify(config), 21600);
-  } catch (e) {
-    Logger.log("Error caching printConfig_v1: " + e.message);
   }
 
   return config;
