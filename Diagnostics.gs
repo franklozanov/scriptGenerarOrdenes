@@ -342,5 +342,17 @@ function diagnosticarHtmlCompilado() {
   }
   Logger.log(found === 0 ? 'No se hallaron caracteres de control problemáticos.' : ('TOTAL problemáticos: ' + found));
 
+  // --- GUARDAR EL HTML COMPILADO COMPLETO A UN ARCHIVO EN DRIVE ---
+  // Para poder descargarlo y compararlo byte-a-byte con el fuente en git.
+  try {
+    var file = DriveApp.createFile('DEBUG_modal_impresion_compilado.txt', html, MimeType.PLAIN_TEXT);
+    Logger.log('=== HTML COMPILADO GUARDADO EN DRIVE ===');
+    Logger.log('Archivo: ' + file.getName());
+    Logger.log('URL: ' + file.getUrl());
+    Logger.log('ID: ' + file.getId());
+  } catch (e) {
+    Logger.log('No se pudo guardar el archivo de debug: ' + e.message);
+  }
+
   return 'Listo. Revisa el Registro de ejecución (Ctrl+Enter).';
 }
