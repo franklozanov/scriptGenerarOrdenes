@@ -1120,20 +1120,21 @@
 
           const blobURL = URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }));
           
-          status.innerText = "✅ PDF listo en memoria. Haga clic en 'Descargar PDF Generado' para guardarlo.";
+          status.innerText = "✅ PDF listo en memoria. Haga clic en 'Ver PDF Generado' para abrirlo y guardarlo.";
           status.className = "success-text";
           
-          btn.innerText = "👉 Descargar PDF Generado";
+          btn.innerText = "👉 Ver PDF Generado";
           btn.disabled = false;
           
           btn.onclick = function() {
-            // Descargar el PDF directamente en lugar de abrir en nueva pestaña (evita bloqueos de popup)
-            const a = document.createElement('a');
-            a.href = blobURL;
-            a.download = `Orden_Impresion_${orderNo}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            var newWindow = window.open(blobURL, "_blank");
+            
+            // FASE 6 FIX: El chequeo anterior (newWindow.closed === 'undefined') fallaba
+            // en iframes de Apps Script por restricciones Cross-Origin.
+            if (!newWindow) {
+              alert("Tu navegador bloqueó la ventana emergente. Por favor, habilita los pop-ups para este sitio en la barra de direcciones y vuelve a hacer clic.");
+              return;
+            }
             
             
             // Pop-up abierto correctamente. Liberar UI inmediatamente.
