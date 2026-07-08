@@ -461,6 +461,19 @@
         });
       }
 
+      function areSelectedStaticTemplatesReady() {
+        return globalTemplates.every(t => {
+          if (t.type === 'Dynamic' || t.key === 'DOC_COMPLETO') return true;
+          const input = document.getElementById('val_' + t.key);
+          const copies = input ? parseInt(input.value) || 0 : 0;
+          // Si tiene copias seleccionadas, verificamos si ya bajó
+          if (copies > 0) {
+            return !!preloadedStaticPdfs[t.key];
+          }
+          return true; // Si no está seleccionada, no bloquea
+        });
+      }
+
       function isUserSelectionValid() {
         if (window.currentUserIdentity) return true; // Autenticado
         
@@ -480,8 +493,9 @@
         const isOrderReady = isPreloadReadyForOrder(orderInput.value.trim());
         const isUserValid = isUserSelectionValid();
         const hasCopies = hasAnyCopiesSelected();
+        const staticReady = areSelectedStaticTemplatesReady();
         
-        const isEnabled = isOrderReady && isUserValid && hasCopies;
+        const isEnabled = isOrderReady && isUserValid && hasCopies && staticReady;
         btn.disabled = !isEnabled;
 
         // Feedback visual si el orden está listo pero el botón sigue bloqueado
@@ -492,8 +506,11 @@
           } else if (!hasCopies) {
             status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
             status.className = "error-text";
+          } else if (!staticReady) {
+            status.innerText = "⏳ Descargando plantillas estáticas en segundo plano...";
+            status.className = "info-text";
           }
-        } else if (isOrderReady && isEnabled && status.innerText.includes("⚠️")) {
+        } else if (isOrderReady && isEnabled && (status.innerText.includes("⚠️") || status.innerText.includes("⏳ Descargando"))) {
           // Limpiar aviso si ya todo está correcto
           status.innerText = "✅ Documentos listos para impresión";
           status.className = "success-text";
@@ -506,7 +523,10 @@
         
         let i = 0;
         function loadNext() {
-          if (i >= staticTemplates.length) return;
+          if (i >= staticTemplates.length) {
+            updateGoButtonState();
+            return;
+          }
           const t = staticTemplates[i];
           i++;
           
@@ -515,6 +535,7 @@
               if (base64) {
                 preloadedStaticPdfs[t.key] = base64;
                 console.log(`✓ [Background] Precargada plantilla: ${t.key}`);
+                updateGoButtonState(); // Actualiza si ya estaban esperando este doc
               }
               setTimeout(loadNext, 100); // Pequeña pausa para no bloquear el navegador
             }).withFailureHandler(err => {
