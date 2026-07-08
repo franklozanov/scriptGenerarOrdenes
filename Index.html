@@ -781,26 +781,20 @@
 
           // Merge dynamic templates from payload with preloaded static templates
           // Respect the original order and copies from config
-          const staticTemplateKeys = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES"];
-          
           // Build the final pdfs array by iterating through config (which has correct order and copies)
           const finalPdfs = [];
           config.forEach(cfg => {
-            if (staticTemplateKeys.includes(cfg.key)) {
+            if (preloadedStaticPdfs[cfg.key]) {
               // Static template - use preloaded base64
-              if (preloadedStaticPdfs[cfg.key]) {
-                finalPdfs.push({
-                  key: cfg.key,
-                  base64: preloadedStaticPdfs[cfg.key],
-                  copies: cfg.copies
-                });
-                console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
-              } else if (cfg.key === 'DOC_COMPLETO') {
-                // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
-                console.log(`✓ Omitiendo DOC_COMPLETO (carpeta de destino)`);
-              } else {
-                throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
-              }
+              finalPdfs.push({
+                key: cfg.key,
+                base64: preloadedStaticPdfs[cfg.key],
+                copies: cfg.copies
+              });
+              console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+            } else if (cfg.key === 'DOC_COMPLETO') {
+              // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
+              console.log(`✓ Omitiendo DOC_COMPLETO (carpeta de destino)`);
             } else {
               // Dynamic template - use from payload
               const dynamicPdf = payload.pdfs.find(p => p.key === cfg.key);
