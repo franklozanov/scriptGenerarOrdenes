@@ -90,11 +90,9 @@ function getInitialData() {
         var parsedData = JSON.parse(cached); 
         for (var i = 0; i < parsedData.templates.length; i++) {
           var t = parsedData.templates[i];
-          if (STATIC_TEMPLATE_KEYS_.indexOf(t.key) !== -1 && t.fileId && t.hasAccess) {
-            t.base64 = getStaticTemplateBase64_(t.key, t.fileId);
-          } else {
-            t.base64 = null;
-          }
+          // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí para no bloquear la UI.
+          // Se descargarán asíncronamente o en Lazy Load durante la impresión.
+          t.base64 = null;
         }
         if (!parsedData.webAppUrl) {
           try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
@@ -217,12 +215,11 @@ function getInitialData() {
               if (displayName === key) {
                 displayName = file.getName();
               }
-              
               if (STATIC_TEMPLATE_KEYS_.indexOf(key) !== -1) {
-                base64 = getStaticTemplateBase64_(key, value);
-                Logger.log("✓ Precargando base64 para " + key);
+                // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí
+                base64 = null;
               }
-            } catch (e) { 
+            } catch (e) {
               Logger.log("ERROR: No se puede acceder al archivo de Drive para " + key);
               Logger.log("  - ID del archivo: " + value);
               Logger.log("  - Error: " + e.message);

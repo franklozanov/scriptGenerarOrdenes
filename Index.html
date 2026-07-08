@@ -499,6 +499,36 @@
           status.className = "success-text";
         }
       }
+      
+      // Función para precargar plantillas estáticas en segundo plano una a una
+      function startBackgroundStaticPreload() {
+        const staticTemplates = globalTemplates.filter(t => t.type !== 'Dynamic' && t.hasAccess && t.fileId);
+        
+        let i = 0;
+        function loadNext() {
+          if (i >= staticTemplates.length) return;
+          const t = staticTemplates[i];
+          i++;
+          
+          if (!preloadedStaticPdfs[t.key]) {
+            google.script.run.withSuccessHandler(base64 => {
+              if (base64) {
+                preloadedStaticPdfs[t.key] = base64;
+                console.log(`✓ [Background] Precargada plantilla: ${t.key}`);
+              }
+              setTimeout(loadNext, 100); // Pequeña pausa para no bloquear el navegador
+            }).withFailureHandler(err => {
+              console.log(`⚠️ [Background] Error precargando ${t.key}:`, err);
+              setTimeout(loadNext, 500);
+            }).getStaticTemplateBase64(t.key, t.fileId);
+          } else {
+            loadNext();
+          }
+        }
+        
+        console.log('🚀 Iniciando precarga silenciosa de plantillas estáticas...');
+        loadNext();
+      }
 
       // Background preloading function
       function preloadOrderData(orderNo) {
@@ -821,10 +851,12 @@
             if (matchedUsers.length === 1) {
               onUserValidated(matchedUsers[0]);
               document.getElementById('loader').style.display = 'none';
+              startBackgroundStaticPreload();
             } else if (matchedUsers.length > 1) {
               if (data.savedProfileIdx !== undefined && data.savedProfileIdx !== null && matchedUsers[data.savedProfileIdx]) {
                 onUserValidated(matchedUsers[data.savedProfileIdx]);
                 document.getElementById('loader').style.display = 'none';
+                startBackgroundStaticPreload();
               } else {
                 // Múltiples perfiles sin selección previa: mostrar selector
                 const loader = document.getElementById('loader');
@@ -849,6 +881,7 @@
                     onUserValidated(matchedUsers[idx]);
                     document.getElementById('loader').style.display = 'none';
                     updateGoButtonState();
+                    startBackgroundStaticPreload();
                   }).saveUserProfileSelection(idx);
                 });
                 // Salimos aquí para que el loader espere a la confirmación
@@ -1087,18 +1120,21 @@
 
           const blobURL = URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }));
           
-          status.innerText = "✅ PDF listo en memoria. Haga clic en 'Ver PDF Generado' para abrirlo y guardarlo.";
+          status.innerText = "✅ PDF listo en memoria. Haga clic en 'Descargar PDF Generado' para guardarlo.";
           status.className = "success-text";
           
-          btn.innerText = "👉 Ver PDF Generado";
+          btn.innerText = "👉 Descargar PDF Generado";
           btn.disabled = false;
           
           btn.onclick = function() {
-            var newWindow = window.open(blobURL, "_blank");
-            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-              alert("Tu navegador bloqueó la ventana emergente. Por favor, habilita los pop-ups para este sitio en la barra de direcciones y vuelve a hacer clic.");
-              return;
-            }
+            // Descargar el PDF directamente en lugar de abrir en nueva pestaña (evita bloqueos de popup)
+            const a = document.createElement('a');
+            a.href = blobURL;
+            a.download = `Orden_Impresion_${orderNo}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
             
             // Pop-up abierto correctamente. Liberar UI inmediatamente.
             document.getElementById('orderNo').value = '';
