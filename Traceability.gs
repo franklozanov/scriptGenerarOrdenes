@@ -205,38 +205,32 @@ function setupAuditTrailTrigger() {
  * Incluye validación de permisos y lógica especial para columnas específicas.
  */
 function onEditInstalled(e) {
+  var lock = LockService.getScriptLock();
   try {
+    // Bloqueo corto para ordenar ediciones simultáneas/rápidas
+    lock.tryLock(500); 
+
     if (!e || !e.range || !e.source) return;
-    
     if (e.source.getActiveSheet().getName() === 'Logs') return;
     
     var editedRange = e.range;
     var sheet = editedRange.getSheet();
     var sheetName = sheet.getName();
-    
-    var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-    var allRangeProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-    var overlappingProtections = sheetProtections.slice();
-    
     var eRow = editedRange.getRow();
     var eCol = editedRange.getColumn();
 
-    // CORREGIDO: Solo ignorar si NO hay objeto evento (ediciones programáticas)
-    // Las ediciones manuales del propietario SÍ deben registrarse
-    if (!e || !e.range) return;
-
-    // --- VERIFICACIÓN DE DESBLOQUEO TEMPORAL DE ADMIN ---
-    var isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
-
-    // --- CASO ESPECIAL: Sys_MatricesConfig requiere PIN de administrador, no solo reversión ---
-    // A diferencia del resto de hojas bloqueadas, aquí la edición manual no se descarta en
-    // silencio: se revierte igual (defensa en profundidad) pero además se abre un modal que
-    // pide el PIN de un usuario ADMIN. Si el PIN es válido, el propio modal reaplica el valor
-    // de forma programática y dispara la validación estructural contra la hoja externa
-    // (ver validarYActualizarFilaMatriz_ en MatrizConfig.gs).
-    if (sheetName === SYS_MATRICES_SHEET_NAME) {
+    // 1. DEFENSA EN PROFUNDIDAD (Salida Temprana / Early Exit)
+    // Evaluamos primero las restricciones del sistema antes de hacer llamadas pesadas a la API
+    var isUnlocked = null; // Se evalúa de manera perezosa (lazy)
+    var userIdentity = null; // Se evalúa de manera perezosa (y cacheada)
+    var SYS_MATRICES_SHEET_NAME_ = (typeof SYS_MATRICES_SHEET_NAME !== 'undefined') ? SYS_MATRICES_SHEET_NAME : 'Sys_MatricesConfig';
+    
+    // CASO ESPECIAL: Sys_MatricesConfig
+    if (sheetName === SYS_MATRICES_SHEET_NAME_) {
+      isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
       if (isUnlocked) {
-        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, resolveEditorIdentity_(e));
+        userIdentity = resolveEditorIdentity_(e);
+        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, userIdentity);
         return;
       }
       var valorPropuesto = (e.value !== undefined) ? e.value : '';
@@ -245,26 +239,30 @@ function onEditInstalled(e) {
       return;
     }
 
-    // --- DEFENSA EN PROFUNDIDAD: revertir ediciones MANUALES a hojas/columnas de sistema ---
-    // Las escrituras de la app son programáticas y NO disparan onEdit; aquí solo llega una edición
-    // manual. La protección ACL ya bloquea a los colaboradores; esto además revierte ediciones
-    // manuales del propietario, que por diseño solo debe modificar estos datos vía la aplicación.
+    // HOJAS BLOQUEADAS
     var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad'];
     if (HOJAS_BLOQUEADAS_.indexOf(sheetName) !== -1) {
+      isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
       if (isUnlocked) {
-        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, resolveEditorIdentity_(e));
+        userIdentity = resolveEditorIdentity_(e);
+        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, userIdentity);
         return;
       }
       revertManualEdit_(editedRange, e, sheetName, 'hoja bloqueada');
       return;
     }
+
+    // COLUMNAS DE SISTEMA EN ORDENES
+    var headersGen = null;
     if (sheetName === 'Ordenes') {
       var ORDENES_COLS_SISTEMA_ = ['STATUS', 'NoPags', 'Reimpresion', 'TotalPags', 'ConsecutivoImp', 'ImpresoPor', 'Reimpreso', 'ReimpresoPor', 'HistorialImpresion', 'Decision', 'Fabricante'];
-      var hdrsSis = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      var colEditadaNombre = hdrsSis[eCol - 1] ? hdrsSis[eCol - 1].toString().trim() : '';
+      headersGen = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+      var colEditadaNombre = headersGen[eCol - 1] ? headersGen[eCol - 1].toString().trim() : '';
       if (ORDENES_COLS_SISTEMA_.indexOf(colEditadaNombre) !== -1) {
+        isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
         if (isUnlocked) {
-          logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó columna ' + colEditadaNombre + ' en Ordenes', resolveEditorIdentity_(e), { campo: colEditadaNombre });
+          userIdentity = resolveEditorIdentity_(e);
+          logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó columna ' + colEditadaNombre + ' en Ordenes', userIdentity, { campo: colEditadaNombre });
           return;
         }
         revertManualEdit_(editedRange, e, sheetName, 'columna de sistema: ' + colEditadaNombre);
@@ -272,6 +270,12 @@ function onEditInstalled(e) {
       }
     }
     // --- FIN DEFENSA EN PROFUNDIDAD ---
+
+    // 2. VERIFICACIÓN DE PROTECCIONES NATIVAS DE SHEETS
+    // Llamadas pesadas a la API de protecciones solo si no se bloqueó en el paso anterior
+    var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+    var allRangeProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+    var overlappingProtections = sheetProtections.slice();
 
     for (var j = 0; j < allRangeProtections.length; j++) {
       var pRange = allRangeProtections[j].getRange();
@@ -293,10 +297,12 @@ function onEditInstalled(e) {
       }
     }
     
-    var userIdentity = resolveEditorIdentity_(e);
-
     if (!hasPermission) {
+      if (isUnlocked === null) {
+        isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
+      }
       if (isUnlocked) {
+        if (!userIdentity) userIdentity = resolveEditorIdentity_(e);
         logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó rango protegido en ' + sheetName + ' (' + protectionDesc + ')', userIdentity);
         return;
       }
@@ -304,11 +310,14 @@ function onEditInstalled(e) {
       return;
     }
     
+    // Si la edición es válida, obtenemos la identidad para continuar (si no la teníamos ya)
+    if (!userIdentity) userIdentity = resolveEditorIdentity_(e);
+    
     var numRows = editedRange.getNumRows();
     var numCols = editedRange.getNumColumns();
 
     if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
-      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var headers = headersGen || sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
 
       var editedColName = headers[editedRange.getColumn() - 1];
       
@@ -401,8 +410,8 @@ function onEditInstalled(e) {
     }
     
     if (numRows === 1 && numCols === 1) {
-      var headersGen = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      var campoEditado = headersGen[eCol - 1] ? headersGen[eCol - 1].toString().trim() : '';
+      var headersGenLog = headersGen || sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+      var campoEditado = headersGenLog[eCol - 1] ? headersGenLog[eCol - 1].toString().trim() : '';
       var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
       var newValue = e.value !== undefined ? e.value : "(vacío)";
       var cellAddress = editedRange.getA1Notation();
@@ -412,7 +421,7 @@ function onEditInstalled(e) {
 
       var ordenRefSingle = '';
       if (sheetName === 'Ordenes') {
-        var colNoOrdenGen = getColumnIndexByNameCaseInsensitive(headersGen, 'NoOrden', false);
+        var colNoOrdenGen = getColumnIndexByNameCaseInsensitive(headersGenLog, 'NoOrden', false);
         if (colNoOrdenGen) {
           var noOrdenValSingle = sheet.getRange(eRow, colNoOrdenGen).getValue();
           ordenRefSingle = noOrdenValSingle ? noOrdenValSingle.toString().trim() : '';
@@ -436,6 +445,10 @@ function onEditInstalled(e) {
       logChange(TIPOS_CAMBIO.ERROR_SISTEMA, 'Error en onEditInstalled: ' + error.message, 'Sistema');
     } catch (logError) {
       Logger.log("No se pudo registrar el error en Logs: " + logError.message);
+    }
+  } finally {
+    if (lock && lock.hasLock()) {
+      lock.releaseLock();
     }
   }
 }
@@ -570,10 +583,32 @@ function resolveEditorIdentity_(e) {
   var email = (e && e.user && e.user.getEmail) ? e.user.getEmail() : '';
   if (!email) return "Editor no identificado (permiso de email no disponible)";
 
-  var user = getUserRecordByEmail_(email);
-  if (user && user.userId) return getUserIdentityStringByUserId_(user.userId);
+  // CACHING: Evitar llamadas repetitivas a la hoja Usuarios en ediciones rápidas
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'userIdentity_' + email;
+  var cachedIdentity = cache.get(cacheKey);
+  if (cachedIdentity) return cachedIdentity;
 
-  return email; // Email válido pero sin registro en Usuarios (ej. propietario del script)
+  var user = getUserRecordByEmail_(email);
+  var identity = email;
+  
+  if (user && user.userId) {
+    try {
+      // getUserIdentityStringByUserId_ está en Auth.gs
+      if (typeof getUserIdentityStringByUserId_ !== 'undefined') {
+        identity = getUserIdentityStringByUserId_(user.userId);
+      } else {
+        identity = user.userId + (user.nombreCorto ? ' - ' + user.nombreCorto : '');
+      }
+    } catch (err) {
+      identity = user.userId;
+    }
+  }
+
+  // Guardar en caché por 15 minutos (900 segundos)
+  cache.put(cacheKey, identity, 900);
+  
+  return identity;
 }
 
 /**
