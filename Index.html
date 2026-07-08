@@ -1066,39 +1066,26 @@
               return;
             }
             
-            // Pop-up abierto correctamente
-            btn.style.display = 'none';
-            status.innerText = "⏳ Guardando PDF en segundo plano y registrando impresión...";
-            status.className = "info-text";
+            // Pop-up abierto correctamente. Liberar UI inmediatamente.
+            document.getElementById('orderNo').value = '';
+            resetPreloadState();
+            setPreloadBanner('', '');
+            document.getElementById('orderNo').focus();
             
+            btn.innerText = "Generar PDF Combinado";
+            btn.onclick = run;
+            updateGoButtonState();
+            
+            status.innerText = "⏳ Guardando PDF en segundo plano...";
+            status.className = "info-text";
+            setTimeout(() => {
+              if (status.innerText.includes("Guardando PDF en segundo plano")) {
+                status.innerText = '';
+              }
+            }, 3000);
+            
+            // Disparar proceso en segundo plano (las notificaciones llegarán vía Toast desde el backend)
             google.script.run
-              .withSuccessHandler(function() {
-                status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
-                status.className = "success-text";
-                document.getElementById('orderNo').value = '';
-                resetPreloadState();
-                setPreloadBanner('', '');
-                document.getElementById('orderNo').focus();
-                setTimeout(() => {
-                  if (status.innerText.includes("Listo para la siguiente orden")) {
-                    status.innerText = '';
-                  }
-                  btn.innerText = "Generar PDF Combinado";
-                  btn.onclick = run;
-                  btn.style.display = 'block';
-                  updateGoButtonState();
-                }, 3000);
-              })
-              .withFailureHandler(function(err) {
-                status.innerText = "⚠️ Error de guardado: " + err.message + " (Registrado en HistorialImpresion)";
-                status.className = "error-text";
-                setTimeout(() => {
-                  btn.innerText = "Generar PDF Combinado";
-                  btn.onclick = run;
-                  btn.style.display = 'block';
-                  updateGoButtonState();
-                }, 5000);
-              })
               .processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType);
           };
 

@@ -668,13 +668,20 @@ function processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPa
     // 3. Post guardado (Seguridad)
     finalizeFinalPdfPostSave(orderNo, saveResult.fileId, saveResult.archivoReemplazado, userId);
     
-    // Éxito: Escribir en HistorialImpresion (opcional, si se quiere llevar log de éxitos)
+    // Éxito: Escribir en HistorialImpresion
     logHistorialImpresion_(orderNo, userId, "✅ PDF Guardado exitosamente. Consecutivo: " + saveResult.consecutivo);
+    
+    // Notificar al usuario vía Toast
+    SpreadsheetApp.getActiveSpreadsheet().toast("✅ Orden " + orderNo + " guardada en Drive con consecutivo " + saveResult.consecutivo, "Guardado Exitoso", 5);
     
     return true;
   } catch (error) {
     Logger.log("Error en processAndSavePdfBackgroundForUser: " + error.message);
     logHistorialImpresion_(orderNo, userId, "❌ ERROR AL GUARDAR: " + error.message);
+    
+    // Notificar al usuario vía Toast
+    SpreadsheetApp.getActiveSpreadsheet().toast("❌ Error al guardar Orden " + orderNo + ": " + error.message, "Error en Guardado", 10);
+    
     throw error;
   }
 }
