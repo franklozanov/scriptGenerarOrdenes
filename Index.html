@@ -469,9 +469,11 @@
       function areSelectedStaticTemplatesReady() {
         return globalTemplates.every(t => {
           if (t.type === 'Dynamic' || t.key === 'DOC_COMPLETO') return true;
+          // Si no tiene fileId o no tiene acceso, es imposible descargarla, así que no esperamos por ella.
+          if (!t.fileId || !t.hasAccess) return true;
+          
           const input = document.getElementById('val_' + t.key);
           const copies = input ? parseInt(input.value) || 0 : 0;
-          // Si tiene copias seleccionadas, verificamos si ya bajó
           if (copies > 0) {
             return !!preloadedStaticPdfs[t.key];
           }
@@ -503,28 +505,33 @@
         const isEnabled = isOrderReady && isUserValid && hasCopies && staticReady;
         btn.disabled = !isEnabled;
 
-        // Feedback visual si el orden está listo pero el botón sigue bloqueado
+        // Limpiar el botón a su texto original siempre
+        btn.innerText = "Generar PDF Combinado";
+
         if (isOrderReady && !isEnabled && !status.innerText.includes("Impresión registrada")) {
           if (!isUserValid) {
             status.innerText = "⚠️ Seleccione un usuario válido de la lista";
             status.className = "error-text";
+            setPreloadBanner('info', 'Por favor seleccione su usuario para continuar.');
           } else if (!hasCopies) {
             status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
             status.className = "error-text";
+            setPreloadBanner('info', 'Seleccione al menos 1 copia de alguna plantilla.');
           } else if (!staticReady) {
-            status.innerText = "⏳ Descargando plantillas estáticas en segundo plano...";
-            status.className = "info-text";
-            // Actualizar banner también
-            setPreloadBanner('info', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>⏳ Descargando plantillas estáticas en segundo plano...');
+            // El usuario quiere algo simple y alusivo, sin detalles técnicos
+            status.innerHTML = "⏳ <span style='color: #64748b;'>Preparando recursos...</span>";
+            status.className = "";
+            btn.innerHTML = "<div class='spinner' style='width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 8px;'></div> Preparando...";
+            setPreloadBanner('info', '⏳ Preparando archivos para la impresión...');
           }
         } else if (isOrderReady && isEnabled && !status.innerText.includes("Impresión registrada")) {
-          // Todo correcto y cargado
+          // TODO CORRECTO Y CARGADO
           status.innerText = "✅ Documentos listos para impresión";
           status.className = "success-text";
-          // Actualizar banner a success
-          setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Todos los documentos listos para impresión.');
+          setPreloadBanner('success', '✅ Orden cargada con éxito.<br>✅ Documentos listos para impresión.');
         } else if (!isOrderReady && !status.innerText.includes("Impresión registrada") && orderInput.value.trim().length === 0) {
            status.innerText = "";
+           setPreloadBanner('', '');
         }
       }
       
