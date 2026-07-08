@@ -25,6 +25,8 @@ function onOpen() {
 
   // 3. Menú Principal (Gestionar OA)
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
+    .addItem('🔐 Validar mi Usuario (INICIAR)', 'abrirModalValidacion')
+    .addSeparator()
     .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad')
@@ -32,7 +34,20 @@ function onOpen() {
     .addSubMenu(configMenu)
     .addToUi();
   
-  // Mostrar modal de validación inicial
+  // Cache warmup y aviso inicial
+  try {
+    getInitialData();
+    syncVerifCantDisponible();
+    SpreadsheetApp.getActiveSpreadsheet().toast('⚠️ Para continuar, por favor ve al menú "Gestionar OA" y selecciona "Validar mi Usuario".', 'Sistema QMS', 15);
+  } catch (e) {
+    Logger.log("Error en warmup de caché: " + e.message);
+  }
+}
+
+/**
+ * Abre el modal de validación (debe ser accionado por el usuario por restricciones de GAS)
+ */
+function abrirModalValidacion() {
   try {
     var html = HtmlService.createTemplateFromFile('ModalValidacion').evaluate()
       .setWidth(500)
@@ -40,15 +55,7 @@ function onOpen() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Validación de Acceso al Sistema');
   } catch (e) {
     Logger.log("Error al mostrar ModalValidacion: " + e.message);
-  }
-  
-  // Cache warmup: precargar datos silenciosamente
-  try {
-    getInitialData();
-    syncVerifCantDisponible();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo. Use "Gestionar OA → 📝 Registrar Entrega / Novedad" para registrar novedades.', 'Sistema QMS', 7);
-  } catch (e) {
-    Logger.log("Error en warmup de caché: " + e.message);
+    SpreadsheetApp.getUi().alert("Error", "No se pudo cargar el modal de validación: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
