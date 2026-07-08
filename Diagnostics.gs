@@ -291,6 +291,19 @@ function diagnosticarHtmlCompilado() {
   Logger.log('TOTAL LINEAS DEL HTML COMPILADO: ' + lines.length);
   Logger.log('LONGITUD TOTAL (chars): ' + html.length);
 
+  // --- VERIFICAR QUÉ VERSIÓN DE Index.html ESTÁ REALMENTE EN GAS ---
+  // Buscamos marcadores únicos de los últimos commits. Si NO aparecen,
+  // el sync GitHub->GAS no subió los cambios y se está corriendo código viejo.
+  Logger.log('=== VERIFICACIÓN DE VERSIÓN DEL ARCHIVO EN GAS ===');
+  Logger.log('¿Tiene <meta charset="UTF-8">? ' + (html.indexOf('<meta charset="UTF-8">') !== -1));
+  Logger.log('¿Tiene overlay de error (ERROR JS DETECTADO)? ' + (html.indexOf('ERROR JS DETECTADO') !== -1));
+  Logger.log('¿Tiene carga async pdf-lib (pdfLibReady)? ' + (html.indexOf('pdfLibReady') !== -1));
+  Logger.log('¿Tiene watchdog (startLoaderWatchdog)? ' + (html.indexOf('startLoaderWatchdog') !== -1));
+  Logger.log('¿Tiene <script src pdf-lib SÍNCRONO viejo? ' + (html.indexOf('<script src="https://unpkg.com/pdf-lib') !== -1));
+  // Primeros 400 chars para ver el <head> real
+  Logger.log('=== PRIMEROS 400 CHARS DEL HTML REAL EN GAS ===');
+  Logger.log(html.substring(0, 400));
+
   // Analizar un rango alrededor de la línea 387 reportada por el navegador
   var from = 380, to = 395;
   for (var i = from; i <= to && i <= lines.length; i++) {
