@@ -2,8 +2,19 @@
 <html>
   <head>
     <base target="_top">
-    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-    
+    <script>
+      // Carga pdf-lib de forma asíncrona y NO bloqueante: si el CDN está lento o
+      // bloqueado por la red, el modal debe abrir y cargar igual; solo se espera
+      // esta promesa justo antes de generar el PDF (ver processPdfGeneration).
+      window.pdfLibReady = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/pdf-lib/dist/pdf-lib.min.js';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('No se pudo cargar la librería PDF (pdf-lib) desde la CDN. Verifique su conexión a internet e inténtelo de nuevo.'));
+        document.head.appendChild(s);
+      });
+    </script>
+
     <!-- FASE 6: Design System Centralizado -->
     <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
     
@@ -796,8 +807,27 @@
         }
       }
 
+      let __loaderWatchdogId = null;
+      function startLoaderWatchdog(timeoutMs) {
+        return setTimeout(() => {
+          const loader = document.getElementById('loader');
+          if (loader) {
+            loader.style.display = 'flex';
+            loader.innerHTML = `
+              <div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:'Inter',sans-serif;">
+                <div style="font-size:2rem; margin-bottom:12px;">⏱️</div>
+                <h3 style="margin:0 0 8px 0; color:#0f172a; font-size:1rem;">La carga está tomando más de lo normal</h3>
+                <p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Puede deberse a su conexión a internet o a que Google Drive/Sheets está respondiendo lento.</p>
+                <button onclick="location.reload()" style="width:100%; padding:10px; background:#1976d2; color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer;">🔄 Reintentar</button>
+              </div>`;
+          }
+        }, timeoutMs);
+      }
+
       window.onload = () => {
+        __loaderWatchdogId = startLoaderWatchdog(20000);
         google.script.run.withSuccessHandler(data => {
+          clearTimeout(__loaderWatchdogId);
           try {
             console.log('🚀 Inicializando modal - data recibida:', data);
             globalTemplates = data.templates;
@@ -950,6 +980,7 @@
             console.error(e);
           }
         }).withFailureHandler(e => {
+          clearTimeout(__loaderWatchdogId);
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
         }).getInitialData();
       };
@@ -1010,6 +1041,9 @@
           
           // Replace payload.pdfs with the merged array
           payload.pdfs = finalPdfs;
+
+          status.innerText = "⏳ Paso 2/4: Cargando librería PDF...";
+          await window.pdfLibReady;
 
           const { PDFDocument, rgb, degrees } = PDFLib;
           const finalPdf = await PDFDocument.create();
