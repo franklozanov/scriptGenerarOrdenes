@@ -745,6 +745,42 @@
               updateGoButtonState();
             }
 
+            // --- INICIO INICIALIZACIÓN UI ---
+            const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
+            if (noAccessCount > 0) {
+              const status = document.getElementById('status');
+              status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
+              status.className = "error-text";
+            }
+
+            // Add event listener for background preloading on orderNo input
+            const orderNoInput = document.getElementById('orderNo');
+            const debouncedPreload = debounce((value) => {
+              if (value.trim().length >= 3) { // Only preload if at least 3 characters
+                preloadOrderData(value);
+              } else {
+                resetPreloadState();
+                setPreloadBanner('', '');
+              }
+            }, 600);
+            
+            orderNoInput.addEventListener('input', (e) => {
+              if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
+                resetPreloadState();
+                setPreloadBanner('', '');
+              }
+              updateGoButtonState();
+              debouncedPreload(e.target.value);
+            });
+            
+            orderNoInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('goBtn').click();
+              }
+            });
+            // --- FIN INICIALIZACIÓN UI ---
+
             const myEmail = data.activeEmail ? data.activeEmail.toLowerCase().trim() : "";
             const matchedUsers = data.users.filter(u => u.email && u.email.toLowerCase().trim() === myEmail);
 
@@ -798,44 +834,6 @@
                `;
                return;
             }
-
-            const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
-            if (noAccessCount > 0) {
-              const status = document.getElementById('status');
-              status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
-              status.className = "error-text";
-            }
-
-            // Ocultar loader como fallback final (si no se cortó el flujo antes)
-            document.getElementById('loader').style.display = 'none';
-            updateGoButtonState();
-            
-            // Add event listener for background preloading on orderNo input
-            const orderNoInput = document.getElementById('orderNo');
-            const debouncedPreload = debounce((value) => {
-              if (value.trim().length >= 3) { // Only preload if at least 3 characters
-                preloadOrderData(value);
-              } else {
-                resetPreloadState();
-                setPreloadBanner('', '');
-              }
-            }, 600);
-            
-            orderNoInput.addEventListener('input', (e) => {
-              if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
-                resetPreloadState();
-                setPreloadBanner('', '');
-              }
-              updateGoButtonState();
-              debouncedPreload(e.target.value);
-            });
-            
-            orderNoInput.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('goBtn').click();
-              }
-            });
 
           } catch (e) {
             document.getElementById('loader').innerHTML = `<span class="error-text">Error interno al cargar: ${e.message}</span>`;
