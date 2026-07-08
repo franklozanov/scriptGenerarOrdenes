@@ -1121,6 +1121,15 @@
         }
       }
 
+      function buildConfigFromUI() {
+        return globalTemplates.map(t => ({
+          key: t.key,
+          fileId: t.fileId,
+          hasAccess: t.hasAccess,
+          copies: parseInt(document.getElementById('val_' + t.key) ? document.getElementById('val_' + t.key).value : '0') || 0
+        })).filter(c => c.copies > 0);
+      }
+
       async function run() {
         const config = buildConfigFromUI();
         const orderNo = document.getElementById('orderNo').value.trim();
