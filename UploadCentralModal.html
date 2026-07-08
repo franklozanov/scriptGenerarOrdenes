@@ -566,7 +566,7 @@
 
       rowsContainer.insertAdjacentHTML('beforeend', rowHtml);
       var newRow = document.getElementById(rowId);
-      var docTypeSelect = newRow.querySelector('.doc-type-select-input');
+
       var referenceSelect = newRow.querySelector('.reference-select');
       
       // Inicializar con lista de órdenes por defecto
@@ -656,7 +656,7 @@
 
       // Validar tamaño
       if (file.size > MAX_FILE_SIZE) {
-        var sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+
         wrapper.classList.add('has-error');
         statusIndicator.textContent = '❌ >10MB';
         statusIndicator.className = 'status-indicator error';

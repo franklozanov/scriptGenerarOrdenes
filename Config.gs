@@ -75,6 +75,12 @@ var SESSION_PERSIST_PROP_KEY = 'SESSION_PERSIST_MINUTES';
 var SESSION_PERSIST_DEFAULT_MIN = 30;
 var SESSION_PERSIST_MAX_MIN = 1440; // 24 h
 
+// --- CLAVE DE CONFIGURACIÓN DE CIERRE POR INACTIVIDAD (ScriptProperties) ---
+// Minutos de inactividad permitidos antes de cerrar la sesión automáticamente (21 CFR Part 11)
+var SESSION_TIMEOUT_PROP_KEY = 'SESSION_TIMEOUT_MINUTES';
+var SESSION_TIMEOUT_DEFAULT_MIN = 15;
+var SESSION_TIMEOUT_MAX_MIN = 120;
+
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 

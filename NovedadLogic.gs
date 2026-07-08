@@ -244,7 +244,7 @@ function procesarRegistroNovedad(params, userId) {
     var totalPags = params.totalPags || 0;
     var noPagDevueltas = params.noPagDevueltas || 0;
     var nuevoStatus = params.status || "";
-    var realizadoPor = params.realizadoPor || userId;
+
 
     // Actualizar STATUS en la hoja Ordenes
     var sheetOrdenes = ss.getSheetByName('Ordenes');

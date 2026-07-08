@@ -280,8 +280,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var colAdjuntoCOAIdx = getColumnIndexByName(headers, 'AdjuntoCOA', false);
     var colAdjuntoOAIdx = getColumnIndexByName(headers, 'AdjuntoOA', false);
     var colEstadoCargaIdx = getColumnIndexByName(headers, 'EstadoCarga', false);
-    var colNoOrdenIdx = getColumnIndexByName(headers, 'NoOrden', true);
-    var colNoAnalisisIdx = getColumnIndexByName(headers, 'NoAnalisis', false);
+
     
     // Determinar la columna objetivo según docType (para búsqueda en array data)
     var targetColName = "";

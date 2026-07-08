@@ -3,7 +3,7 @@
 // Descripción: Endpoints públicos (doGet, doPost)
 // Prioridad de Carga: 13° (último - depende de todo)
 // FASE 5 - Batch 5.3: Web App Endpoints (FINAL)
-/* global getSpreadsheetMetadata_, getSheetHeaders_ */
+/* global getSpreadsheetMetadata_, getSheetHeaders_, getSessionTimeoutMinutes */
 // ============================================================
 
 // --- ENDPOINT GET: Visor de PDF ---
@@ -553,7 +553,7 @@ function handlePrivilegedOperation_(params) {
     if (!hasPermission(callingUserId, PERMISOS.MENU_ADMIN) && !hasPermission(callingUserId, PERMISOS.MENU_CONFIG)) {
       return { status: 'error', message: 'No tiene permisos para ver esta configuración.', diagnostic: 'PERMISSION_DENIED' };
     }
-    return { status: 'success', minutos: getSessionPersistMinutes() };
+    return { status: 'success', minutos: getSessionPersistMinutes(), timeoutMinutos: getSessionTimeoutMinutes() };
   }
 
   if (operation === 'setSessionPersist') {

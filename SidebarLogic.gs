@@ -2,6 +2,7 @@
 // MODULE: SidebarLogic
 // Descripción: Lógica del lado del servidor para el Sidebar SPA
 // ============================================================
+/* global SESSION_TIMEOUT_PROP_KEY, SESSION_TIMEOUT_DEFAULT_MIN, SESSION_TIMEOUT_MAX_MIN */
 
 /**
  * Abre el panel lateral principal de QMS.
@@ -179,6 +180,18 @@ function getSessionPersistMinutes() {
   }
 }
 
+function getSessionTimeoutMinutes() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(SESSION_TIMEOUT_PROP_KEY);
+    if (raw === null || raw === '') return SESSION_TIMEOUT_DEFAULT_MIN;
+    var n = parseInt(raw, 10);
+    if (isNaN(n) || n < 1) return SESSION_TIMEOUT_DEFAULT_MIN;
+    return Math.min(n, SESSION_TIMEOUT_MAX_MIN);
+  } catch (e) {
+    return SESSION_TIMEOUT_DEFAULT_MIN;
+  }
+}
+
 /**
  * Guarda los minutos de persistencia de sesión. Operación privilegiada: requiere
  * permiso de administrador y firma PIN (validada en la Web App antes de llamar aquí).
@@ -190,19 +203,25 @@ function procesarSetSessionPersist(params, userId) {
   enforcePermission(userId, PERMISOS.MENU_ADMIN);
 
   var minutos = parseInt(params.minutos, 10);
-  if (isNaN(minutos) || minutos < 0) throw new Error('Los minutos deben ser un número entero mayor o igual a 0.');
-  if (minutos > SESSION_PERSIST_MAX_MIN) throw new Error('El máximo permitido es ' + SESSION_PERSIST_MAX_MIN + ' minutos (24 h).');
+  if (isNaN(minutos) || minutos < 0) throw new Error('Los minutos de persistencia deben ser un número entero mayor o igual a 0.');
+  if (minutos > SESSION_PERSIST_MAX_MIN) throw new Error('El máximo permitido para persistencia es ' + SESSION_PERSIST_MAX_MIN + ' minutos (24 h).');
 
-  PropertiesService.getScriptProperties().setProperty(SESSION_PERSIST_PROP_KEY, String(minutos));
+  var timeoutMinutos = parseInt(params.timeoutMinutos, 10);
+  if (isNaN(timeoutMinutos) || timeoutMinutos < 1) throw new Error('Los minutos de inactividad deben ser un número entero mayor a 0.');
+  if (timeoutMinutos > SESSION_TIMEOUT_MAX_MIN) throw new Error('El máximo permitido para inactividad es ' + SESSION_TIMEOUT_MAX_MIN + ' minutos.');
+
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(SESSION_PERSIST_PROP_KEY, String(minutos));
+  props.setProperty(SESSION_TIMEOUT_PROP_KEY, String(timeoutMinutos));
 
   var userIdentity = getUserIdentityStringByUserId_(userId);
   logChange(
     'CONFIG_SESION_PERSISTENCIA',
-    'Persistencia de sesión configurada en ' + minutos + ' minuto(s)' + (minutos === 0 ? ' (siempre pedir PIN)' : ''),
+    'Persistencia: ' + minutos + ' min. Inactividad: ' + timeoutMinutos + ' min.',
     userIdentity
   );
 
-  return { status: 'success', message: 'Persistencia de sesión: ' + minutos + ' min.', minutos: minutos };
+  return { status: 'success', message: 'Configuración actualizada.', minutos: minutos, timeoutMinutos: timeoutMinutos };
 }
 
 /**

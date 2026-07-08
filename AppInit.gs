@@ -24,7 +24,6 @@ function promptInitializeApp() {
  */
 function initializeApp(ui) {
   if (!ui) ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var report = validateStructure();
   
   if (report.missingSheets.length === 0 && report.incorrectHeaders.length === 0) {
@@ -138,14 +137,6 @@ function initializeCompleteSystem(ui) {
     summary.push("⚠️ Validaciones de STATUS: " + e.message);
   }
 
-
-  // Diagnóstico de ConsecutivoImp
-  try {
-    var diagnosticResult = runConsecutivoImpDiagnostic_();
-    summary.push("✓ " + diagnosticResult);
-  } catch (e) {
-    summary.push("⚠️ Diagnóstico ConsecutivoImp: " + e.message);
-  }
 
   // Migración de Seguridad de PIN y Bloqueo — requiere confirmación explícita, ya que
   // puede reiniciar a "PENDIENTE" cualquier valor de Clave que no sea ya un hash válido

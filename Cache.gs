@@ -3,6 +3,7 @@
 // Descripción: Sistema de caché para plantillas y datos iniciales
 // Prioridad de Carga: 5° (depende de Helpers y Config)
 // ============================================================
+/* global getSessionTimeoutMinutes */
 
 /**
  * Genera el prefijo de caché para una plantilla estática.
@@ -129,6 +130,7 @@ function getInitialData(includeBase64) {
         parsedData.userPermissions = userPermissions;
         parsedData.currentUser = validUser;
         parsedData.activeEmail = activeEmail;
+        parsedData.sessionTimeoutMinutos = getSessionTimeoutMinutes();
         return parsedData;
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
@@ -304,8 +306,8 @@ function getInitialData(includeBase64) {
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
     
-    // Los permisos ya se calcularon al inicio de la función
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions, currentUser: validUser, activeEmail: activeEmail };
+    // Los permisos y timeout se calcularon al inicio o fin de la función
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions, currentUser: validUser, activeEmail: activeEmail, sessionTimeoutMinutos: getSessionTimeoutMinutes() };
     
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
