@@ -278,26 +278,13 @@ function getInitialData() {
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
     var result = { users: users, templates: templates, webAppUrl: webAppUrl };
     
-    const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
-    templates.sort(function(a, b) {
-      var indexA = sortOrder.indexOf(a.key);
-      var indexB = sortOrder.indexOf(b.key);
-      if (indexA !== -1 && indexB !== -1) {
-        return indexA - indexB;
-      }
-      if (indexA !== -1) {
-        return -1;
-      }
-      if (indexB !== -1) {
-        return 1;
-      }
-      return 0;
-    });
+    // La lista ya fue ordenada por FormOrder numérico en el bloque anterior.
+    // No usamos el arreglo quemado 'sortOrder' para permitir control total desde la hoja.
     
     var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];
-      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, hasAccess: t.hasAccess });
+      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, type: t.type, formOrder: t.formOrder, hasAccess: t.hasAccess });
     }
     
     try { cache.put('initialData_v2', JSON.stringify(dataToCache), 600); } catch (e) {
