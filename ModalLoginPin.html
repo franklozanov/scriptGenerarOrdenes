@@ -143,7 +143,7 @@
 </head>
 <body>
   <div class="lp-container">
-    <h3>Autorización Requerida</h3>
+    <h3 id="lp-title">Iniciando Sesión</h3>
     <p id="lp-subtitle">Verificando identidad...</p>
     <div id="lp-body"></div>
     <div class="lp-actions">
@@ -176,6 +176,12 @@
       google.script.host.close();
     });
 
+    function setTitle(text, color) {
+      var el = document.getElementById('lp-title');
+      el.textContent = text;
+      el.style.color = color || '#0f172a';
+    }
+
     function setSubtitle(text) {
       document.getElementById('lp-subtitle').textContent = text;
     }
@@ -196,9 +202,10 @@
     // === PASO 1: identidad ===
     function init() {
       if (identidad.status === 'none') {
-        setSubtitle('No pudimos identificarlo en el sistema.');
-        setBody('<p style="color:#dc2626; font-size:13px;">El correo de su sesión de Google (' +
-          escapeHtml(identidad.activeEmail || '') + ') no está registrado en la hoja de Usuarios. Contacte al administrador.</p>');
+        setTitle('Acceso Denegado', '#dc2626');
+        setSubtitle('Usuario no registrado.');
+        setBody('<p style="color:#dc2626; font-size:13px; background:#fef2f2; padding:12px; border-radius:8px; border:1px solid #f87171;">El correo de su sesión de Google (<b>' +
+          escapeHtml(identidad.activeEmail || '') + '</b>) no tiene permisos de acceso al sistema. Por favor, contacte al administrador.</p>');
         return;
       }
       if (identidad.status === 'multiple') {
@@ -209,6 +216,7 @@
     }
 
     function renderSelectorUsuario(candidatos) {
+      setTitle('Múltiples Usuarios');
       setSubtitle('Su correo está asociado a varios usuarios. Seleccione con cuál desea ingresar:');
       var html = '<div class="lp-user-list">';
       candidatos.forEach(function (c, idx) {
@@ -231,27 +239,31 @@
       var nombre = nombreDe(candidato);
 
       if (candidato.estado === 'Bloqueado') {
-        setSubtitle('Hola, ' + nombre + '.');
-        setBody('<p style="color:#dc2626; font-size:13px;">⛔ Su usuario está bloqueado por intentos fallidos de PIN. Contacte al administrador.</p>');
+        setTitle('Usuario Bloqueado', '#dc2626');
+        setSubtitle('Acceso restringido para ' + nombre + '.');
+        setBody('<p style="color:#dc2626; font-size:13px; background:#fef2f2; padding:12px; border-radius:8px; border:1px solid #f87171;">⛔ Su usuario ha sido bloqueado por superar el límite de intentos fallidos de firma. Contacte al administrador.</p>');
         return;
       }
 
       if (candidato.estado === 'Pendiente') {
+        setTitle('Acceso Pendiente', '#d97706');
         setSubtitle('Hola, ' + nombre + '.');
-        setBody('<p style="color:#dc2626; font-size:13px;">⏳ Su acceso está pendiente de aprobación por el administrador.</p>');
+        setBody('<p style="color:#d97706; font-size:13px; background:#fffbeb; padding:12px; border-radius:8px; border:1px solid #fcd34d;">⏳ Su solicitud de acceso aún está pendiente de aprobación por el administrador.</p>');
         return;
       }
 
       if (!candidato.rol) {
+        setTitle('Falta Configuración', '#d97706');
         setSubtitle('Hola, ' + nombre + '.');
-        setBody('<p style="color:#dc2626; font-size:13px;">Su usuario no tiene un rol asignado. Contacte al administrador antes de continuar.</p>');
+        setBody('<p style="color:#d97706; font-size:13px; background:#fffbeb; padding:12px; border-radius:8px; border:1px solid #fcd34d;">Su usuario no tiene un rol asignado. Contacte al administrador antes de continuar.</p>');
         return;
       }
 
       if (!isPinConfiguredClient_(candidato.pin)) {
         iniciarCreacionPin(nombre, candidato);
       } else {
-        setSubtitle('Hola, ' + nombre + '. Ingrese su PIN para continuar:');
+        setTitle('Verificación de Identidad');
+        setSubtitle('Hola, ' + nombre + '. Ingrese su PIN de seguridad para continuar:');
         renderPinInputs(function (pin, inputs) {
           validarPin(pin, inputs, candidato);
         });
@@ -274,13 +286,15 @@
     }
 
     function renderAdminOverrideForm(candidato) {
+      setTitle('Clave de Administrador', '#9333ea');
+      setSubtitle('Ingrese la clave maestra para omitir la validación del PIN.');
       document.querySelectorAll('.lp-admin-override-link, .lp-admin-override-form').forEach(function (el) { el.remove(); });
 
       var form = document.createElement('div');
       form.className = 'lp-admin-override-form';
       form.innerHTML =
-        '<input type="password" class="lp-admin-override-input" placeholder="Clave de administrador">' +
-        '<button type="button" class="btn btn-secondary lp-admin-override-submit">Validar clave de administrador</button>' +
+        '<input type="password" class="lp-admin-override-input" placeholder="Clave maestra de sistema">' +
+        '<button type="button" class="btn btn-secondary lp-admin-override-submit">Validar</button>' +
         '<div class="lp-error" id="lp-override-error"></div>';
       document.querySelector('.lp-container').insertBefore(form, document.querySelector('.lp-actions'));
 
@@ -419,13 +433,15 @@
 
     // === Creación de PIN en dos pasos (usuario sin PIN configurado) ===
     function iniciarCreacionPin(nombre, candidato) {
-      setSubtitle('Hola, ' + nombre + '. No tiene un PIN configurado. Cree su nuevo PIN (4 dígitos):');
+      setTitle('Crear Firma Electrónica', '#2563eb');
+      setSubtitle('Hola, ' + nombre + '. Necesita configurar su PIN (4 dígitos) por primera vez:');
       renderPinInputs(function (pin1, inputs1) {
         setPinInputsDisabled(inputs1, true);
-        setSubtitle('Reingrese su nuevo PIN para confirmar:');
+        setTitle('Confirmar Firma Electrónica', '#2563eb');
+        setSubtitle('Vuelva a ingresar el PIN para confirmar:');
         renderPinInputs(function (pin2, inputs2) {
           if (pin1 !== pin2) {
-            showPinError('Los PIN no coinciden. Intente de nuevo.');
+            showPinError('Los PIN ingresados no coinciden. Intente nuevamente.');
             iniciarCreacionPin(nombre, candidato);
             return;
           }
@@ -459,8 +475,9 @@
 
     // === Éxito: abrir el Sidebar QMS ya autenticado y cerrar este modal ===
     function finalizarLogin(userId) {
-      setSubtitle('✅ Identidad verificada. Abriendo panel...');
-      setBody('');
+      setTitle('¡Bienvenido!', '#166534');
+      setSubtitle('Su identidad ha sido verificada correctamente.');
+      setBody('<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 0;"><div style="width:48px; height:48px; border-radius:50%; background:#dcfce7; color:#166534; display:flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:12px;">✅</div><p style="color:#166534; font-size:13px; font-weight:500;">Iniciando el sistema QMS...</p></div>');
       document.getElementById('lp-cancel-btn').disabled = true;
 
       google.script.run

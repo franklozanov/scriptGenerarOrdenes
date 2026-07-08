@@ -3,6 +3,7 @@
 // Descripción: Endpoints públicos (doGet, doPost)
 // Prioridad de Carga: 13° (último - depende de todo)
 // FASE 5 - Batch 5.3: Web App Endpoints (FINAL)
+/* global getSpreadsheetMetadata_, getSheetHeaders_ */
 // ============================================================
 
 // --- ENDPOINT GET: Visor de PDF ---
@@ -130,8 +131,16 @@ function handlePrivilegedOperation_(params) {
   Logger.log("WebApp - Operación solicitada: " + operation);
 
   var callingUserId;
-  // La validación estricta (PIN) se requiere para casi todo, excepto para la creación inicial del PIN.
-  if (operation === 'configurarNuevoPin') {
+  // La validación estricta (PIN) se requiere para casi todo, excepto para operaciones de solo lectura
+  // o configuración inicial que no realizan modificaciones de seguridad/registros.
+  const basicAuthOperations = [
+    'configurarNuevoPin', 
+    'getMatricesConfig',
+    'getSpreadsheetMetadata',
+    'getSheetHeaders'
+  ];
+
+  if (basicAuthOperations.indexOf(operation) !== -1) {
     callingUserId = requireAuthorizedUser_(params);
   } else {
     callingUserId = requireAuthorizedUserStrict_(params);
@@ -414,6 +423,40 @@ function handlePrivilegedOperation_(params) {
       resultadoGuardado.validacion = validarYActualizarFilaMatriz_(resultadoGuardado.rowIndex);
     }
     return resultadoGuardado;
+  }
+
+  if (operation === 'getSpreadsheetMetadata') {
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede crear o modificar matrices.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    return getSpreadsheetMetadata_(params.idOrUrl);
+  }
+
+  if (operation === 'getSheetHeaders') {
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede crear o modificar matrices.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    return getSheetHeaders_(params.id, params.sheetName, params.headerRowIndex);
+  }
+
+  if (operation === 'guardarMultiplesMatricesConfig') {
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede crear o modificar matrices.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    
+    try {
+      params.hojasSeleccionadas.forEach(function(hoja) {
+        var config = Object.assign({}, params.configBase);
+        config.nombrePestana = hoja;
+        // Guardar sin rowIndex significa que siempre agrega una nueva fila
+        guardarMatrizConfig(config, null);
+      });
+      // Limpiar el cache general de matrices para que el cliente reciba la info actualizada
+      CacheService.getScriptCache().remove('qmsConfigActiveMatrices');
+      return { status: 'success', message: 'Matrices guardadas exitosamente.' };
+    } catch (e) {
+      return { status: 'error', message: e.message };
+    }
   }
 
   if (operation === 'eliminarMatrizConfig') {

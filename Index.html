@@ -363,8 +363,7 @@
 
         <div class="field">
           <label>Usuario</label>
-          <input type="text" id="userName" list="usersList" autocomplete="off" placeholder="Empiece a escribir su nombre...">
-          <datalist id="usersList"></datalist>
+          <input type="text" id="userName" readonly style="background-color: #f5f5f5;" placeholder="Cargando usuario...">
         </div>
       </div>
 
@@ -487,10 +486,10 @@
 
       function isUserSelectionValid() {
         const userNameInput = document.getElementById('userName');
-        if (!userNameInput || !window.QMSContext.users) return false;
+        if (!userNameInput || !window.QMSContext.currentUser) return false;
         const val = userNameInput.value.trim();
-        if (!val) return false;
-        return window.QMSContext.users.some(u => u.nombreCompleto === val);
+        if (val === "") return false;
+        return window.QMSContext.currentUser.nombreCompleto === val;
       }
 
       function updateGoButtonState() {
@@ -841,28 +840,15 @@
             `;
           }).join('');
 
-          // Filtrar usuarios por el email logueado (activeEmail)
-          let activeEmail = data.activeEmail ? data.activeEmail.toLowerCase() : "";
-          let validUsers = data.users.filter(u => u.email && u.email.toLowerCase() === activeEmail);
-          // Si el usuario es ADMIN, tal vez queremos permitir todos? El requerimiento dice "solo debe leerse el email que esta logueado", así que lo restringimos para todos, a menos que se solicite lo contrario.
-          // Para evitar bloquear si por algún error activeEmail no llegó, si es vacío, no filtramos (fallback).
-          if (activeEmail !== "") {
-            window.QMSContext.users = validUsers;
-          } else {
-            window.QMSContext.users = data.users;
+          if (data && data.currentUser) {
+            window.QMSContext.currentUser = data.currentUser;
+            let input = document.getElementById('userName');
+            input.value = data.currentUser.nombreCompleto;
           }
 
           // Inicializar URL de la WebApp para peticiones Fetch
           if (data && data.webAppUrl) {
             window.QMSContext.webAppUrl = data.webAppUrl;
-          }
-          document.getElementById('usersList').innerHTML = window.QMSContext.users.map(u => `<option value="${u.nombreCompleto}">`).join('');
-          
-          if (window.QMSContext.users.length === 1) {
-            let input = document.getElementById('userName');
-            input.value = window.QMSContext.users[0].nombreCompleto;
-            input.readOnly = true; // Evitar que escriba otro
-            input.style.backgroundColor = "#e8eaed";
           }
           
           document.getElementById('userName').addEventListener('input', updateGoButtonState);
@@ -1275,11 +1261,10 @@
           return;
         }
 
-        // Buscar el UserID correspondiente al Nombre Completo seleccionado
-        const userObj = window.QMSContext.users.find(u => u.nombreCompleto === userName);
+        // Usar el usuario logueado en sesión
+        const userObj = window.QMSContext.currentUser;
         if (!userObj) {
-          showToast("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.", 'error');
-          document.getElementById('userName').focus();
+          showToast("Error: No hay un usuario logueado en sesión.", 'error');
           return;
         }
         const userId = userObj.userId;
@@ -1344,11 +1329,10 @@
           return;
         }
 
-        // Buscar el UserID correspondiente al Nombre Completo seleccionado
-        const userObj = window.QMSContext.users.find(u => u.nombreCompleto === userName);
+        // Usar el usuario logueado en sesión
+        const userObj = window.QMSContext.currentUser;
         if (!userObj) {
-          showToast("Error: El usuario \"" + userName + "\" no es válido. Debe seleccionar un nombre completo de la lista.", 'error');
-          document.getElementById('userName').focus();
+          showToast("Error: No hay un usuario logueado en sesión.", 'error');
           return;
         }
         const userId = userObj.userId;

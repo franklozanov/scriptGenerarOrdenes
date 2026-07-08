@@ -117,7 +117,6 @@
         }
         if (serverInitialData.users) {
           users = serverInitialData.users;
-          populateUsuariosList();
         }
         if (serverInitialData.currentUser) {
           currentUserId = serverInitialData.currentUser.userId;
@@ -136,7 +135,6 @@
             }
             if (data && data.users) {
               users = data.users;
-              populateUsuariosList();
             }
             if (data && data.currentUser) {
               currentUserId = data.currentUser.userId;
@@ -159,17 +157,6 @@
       document.getElementById('noPagDevueltas').addEventListener('input', validarPaginas);
     }
 
-    function populateUsuariosList() {
-      var datalist = document.getElementById('usuariosList');
-      if (!datalist) return;
-      datalist.innerHTML = '';
-      users.forEach(function(user) {
-        var option = document.createElement('option');
-        option.value = user.nombreCompleto;
-        option.setAttribute('data-userid', user.userId);
-        datalist.appendChild(option);
-      });
-    }
 
     function loadOrdenes() {
       google.script.run

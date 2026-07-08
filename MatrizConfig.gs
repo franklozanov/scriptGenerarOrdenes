@@ -498,3 +498,58 @@ function abrirModalPinMatrizConfig_(fila, columna, valorPropuesto, identidadEdit
       .setHeight(480);
   SpreadsheetApp.getUi().showModalDialog(html, 'Edición Protegida — Matrices K');
 }
+
+// -------------------------------------------------------
+// SECCIÓN 6: ASISTENTE DE CONFIGURACIÓN (WIZARD)
+// -------------------------------------------------------
+
+/**
+ * Obtiene el metadata de un Spreadsheet (Nombre y Hojas).
+ * @param {string} idOrUrl - ID o URL del Spreadsheet.
+ * @return {object} { id: string, name: string, sheets: string[] }
+ */
+function getSpreadsheetMetadata_(idOrUrl) {
+  var id = idOrUrl;
+  if (idOrUrl && idOrUrl.indexOf('/d/') !== -1) {
+    try {
+      id = idOrUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
+    } catch(e) {}
+  }
+  
+  try {
+    var ss = SpreadsheetApp.openById(id);
+    var sheets = ss.getSheets().map(function(s) { return s.getName(); });
+    return { status: 'success', data: { id: id, name: ss.getName(), sheets: sheets } };
+  } catch (e) {
+    return { status: 'error', message: 'No se pudo abrir el archivo. Verifique que el ID sea correcto y que tenga permisos de lectura. Detalle: ' + e.message };
+  }
+}
+
+/**
+ * Obtiene los encabezados de una hoja específica en la fila indicada.
+ * @param {string} id - ID del Spreadsheet.
+ * @param {string} sheetName - Nombre de la pestaña.
+ * @param {number} headerRowIndex - Número de fila (base 1).
+ * @return {object} { headers: string[] }
+ */
+function getSheetHeaders_(id, sheetName, headerRowIndex) {
+  try {
+    var ss = SpreadsheetApp.openById(id);
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      return { status: 'error', message: 'La pestaña "' + sheetName + '" no existe en el archivo.' };
+    }
+    
+    var lastCol = sheet.getLastColumn();
+    if (lastCol === 0) {
+      return { status: 'success', data: { headers: [] } };
+    }
+    
+    var rowValues = sheet.getRange(headerRowIndex, 1, 1, lastCol).getValues()[0];
+    var headers = rowValues.map(function(v) { return (v || '').toString().trim(); }).filter(function(v) { return v !== ''; });
+    
+    return { status: 'success', data: { headers: headers } };
+  } catch (e) {
+    return { status: 'error', message: 'Error al leer la hoja: ' + e.message };
+  }
+}
