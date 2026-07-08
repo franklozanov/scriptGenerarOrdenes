@@ -192,41 +192,14 @@ function applyNewProtectionScheme() {
   // Verificar y asegurar permisos de carpetas de Drive
   ensureFolderPermissions();
   
-  // Proteger hoja templates
-  var sheetTemplates = ss.getSheetByName('templates');
-  if (sheetTemplates) {
-    protectSheetFully(sheetTemplates, 'Proteccion_Templates');
-  }
+  // Proteger TODAS las hojas completamente
+  var sheets = ss.getSheets();
+  sheets.forEach(function(sheet) {
+    protectSheetFully(sheet, 'Proteccion_' + sheet.getName());
+  });
   
-  // Proteger hoja Usuarios
-  var sheetUsuarios = ss.getSheetByName('Usuarios');
-  if (sheetUsuarios) {
-    protectSheetFully(sheetUsuarios, 'Proteccion_Usuarios');
-  }
-  
-  // Proteger hoja RegistroNovedad
-  var sheetRegistroNovedad = ss.getSheetByName('RegistroNovedad');
-  if (sheetRegistroNovedad) {
-    protectSheetFully(sheetRegistroNovedad, 'Proteccion_RegistroNovedad');
-  }
-
-  // Proteger hoja PermisosRoles (crítica: define el control de acceso)
-  var sheetPermisosRoles = ss.getSheetByName('PermisosRoles');
-  if (sheetPermisosRoles) {
-    protectSheetFully(sheetPermisosRoles, 'Proteccion_PermisosRoles');
-  }
-
-  // Proteger hoja SolicitudesImpresion (las escrituras van por la Web App como propietario)
-  var sheetSolicitudes = ss.getSheetByName('SolicitudesImpresion');
-  if (sheetSolicitudes) {
-    protectSheetFully(sheetSolicitudes, 'Proteccion_SolicitudesImpresion');
-  }
-
-  // Configurar protección mixta para Ordenes
-  configureOrdenesProtection();
-  
-  // Configurar protección para Logs
-  configureLogsProtection();
+  // Guardar estado de modo mantenimiento (apagado)
+  PropertiesService.getDocumentProperties().setProperty('MAINTENANCE_MODE', 'false');
   
   // Aplicar Validación de Datos a las columnas STATUS
   applyStatusDataValidation();
@@ -256,80 +229,18 @@ function protectSheetFully(sheet, description) {
 }
 
 /**
- * Configura protección mixta para la hoja Ordenes.
- * Protege solo columnas específicas de administrador, dejando otras editables.
+ * Activa o desactiva el modo mantenimiento (desprotege/protege todas las hojas).
+ * @param {boolean} enabled - true para activar (desproteger), false para desactivar (proteger)
  */
-function configureOrdenesProtection() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetOrdenes = ss.getSheetByName('Ordenes');
-  if (!sheetOrdenes) return;
-  
-  // 1. Eliminar todas las protecciones de rango y de hoja completas existentes en la hoja "Ordenes"
-  var proteccionesActuales = sheetOrdenes.getProtections(SpreadsheetApp.ProtectionType.RANGE);
-  proteccionesActuales.forEach(function(p) { p.remove(); });
-  
-  var proteccionHoja = sheetOrdenes.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-  proteccionHoja.forEach(function(p) { p.remove(); });
-  Logger.log("✓ Protecciones previas eliminadas de la hoja Ordenes.");
-  
-  // 2. Columnas que SOLO el administrador/propietario o el sistema pueden editar.
-  // Se agregan STATUS y columnas de trazabilidad para evitar alteraciones manuales.
-  var colsToProtect = [
-    "VerifLote", "VerifCant. Disponible", "VerifExp",
-    "Fabricante", "Decision", "STATUS", "NoPags",
-    "Reimpresion", "TotalPags", "ConsecutivoImp",
-    "ImpresoPor", "Reimpreso", "ReimpresoPor", "HistorialImpresion"
-  ];
-  
-  var filaEncabezados = 1;
-  var headers = sheetOrdenes.getRange(filaEncabezados, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
-  
-  // 3. Aplicar protección solo a las columnas en colsToProtect
-  for (var i = 0; i < headers.length; i++) {
-    var header = headers[i] ? headers[i].toString().trim() : "";
-    if (colsToProtect.indexOf(header) !== -1 || colsToProtect.indexOf(header.replace('Por', '')) !== -1) {
-      var columna = i + 1;
-      // Protege toda la columna excepto el encabezado
-      var rangoAProteger = sheetOrdenes.getRange(filaEncabezados + 1, columna, sheetOrdenes.getMaxRows() - filaEncabezados);
-      
-      var proteccion = rangoAProteger.protect().setDescription("Protección Admin: " + header);
-      
-      // Eliminar editores para que solo el propietario/admin pueda editar
-      proteccion.removeEditors(proteccion.getEditors());
-      if (proteccion.canDomainEdit()) proteccion.setDomainEdit(false);
-      
-      // Agregar al propietario como editor para que el script pueda escribir
-      var ownerEmail = Session.getEffectiveUser().getEmail();
-      if (ownerEmail) {
-        proteccion.addEditor(ownerEmail);
-      }
-      
-      Logger.log("✓ Protección aplicada a columna: " + header);
-    }
-  }
-  
-  Logger.log("✓ Protección por columna configurada para Ordenes (se permiten ediciones en columnas no protegidas)");
-}
-
-/**
- * Configura protección completa para la hoja Logs.
- * Solo el script puede escribir en esta hoja.
- */
-function configureLogsProtection() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetLogs = ss.getSheetByName('Logs');
-  if (!sheetLogs) return;
-  
-  // Proteger hoja completa
-  var protection = sheetLogs.protect().setDescription('Proteccion_Logs');
-  protection.removeEditors(protection.getEditors());
-  if (protection.canDomainEdit()) protection.setDomainEdit(false);
-  
-  // Agregar permiso de escritura para el script (propietario)
-  var ownerEmail = Session.getEffectiveUser().getEmail();
-  if (ownerEmail) {
-    protection.addEditor(ownerEmail);
-    Logger.log("✓ Hoja Logs protegida con permisos de escritura para script");
+function toggleMaintenanceMode_(enabled) {
+  if (enabled) {
+    removeLegacyProtections();
+    PropertiesService.getDocumentProperties().setProperty('MAINTENANCE_MODE', 'true');
+    Logger.log("Modo mantenimiento activado. Hojas desprotegidas.");
+    return { status: 'success', message: 'Modo de mantenimiento ACTIVADO. Hojas desprotegidas.' };
+  } else {
+    applyNewProtectionScheme();
+    return { status: 'success', message: 'Modo de mantenimiento DESACTIVADO. Hojas protegidas.' };
   }
 }
 

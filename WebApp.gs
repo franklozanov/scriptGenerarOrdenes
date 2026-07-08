@@ -3,7 +3,7 @@
 // Descripción: Endpoints públicos (doGet, doPost)
 // Prioridad de Carga: 13° (último - depende de todo)
 // FASE 5 - Batch 5.3: Web App Endpoints (FINAL)
-/* global getSpreadsheetMetadata_, getSheetHeaders_, getSessionTimeoutMinutes */
+/* global getSpreadsheetMetadata_, getSheetHeaders_, getSessionTimeoutMinutes, toggleMaintenanceMode_ */
 // ============================================================
 
 // --- ENDPOINT GET: Visor de PDF ---
@@ -475,6 +475,16 @@ function handlePrivilegedOperation_(params) {
     return eliminarMatrizConfig(params.rowIndex);
   }
 
+  if (operation === 'toggleMaintenanceMode') {
+    if (!esUsuarioRolAdmin_(callingUserId)) {
+      return { status: 'error', message: 'Solo un administrador puede cambiar el modo de mantenimiento.', diagnostic: 'PERMISSION_DENIED' };
+    }
+    if (typeof toggleMaintenanceMode_ === 'function') {
+      return toggleMaintenanceMode_(params.enabled);
+    }
+    return { status: 'error', message: 'La función toggleMaintenanceMode_ no está disponible.' };
+  }
+
   if (operation === 'confirmarEdicionMatrizConfig') {
     if (!esUsuarioRolAdmin_(callingUserId)) {
       return { status: 'error', message: 'Solo un administrador puede autorizar esta edición.', diagnostic: 'PERMISSION_DENIED' };
@@ -605,6 +615,8 @@ function handlePrivilegedOperation_(params) {
 }
 
 // --- SEGURIDAD 21 CFR Part 11 ---
+
+
 
 // Prefijo que identifica una firma enviada como clave de administrador (bypass de PIN), en vez
 // de un PIN de 4 dígitos. Ver requireAuthorizedUserStrict_ y GlobalScripts.html:promptSecurityPin.

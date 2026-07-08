@@ -131,6 +131,7 @@ function getInitialData(includeBase64) {
         parsedData.currentUser = validUser;
         parsedData.activeEmail = activeEmail;
         parsedData.sessionTimeoutMinutos = getSessionTimeoutMinutes();
+        parsedData.maintenanceMode = PropertiesService.getDocumentProperties().getProperty('MAINTENANCE_MODE') === 'true';
         return parsedData;
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
@@ -307,7 +308,7 @@ function getInitialData(includeBase64) {
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
     
     // Los permisos y timeout se calcularon al inicio o fin de la función
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions, currentUser: validUser, activeEmail: activeEmail, sessionTimeoutMinutos: getSessionTimeoutMinutes() };
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, userPermissions: userPermissions, currentUser: validUser, activeEmail: activeEmail, sessionTimeoutMinutos: getSessionTimeoutMinutes(), maintenanceMode: PropertiesService.getDocumentProperties().getProperty('MAINTENANCE_MODE') === 'true' };
     
     const sortOrder = ["DOC_ORDENES", "DOC_ANALISIS", "TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_CONTROLES", "TPL_INSPECCION", "TPL_COC"];
     templates.sort(function(a, b) {
