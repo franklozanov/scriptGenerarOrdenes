@@ -651,3 +651,78 @@ function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
   if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
   return internalUpdateTraceability(orderNo, userId, pagesPrinted, printType);
 }
+
+/**
+ * Procesa el guardado en segundo plano llamado por el nuevo esquema asíncrono.
+ */
+function processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType) {
+  if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
+  
+  try {
+    // 1. Guardar PDF y obtener consecutivo
+    var saveResult = saveFinalUnifiedPDF(base64Data, orderNo);
+    
+    // 2. Trazabilidad
+    internalUpdateTraceability(orderNo, userId, totalPages, printType);
+    
+    // 3. Post guardado (Seguridad)
+    finalizeFinalPdfPostSave(orderNo, saveResult.fileId, saveResult.archivoReemplazado, userId);
+    
+    // Éxito: Escribir en HistorialImpresion (opcional, si se quiere llevar log de éxitos)
+    logHistorialImpresion_(orderNo, userId, "✅ PDF Guardado exitosamente. Consecutivo: " + saveResult.consecutivo);
+    
+    return true;
+  } catch (error) {
+    Logger.log("Error en processAndSavePdfBackgroundForUser: " + error.message);
+    logHistorialImpresion_(orderNo, userId, "❌ ERROR AL GUARDAR: " + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Escribe el log en la columna HistorialImpresion de la hoja Ordenes.
+ */
+function logHistorialImpresion_(orderNo, userId, message) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    if (!sheet) return;
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colHistorial = getColumnIndexByNameCaseInsensitive(headers, 'HistorialImpresion', false);
+    
+    // Si no existe la columna, crearla
+    if (!colHistorial) {
+      colHistorial = sheet.getLastColumn() + 1;
+      sheet.getRange(1, colHistorial).setValue('HistorialImpresion');
+    }
+    
+    // Buscar fila de la orden
+    var orderValues = sheet.getRange(1, colNoOrden, sheet.getLastRow(), 1).getValues();
+    var rowIndex = -1;
+    var normalizedOrderNo = orderNo != null ? orderNo.toString().trim().toLowerCase() : "";
+    
+    for (var idx = 1; idx < orderValues.length; idx++) {
+      var rowOrderNo = orderValues[idx][0] != null ? orderValues[idx][0].toString().trim().toLowerCase() : "";
+      if (rowOrderNo === normalizedOrderNo) {
+        rowIndex = idx + 1;
+        break;
+      }
+    }
+    
+    if (rowIndex !== -1) {
+      var now = new Date();
+      var formattedDate = Utilities.formatDate(now, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
+      var userIdentity = getUserIdentityStringByUserId_(userId);
+      var logEntry = "[" + formattedDate + "] - [" + userIdentity + "] - " + message;
+      
+      var currentValue = sheet.getRange(rowIndex, colHistorial).getValue();
+      var newValue = currentValue ? currentValue + "\n" + logEntry : logEntry;
+      
+      sheet.getRange(rowIndex, colHistorial).setValue(newValue);
+    }
+  } catch(e) {
+    Logger.log("Error escribiendo en HistorialImpresion: " + e.message);
+  }
+}
