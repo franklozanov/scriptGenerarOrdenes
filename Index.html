@@ -712,10 +712,14 @@
             const noAccess = t.hasAccess === false;
             const rowStyle = noAccess ? 'opacity: 0.5;' : '';
             const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
+            const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2;">${t.description}</div>` : '';
             return `
-              <div class="tpl-row" style="${rowStyle}">
-                <span class="tpl-name" title="${t.name}" style="${nameStyle}">${t.name}</span>
-                <div class="counter-control">
+              <div class="tpl-row" style="${rowStyle} display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px;">
+                  <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b;">${t.name}</span>
+                  ${descriptionHtml}
+                </div>
+                <div class="counter-control" style="flex-shrink: 0;">
                   <button type="button" class="counter-btn" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
                   <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
                   <button type="button" class="counter-btn" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
