@@ -481,7 +481,7 @@ function getUserPermissions(userRol) {
       return {};
     }
 
-    // Verificar caché primero (6 horas = 21600 segundos)
+    // Verificar caché primero (60 segundos)
     var cacheKey = 'Permisos_' + userRol;
     var cache = CacheService.getScriptCache();
     var cachedPermissions = cache.get(cacheKey);
@@ -513,12 +513,13 @@ function getUserPermissions(userRol) {
         for (var j = 1; j < headers.length; j++) {
           var permisoKey = headers[j] ? headers[j].toString().trim() : '';
           if (permisoKey) {
-            permissions[permisoKey] = data[i][j] === true;
+            var val = data[i][j];
+            permissions[permisoKey] = (val === true || String(val).toUpperCase() === 'TRUE' || String(val).toUpperCase() === 'VERDADERO');
           }
         }
         
-        // Guardar en caché
-        cache.put(cacheKey, JSON.stringify(permissions), 21600);
+        // Guardar en caché (60 segundos para reflejar cambios rápidamente)
+        cache.put(cacheKey, JSON.stringify(permissions), 60);
         Logger.log("getUserPermissions: Permisos obtenidos desde hoja y cacheados para rol: " + userRol);
         return permissions;
       }
