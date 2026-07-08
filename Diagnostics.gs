@@ -140,14 +140,16 @@ function ensureConsecutivoImpColumn_(sheet) {
     if (!colImpresoIdx) {
       // Si no existe ImpresoPor, agregar al final
       var lastCol = sheet.getLastColumn();
-      sheet.insertColumnAfter(lastCol);
-      sheet.getRange(1, lastCol + 1).setValue('ConsecutivoImp');
-      Logger.log('✓ Columna ConsecutivoImp creada al final (columna ' + (lastCol + 1) + ')');
+      var nextCol = Math.max(1, lastCol) + 1;
+      sheet.getRange(1, nextCol).setValue('ConsecutivoImp');
+      Logger.log('✓ Columna ConsecutivoImp creada al final (columna ' + nextCol + ')');
     } else {
-      // Insertar ANTES de ImpresoPor
-      sheet.insertColumnBefore(colImpresoIdx);
-      sheet.getRange(1, colImpresoIdx).setValue('ConsecutivoImp');
-      Logger.log('✓ Columna ConsecutivoImp creada antes de ImpresoPor (columna ' + colImpresoIdx + ')');
+      // En lugar de insertar y desplazar (lo cual mueve las columnas del usuario),
+      // simplemente agregamos al final para respetar el orden actual.
+      var lastCol = sheet.getLastColumn();
+      var nextCol = Math.max(1, lastCol) + 1;
+      sheet.getRange(1, nextCol).setValue('ConsecutivoImp');
+      Logger.log('✓ Columna ConsecutivoImp creada al final (columna ' + nextCol + ') para evitar desplazar encabezados');
     }
     
     // Inicializar todas las filas existentes con valor 0

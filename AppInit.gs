@@ -447,6 +447,18 @@ function aplicarValidacionesEstadoCarga(silent) {
     rangeEstado.setDataValidation(ruleEstadoCarga);
     Logger.log("✓ Validación aplicada a columna EstadoCarga");
     
+    // LIMPIEZA DE COLUMNAS MANUALES (Ej: SolicitadaPor)
+    // Para prevenir y corregir que columnas manuales tengan validaciones residuales
+    var colSolicitadaIdx = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
+    if (!colSolicitadaIdx) {
+      colSolicitadaIdx = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false);
+    }
+    if (colSolicitadaIdx) {
+      var rangeSolicitada = sheet.getRange(2, colSolicitadaIdx, lastRow - 1, 1);
+      rangeSolicitada.clearDataValidations();
+      Logger.log("✓ Validaciones residuales eliminadas de la columna manual SolicitadaPor");
+    }
+    
     // Mostrar mensaje al usuario solo si no es modo silencioso
     if (!silent) {
       try {
