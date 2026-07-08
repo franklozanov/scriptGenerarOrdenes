@@ -445,12 +445,18 @@ function handlePrivilegedOperation_(params) {
     }
     
     try {
-      params.hojasSeleccionadas.forEach(function(hoja) {
-        var config = Object.assign({}, params.configBase);
-        config.nombrePestana = hoja;
-        // Guardar sin rowIndex significa que siempre agrega una nueva fila
-        guardarMatrizConfig(config, null);
-      });
+      if (params.configList) {
+        params.configList.forEach(function(cfgItem) {
+          guardarMatrizConfig(cfgItem.config, cfgItem.rowIndex || null);
+        });
+      } else if (params.hojasSeleccionadas) {
+        params.hojasSeleccionadas.forEach(function(hoja) {
+          var config = Object.assign({}, params.configBase);
+          config.nombrePestana = hoja;
+          // Guardar sin rowIndex significa que siempre agrega una nueva fila
+          guardarMatrizConfig(config, null);
+        });
+      }
       // Limpiar el cache general de matrices para que el cliente reciba la info actualizada
       CacheService.getScriptCache().remove('qmsConfigActiveMatrices');
       return { status: 'success', message: 'Matrices guardadas exitosamente.' };

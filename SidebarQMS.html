@@ -85,6 +85,45 @@
     <div id="loading-text">Cargando Panel...</div>
   </div>
 
+  <!-- MODAL FLOTANTE ASISTENTE DE MATRICES -->
+  <div id="mtz_wizard_modal" class="hidden" style="position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.85); backdrop-filter: blur(4px); z-index: 2000; overflow-y: auto; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 20px;">
+    <div style="background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid #cbd5e1; width: 92%; max-width: 600px; padding: 20px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin:0; color:#1e293b; font-size:16px;">Asistente de Matrices</h3>
+        <button onclick="mtz_wiz_cerrar()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748b;">✖</button>
+      </div>
+      
+      <!-- Paso 1 -->
+      <div id="mtz_wiz_paso1">
+        <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">Archivo de Origen</label>
+        <input type="text" id="mtz_wiz_url" class="form-input" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" placeholder="ID o URL de Google Sheets">
+        <div style="display:flex; gap:8px;">
+          <button class="btn-primary-small" style="flex:1; padding:8px;" onclick="mtz_wiz_buscarArchivo()">Buscar y Conectar</button>
+        </div>
+        <div id="mtz_wiz_error1" style="color:red; font-size:11px; margin-top:4px;"></div>
+      </div>
+
+      <!-- Paso 2: Configuración de Hojas -->
+      <div id="mtz_wiz_paso2" class="hidden" style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="background: #f8fafc; padding: 8px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 11px;">
+          <span style="color:#166534; font-weight:bold;">✅ Conectado:</span> <span id="mtz_wiz_filename"></span>
+        </div>
+        
+        <!-- Tabla de líneas de configuración -->
+        <div id="mtz_wiz_table_container" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Las filas (cards) se insertarán aquí dinámicamente -->
+        </div>
+        
+        <button class="btn-secondary-small" onclick="mtz_wiz_addLine(null, false)" style="width:100%; padding:8px; background:#f1f5f9; color:#334155; border:1px dashed #cbd5e1;">+ Añadir Pestaña a Configurar</button>
+        
+        <div style="display:flex; gap:8px; margin-top: 10px;">
+          <button class="btn-primary-small" style="flex:2; padding:10px; font-size:13px;" onclick="mtz_wiz_guardarTodo()">Guardar Configuraciones</button>
+        </div>
+        <div id="mtz_wiz_error2" style="color:red; font-size:11px; margin-top:4px; text-align:center;"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="view-container show-main" id="viewContainer">
     
     <!-- MAIN VIEW: Tabs y Menús -->
@@ -154,74 +193,7 @@
 
               <div id="matrices-lista" style="margin-top:12px; font-size:12px;"></div>
 
-              <!-- ASISTENTE (WIZARD) NUEVA MATRIZ -->
-              <div id="form-nueva-matriz" style="display:none; margin-top:10px; background:#f1f5f9; padding:10px; border-radius:6px; border:1px solid #cbd5e1;">
-                <input type="hidden" id="mtz_rowIndex" value="">
 
-                <!-- PASO 1: Archivo -->
-                <div id="mtz_paso1">
-                  <label style="font-size:12px; font-weight:600;">Paso 1: Archivo</label>
-                  <input type="text" id="mtz_idArchivo" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="ID o URL de Google Sheets">
-                  <div style="display:flex; gap:8px;">
-                    <button class="btn-primary-small" style="flex:1;" onclick="mtz_validarArchivo()">Buscar y Validar</button>
-                    <button class="btn-secondary-small" style="flex:1;" onclick="mtz_cancelar()">Cancelar</button>
-                  </div>
-                  <div id="mtz_error_paso1" style="color:red; font-size:11px; margin-top:4px;"></div>
-                </div>
-
-                <!-- PASO 2: Confirmación y Hojas -->
-                <div id="mtz_paso2" style="display:none;">
-                  <label style="font-size:12px; font-weight:600;">Paso 2: Hojas y Fila</label>
-                  <div id="mtz_archivoConfirmacion" style="font-size:11px; color:#166534; font-weight:600; margin-bottom:8px;"></div>
-                  
-                  <label style="font-size:12px; font-weight:600;">Seleccionar Hojas:</label>
-                  <div id="mtz_listaHojas" style="max-height:80px; overflow-y:auto; border:1px solid #ccc; background:#fff; padding:4px; margin-bottom:8px; border-radius:4px;"></div>
-
-                  <label style="font-size:12px; font-weight:600;">Fila de Encabezados:</label>
-                  <input type="number" id="mtz_filaEncabezados" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="1" min="1" value="1">
-                  
-                  <div style="display:flex; gap:8px;">
-                    <button class="btn-primary-small" style="flex:1;" onclick="mtz_cargarEncabezados()">Cargar Encabezados</button>
-                    <button class="btn-secondary-small" style="flex:1;" onclick="mtz_volverPaso1()">Atrás</button>
-                  </div>
-                  <div id="mtz_error_paso2" style="color:red; font-size:11px; margin-top:4px;"></div>
-                </div>
-
-                <!-- PASO 3: Mapeo de Columnas -->
-                <div id="mtz_paso3" style="display:none;">
-                  <label style="font-size:12px; font-weight:600;">Paso 3: Mapeo</label>
-                  
-                  <label style="font-size:12px; font-weight:600; display:block; margin-top:8px;">Nombre Base Matriz:</label>
-                  <input type="text" id="mtz_nombreMatriz" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;" placeholder="Ej. Matriz K">
-
-                  <label style="font-size:12px; font-weight:600;">Llave (No. Análisis):</label>
-                  <select id="mtz_columnaLlave" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;"></select>
-
-                  <label style="font-size:12px; font-weight:600;">Lote:</label>
-                  <select id="mtz_columnaLote" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;"></select>
-
-                  <label style="font-size:12px; font-weight:600;">Cantidad Pendiente:</label>
-                  <select id="mtz_columnaCantidad" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;"></select>
-
-                  <label style="font-size:12px; font-weight:600;">Vencimiento (EXP):</label>
-                  <select id="mtz_columnaVencimiento" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;"></select>
-
-                  <label style="font-size:12px; font-weight:600;">Fabricante (opcional):</label>
-                  <select id="mtz_columnaFabricante" class="form-input" style="width:100%; margin-bottom:8px; padding:4px;">
-                    <option value="">-- No aplica --</option>
-                  </select>
-
-                  <label style="font-size:12px; font-weight:600;">Prioridad:</label>
-                  <input type="number" id="mtz_prioridad" class="form-input" style="width:100%; margin-bottom:12px; padding:4px;" placeholder="1" min="1" value="1">
-
-                  <div style="display:flex; gap:8px;">
-                    <button class="btn-primary-small" style="flex:1;" id="mtz_btnGuardar" onclick="mtz_guardar()">Guardar</button>
-                    <button class="btn-secondary-small" style="flex:1;" id="mtz_btnAtrasPaso3" onclick="mtz_volverPaso2()">Atrás</button>
-                  </div>
-                  <div id="mtz_error_paso3" style="color:red; font-size:11px; margin-top:4px;"></div>
-                </div>
-
-              </div>
             </div>
 
             <!-- Gestión de Plantillas -->
@@ -1094,70 +1066,52 @@
       cont.innerHTML = html;
     }
 
-    function mtz_limpiarForm() {
-      document.getElementById('mtz_rowIndex').value = '';
-      document.getElementById('mtz_idArchivo').value = '';
-      document.getElementById('mtz_filaEncabezados').value = '1';
-      document.getElementById('mtz_nombreMatriz').value = '';
-      document.getElementById('mtz_prioridad').value = '1';
-      document.getElementById('mtz_error_paso1').innerText = '';
-      document.getElementById('mtz_error_paso2').innerText = '';
-      document.getElementById('mtz_error_paso3').innerText = '';
-      
-      const selects = ['mtz_columnaLlave', 'mtz_columnaLote', 'mtz_columnaCantidad', 'mtz_columnaVencimiento', 'mtz_columnaFabricante'];
-      selects.forEach(id => { document.getElementById(id).innerHTML = ''; });
-    }
+    let mtz_wiz_rowCount = 0;
+    let mtz_wiz_idArchivo = '';
+    let mtz_wiz_hojas = [];
+    let mtz_wiz_editData = null;
 
     function mtz_abrirForm() {
-      mtz_limpiarForm();
-      mtz_esModoEdicion = false;
-      document.getElementById('form-nueva-matriz').style.display = 'block';
-      document.getElementById('mtz_paso1').style.display = 'block';
-      document.getElementById('mtz_paso2').style.display = 'none';
-      document.getElementById('mtz_paso3').style.display = 'none';
+      mtz_wiz_rowCount = 0;
+      mtz_wiz_idArchivo = '';
+      mtz_wiz_hojas = [];
+      mtz_wiz_editData = null;
+      document.getElementById('mtz_wiz_url').value = '';
+      document.getElementById('mtz_wiz_error1').innerText = '';
+      document.getElementById('mtz_wiz_error2').innerText = '';
+      document.getElementById('mtz_wiz_table_container').innerHTML = '';
+      document.getElementById('mtz_wiz_paso1').classList.remove('hidden');
+      document.getElementById('mtz_wiz_paso2').classList.add('hidden');
+      document.getElementById('mtz_wizard_modal').classList.remove('hidden');
     }
 
-    function mtz_cancelar() {
-      document.getElementById('form-nueva-matriz').style.display = 'none';
+    function mtz_wiz_cerrar() {
+      document.getElementById('mtz_wizard_modal').classList.add('hidden');
     }
 
-    function mtz_volverPaso1() {
-      document.getElementById('mtz_paso2').style.display = 'none';
-      document.getElementById('mtz_paso1').style.display = 'block';
-    }
-
-    function mtz_volverPaso2() {
-      if (mtz_esModoEdicion) {
-        mtz_cancelar();
-        return;
-      }
-      document.getElementById('mtz_paso3').style.display = 'none';
-      document.getElementById('mtz_paso2').style.display = 'block';
-    }
-
-    async function mtz_validarArchivo() {
-      const idOrUrl = document.getElementById('mtz_idArchivo').value.trim();
-      const errEl = document.getElementById('mtz_error_paso1');
+    async function mtz_wiz_buscarArchivo() {
+      const idOrUrl = document.getElementById('mtz_wiz_url').value.trim();
+      const errEl = document.getElementById('mtz_wiz_error1');
       errEl.innerText = '';
       if (!idOrUrl) { errEl.innerText = 'Ingrese un ID o URL.'; return; }
 
-      showLoading('Validando acceso...');
+      showLoading('Buscando archivo...');
       try {
         const res = await postWebApp({ operation: 'getSpreadsheetMetadata', idOrUrl: idOrUrl, userId: sysData.currentUser.userId });
         hideLoading();
         if (res.status === 'success') {
-          mtz_idArchivoValidado = res.data.id;
-          mtz_hojasDetectadas = res.data.sheets;
-          document.getElementById('mtz_archivoConfirmacion').innerText = '✅ ' + res.data.name;
+          mtz_wiz_idArchivo = res.data.id;
+          mtz_wiz_hojas = res.data.sheets;
+          document.getElementById('mtz_wiz_filename').innerText = res.data.name;
           
-          let htmlHojas = '';
-          mtz_hojasDetectadas.forEach((hoja, idx) => {
-            htmlHojas += `<div style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="chk_hoja_${idx}" value="${hoja}" checked> <label for="chk_hoja_${idx}" style="font-size:12px; margin:0;">${hoja}</label></div>`;
-          });
-          document.getElementById('mtz_listaHojas').innerHTML = htmlHojas;
-
-          document.getElementById('mtz_paso1').style.display = 'none';
-          document.getElementById('mtz_paso2').style.display = 'block';
+          document.getElementById('mtz_wiz_paso1').classList.add('hidden');
+          document.getElementById('mtz_wiz_paso2').classList.remove('hidden');
+          
+          if (!mtz_wiz_editData) {
+            mtz_wiz_addLine(null, true);
+          } else {
+            mtz_wiz_addLine(mtz_wiz_editData, true);
+          }
         } else {
           errEl.innerText = res.message;
         }
@@ -1167,175 +1121,205 @@
       }
     }
 
-    async function mtz_cargarEncabezados() {
-      const errEl = document.getElementById('mtz_error_paso2');
-      errEl.innerText = '';
-      
-      let seleccionadas = [];
-      mtz_hojasDetectadas.forEach((hoja, idx) => {
-        if (document.getElementById(`chk_hoja_${idx}`) && document.getElementById(`chk_hoja_${idx}`).checked) {
-          seleccionadas.push(hoja);
-        }
+    function mtz_wiz_addLine(preset, forceDefault) {
+      mtz_wiz_rowCount++;
+      const rId = 'mtz_wiz_row_' + mtz_wiz_rowCount;
+      let opts = '<option value="">-- Seleccionar --</option>';
+      mtz_wiz_hojas.forEach(h => {
+        opts += `<option value="${h}" ${(preset && preset.nombrePestana===h) ? 'selected' : ''}>${h}</option>`;
       });
-      if (seleccionadas.length === 0) { errEl.innerText = 'Seleccione al menos una hoja.'; return; }
 
-      const filaEncabezados = parseInt(document.getElementById('mtz_filaEncabezados').value, 10);
-      if (!filaEncabezados || filaEncabezados < 1) { errEl.innerText = 'Fila inválida.'; return; }
+      const html = `
+        <div id="${rId}" class="mtz-wiz-row" style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 10px; position: relative;">
+          <button onclick="document.getElementById('${rId}').remove()" style="position: absolute; top: 4px; right: 4px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 14px;">✖</button>
+          
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <div style="flex:1;">
+              <label style="font-size:11px; font-weight:600;">Nombre Matriz (Base)</label>
+              <input type="text" class="wiz-nombre" style="width:100%; padding:4px; font-size:11px;" placeholder="Ej. Matriz 2024" value="${preset ? preset.nombreMatriz : ''}">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:11px; font-weight:600;">Prioridad</label>
+              <input type="number" class="wiz-prioridad" style="width:100%; padding:4px; font-size:11px;" value="${preset ? preset.prioridad : '1'}">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <div style="flex:2;">
+              <label style="font-size:11px; font-weight:600;">Pestaña (Hoja)</label>
+              <select class="wiz-pestana" style="width:100%; padding:4px; font-size:11px;">${opts}</select>
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:11px; font-weight:600;">Fila Encabez.</label>
+              <input type="number" class="wiz-fila" style="width:100%; padding:4px; font-size:11px;" value="${preset ? preset.filaEncabezados : '1'}" min="1">
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button class="btn-secondary-small" style="padding:4px 8px; font-size:11px;" onclick="mtz_wiz_loadHeaders('${rId}')">↻ Cargar Cols</button>
+            </div>
+          </div>
+
+          <div class="wiz-cols" style="${preset ? '' : 'display:none;'} background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+              <div>
+                <label style="font-size:10px; font-weight:bold;">Llave</label>
+                <select class="wiz-col-llave" style="width:100%; font-size:10px; padding:2px;" data-preset="${preset?preset.columnaLlave:''}"></select>
+              </div>
+              <div>
+                <label style="font-size:10px; font-weight:bold;">Lote</label>
+                <select class="wiz-col-lote" style="width:100%; font-size:10px; padding:2px;" data-preset="${preset?preset.columnaLote:''}"></select>
+              </div>
+              <div>
+                <label style="font-size:10px; font-weight:bold;">Cantidad</label>
+                <select class="wiz-col-cant" style="width:100%; font-size:10px; padding:2px;" data-preset="${preset?preset.columnaCantidad:''}"></select>
+              </div>
+              <div>
+                <label style="font-size:10px; font-weight:bold;">Vencimiento</label>
+                <select class="wiz-col-venc" style="width:100%; font-size:10px; padding:2px;" data-preset="${preset?preset.columnaVencimiento:''}"></select>
+              </div>
+              <div style="grid-column: span 2;">
+                <label style="font-size:10px; font-weight:bold;">Fabricante</label>
+                <select class="wiz-col-fab" style="width:100%; font-size:10px; padding:2px;" data-preset="${preset?preset.columnaFabricante:''}"></select>
+              </div>
+            </div>
+            ${preset ? '<input type="hidden" class="wiz-rowindex" value="'+preset.rowIndex+'">' : ''}
+          </div>
+        </div>
+      `;
+      document.getElementById('mtz_wiz_table_container').insertAdjacentHTML('beforeend', html);
+      if (preset) {
+        mtz_wiz_loadHeaders(rId);
+      }
+    }
+
+    async function mtz_wiz_loadHeaders(rId) {
+      const rowEl = document.getElementById(rId);
+      if (!rowEl) return;
+      const pestana = rowEl.querySelector('.wiz-pestana').value;
+      const fila = parseInt(rowEl.querySelector('.wiz-fila').value, 10);
+      
+      if (!pestana || !fila) return;
 
       showLoading('Cargando columnas...');
       try {
-        const res = await postWebApp({ operation: 'getSheetHeaders', id: mtz_idArchivoValidado, sheetName: seleccionadas[0], headerRowIndex: filaEncabezados, userId: sysData.currentUser.userId });
+        const res = await postWebApp({ operation: 'getSheetHeaders', id: mtz_wiz_idArchivo, sheetName: pestana, headerRowIndex: fila, userId: sysData.currentUser.userId });
         hideLoading();
         if (res.status === 'success') {
-          mtz_encabezadosActuales = res.data.headers;
-          if (mtz_encabezadosActuales.length === 0) {
-            errEl.innerText = 'La fila seleccionada no tiene columnas válidas.'; return;
+          const headers = res.data.headers;
+          if (headers.length === 0) {
+             showToast('La fila no tiene columnas.', 'error');
+             return;
           }
-          mtz_llenarDropdowns(mtz_encabezadosActuales);
-          document.getElementById('mtz_paso2').style.display = 'none';
-          document.getElementById('mtz_paso3').style.display = 'block';
-        } else {
-          errEl.innerText = res.message;
-        }
-      } catch(e) {
-        hideLoading();
-        errEl.innerText = 'Error de red: ' + e.message;
-      }
-    }
-
-    function mtz_llenarDropdowns(headers, preSelects = {}) {
-      const selects = {
-        'mtz_columnaLlave': preSelects.llave || '',
-        'mtz_columnaLote': preSelects.lote || '',
-        'mtz_columnaCantidad': preSelects.cantidad || '',
-        'mtz_columnaVencimiento': preSelects.vencimiento || '',
-        'mtz_columnaFabricante': preSelects.fabricante || ''
-      };
-      
-      for (const [id, preVal] of Object.entries(selects)) {
-        const el = document.getElementById(id);
-        let optionsHtml = '';
-        if (id === 'mtz_columnaFabricante') optionsHtml += '<option value="">-- No aplica --</option>';
-        else optionsHtml += '<option value="">-- Seleccionar --</option>';
-        
-        headers.forEach(h => {
-          optionsHtml += `<option value="${h}" ${h === preVal ? 'selected' : ''}>${h}</option>`;
-        });
-        el.innerHTML = optionsHtml;
-      }
-    }
-
-    async function mtz_editar(rowIndex) {
-      const m = mtz_cache.find(x => x.rowIndex === rowIndex);
-      if (!m) return;
-      mtz_limpiarForm();
-      mtz_esModoEdicion = true;
-      document.getElementById('mtz_rowIndex').value = m.rowIndex;
-      document.getElementById('mtz_idArchivo').value = m.idArchivo || '';
-      mtz_idArchivoValidado = m.idArchivo || '';
-      document.getElementById('mtz_filaEncabezados').value = m.filaEncabezados || '1';
-      document.getElementById('mtz_nombreMatriz').value = m.nombreMatriz || '';
-      document.getElementById('mtz_prioridad').value = m.prioridad || '1';
-      
-      document.getElementById('form-nueva-matriz').style.display = 'block';
-      document.getElementById('mtz_paso1').style.display = 'none';
-      document.getElementById('mtz_paso2').style.display = 'none';
-      document.getElementById('mtz_paso3').style.display = 'block';
-
-      // Cargar encabezados actuales automáticamente para rellenar dropdowns
-      showLoading('Cargando configuración actual...');
-      try {
-        const res = await postWebApp({ operation: 'getSheetHeaders', id: m.idArchivo, sheetName: m.nombrePestana, headerRowIndex: m.filaEncabezados || 1, userId: sysData.currentUser.userId });
-        hideLoading();
-        if (res.status === 'success') {
-          mtz_llenarDropdowns(res.data.headers, {
-            llave: m.columnaLlave,
-            lote: m.columnaLote,
-            cantidad: m.columnaCantidad,
-            vencimiento: m.columnaVencimiento,
-            fabricante: m.columnaFabricante
+          
+          const colDiv = rowEl.querySelector('.wiz-cols');
+          colDiv.style.display = 'block';
+          
+          const selects = ['llave', 'lote', 'cant', 'venc', 'fab'];
+          selects.forEach(s => {
+            const el = colDiv.querySelector('.wiz-col-' + s);
+            const preset = el.getAttribute('data-preset') || '';
+            let opts = (s === 'fab') ? '<option value="">-- No aplica --</option>' : '<option value="">-- Seleccionar --</option>';
+            headers.forEach(h => {
+              opts += '<option value="'+h+'" '+(h === preset ? 'selected' : '')+'>'+h+'</option>';
+            });
+            el.innerHTML = opts;
+            el.setAttribute('data-preset', '');
           });
+
         } else {
-          document.getElementById('mtz_error_paso3').innerText = 'No se pudieron cargar las columnas del archivo: ' + res.message;
+           showToast(res.message, 'error');
         }
       } catch(e) {
         hideLoading();
-        document.getElementById('mtz_error_paso3').innerText = 'Error de red: ' + e.message;
+        showToast('Error: ' + e.message, 'error');
       }
     }
 
-    async function mtz_guardar() {
-      const errEl = document.getElementById('mtz_error_paso3');
+    async function mtz_wiz_guardarTodo() {
+      const rows = document.querySelectorAll('.mtz-wiz-row');
+      const errEl = document.getElementById('mtz_wiz_error2');
       errEl.innerText = '';
       
-      const rowIndex = document.getElementById('mtz_rowIndex').value ? parseInt(document.getElementById('mtz_rowIndex').value, 10) : null;
-      
-      const baseConfig = {
-        nombreMatriz:       document.getElementById('mtz_nombreMatriz').value.trim(),
-        idArchivo:          mtz_idArchivoValidado,
-        filaEncabezados:    document.getElementById('mtz_filaEncabezados').value.trim(),
-        columnaLlave:       document.getElementById('mtz_columnaLlave').value,
-        columnaLote:        document.getElementById('mtz_columnaLote').value,
-        columnaCantidad:    document.getElementById('mtz_columnaCantidad').value,
-        columnaVencimiento: document.getElementById('mtz_columnaVencimiento').value,
-        columnaFabricante:  document.getElementById('mtz_columnaFabricante').value,
-        prioridad:          document.getElementById('mtz_prioridad').value.trim()
-      };
+      if (rows.length === 0) { errEl.innerText = 'No hay configuraciones para guardar.'; return; }
 
-      if (!baseConfig.nombreMatriz || !baseConfig.idArchivo || !baseConfig.columnaLlave || !baseConfig.columnaLote || !baseConfig.columnaCantidad) {
-        errEl.innerText = 'Nombre Matriz, Llave, Lote y Cantidad son obligatorios.';
+      let configList = [];
+      let hasError = false;
+
+      rows.forEach(r => {
+        const c_nombre = r.querySelector('.wiz-nombre').value.trim();
+        const c_prioridad = r.querySelector('.wiz-prioridad').value.trim() || '1';
+        const c_pestana = r.querySelector('.wiz-pestana').value;
+        const c_fila = r.querySelector('.wiz-fila').value;
+        const c_llave = r.querySelector('.wiz-col-llave').value;
+        const c_lote = r.querySelector('.wiz-col-lote').value;
+        const c_cant = r.querySelector('.wiz-col-cant').value;
+        const c_venc = r.querySelector('.wiz-col-venc').value;
+        const c_fab = r.querySelector('.wiz-col-fab').value;
+        
+        let rowIndexInput = r.querySelector('.wiz-rowindex');
+        let c_rowIndex = rowIndexInput ? parseInt(rowIndexInput.value, 10) : null;
+
+        if (!c_nombre || !c_pestana || !c_fila || !c_llave || !c_lote || !c_cant) {
+          hasError = true;
+        }
+
+        configList.push({
+           rowIndex: c_rowIndex,
+           config: {
+             nombreMatriz: c_nombre,
+             idArchivo: mtz_wiz_idArchivo,
+             filaEncabezados: c_fila,
+             nombrePestana: c_pestana,
+             columnaLlave: c_llave,
+             columnaLote: c_lote,
+             columnaCantidad: c_cant,
+             columnaVencimiento: c_venc,
+             columnaFabricante: c_fab,
+             prioridad: c_prioridad
+           }
+        });
+      });
+
+      if (hasError) {
+        errEl.innerText = 'Nombre, Pestaña, Fila, Llave, Lote y Cantidad son obligatorios.';
         return;
       }
 
       let pinFirma;
       try {
         pinFirma = await promptSecurityPin('Ingrese su PIN de administrador para guardar:', { allowAdminOverride: true });
-      } catch (e) {
-        return; 
-      }
+      } catch (e) { return; }
 
-      showLoading('Guardando matriz...');
+      showLoading('Guardando matrices...');
       try {
-        let res;
-        if (mtz_esModoEdicion) {
-          const m = mtz_cache.find(x => x.rowIndex === rowIndex);
-          baseConfig.nombrePestana = m.nombrePestana;
-          res = await postWebApp({
-            operation: 'guardarMatrizConfig',
-            config: baseConfig,
-            rowIndex: rowIndex,
-            userId: sysData.currentUser.userId,
-            pinFirma: pinFirma
-          });
-        } else {
-          // Creación múltiple
-          let seleccionadas = [];
-          mtz_hojasDetectadas.forEach((hoja, idx) => {
-            if (document.getElementById(`chk_hoja_${idx}`) && document.getElementById(`chk_hoja_${idx}`).checked) {
-              seleccionadas.push(hoja);
-            }
-          });
-          res = await postWebApp({
-            operation: 'guardarMultiplesMatricesConfig',
-            configBase: baseConfig,
-            hojasSeleccionadas: seleccionadas,
-            userId: sysData.currentUser.userId,
-            pinFirma: pinFirma
-          });
-        }
+        const res = await postWebApp({
+          operation: 'guardarMultiplesMatricesConfig',
+          configList: configList,
+          userId: sysData.currentUser.userId,
+          pinFirma: pinFirma
+        });
 
         hideLoading();
         if (res.status === 'success') {
           showToast('Guardado exitosamente.', 'success');
-          document.getElementById('form-nueva-matriz').style.display = 'none';
+          mtz_wiz_cerrar();
           mtz_cargarLista();
         } else {
           errEl.innerText = 'Error: ' + res.message;
         }
-      } catch (err) {
+      } catch(e) {
         hideLoading();
-        errEl.innerText = 'Error de comunicación: ' + err.message;
+        errEl.innerText = 'Error de red: ' + e.message;
       }
+    }
+
+    async function mtz_editar(rowIndex) {
+      const m = mtz_cache.find(x => x.rowIndex === rowIndex);
+      if (!m) return;
+      
+      mtz_abrirForm();
+      mtz_wiz_editData = m;
+      document.getElementById('mtz_wiz_url').value = m.idArchivo || '';
+      await mtz_wiz_buscarArchivo();
     }
 
     async function mtz_eliminar(rowIndex) {

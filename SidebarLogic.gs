@@ -62,7 +62,7 @@ function abrirPanelQMS() {
   var html = template.evaluate()
       .setWidth(380)
       .setHeight(520);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Autorización Requerida');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Ingreso Seguro QMS');
 }
 
 /**
