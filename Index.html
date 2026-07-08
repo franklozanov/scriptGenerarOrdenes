@@ -445,7 +445,12 @@
 
       function renderPreloadResult(response) {
         if (response.ready) {
-          setPreloadBanner('success', '✅ Orden cargada con éxito.<br>✅ Documentos listos para impresión.');
+          const staticReady = areSelectedStaticTemplatesReady();
+          if (staticReady) {
+            setPreloadBanner('success', '✅ Orden cargada con éxito.<br>✅ Documentos listos para impresión.');
+          } else {
+            setPreloadBanner('info', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>⏳ Descargando plantillas estáticas de Drive...');
+          }
           updateGoButtonState();
           return;
         }
@@ -469,18 +474,14 @@
           const input = document.getElementById('val_' + t.key);
           const copies = input ? parseInt(input.value) || 0 : 0;
           if (copies > 0) {
-            const isReady = !!preloadedStaticPdfs[t.key];
-            if (!isReady) {
-              console.log(`⏳ Esperando plantilla estática: ${t.key} (copies: ${copies})`);
-            }
-            return isReady;
+            return !!preloadedStaticPdfs[t.key];
           }
-          return true; 
+          return true;
         });
       }
 
       function isUserSelectionValid() {
-        if (window.currentUserIdentity) return true; // Autenticado
+        if (window.currentUserIdentity) return true; 
         
         const userNameInput = document.getElementById('userName');
         if (!userNameInput || !window.globalUsers) return false;
@@ -498,14 +499,21 @@
         const isOrderReady = isPreloadReadyForOrder(orderInput.value.trim());
         const isUserValid = isUserSelectionValid();
         const hasCopies = hasAnyCopiesSelected();
+        const staticReady = areSelectedStaticTemplatesReady();
         
-        // Removemos staticReady del bloqueo: confiamos en la precarga en segundo plano
-        // o en la descarga on-demand de processPdfGeneration si el usuario da click rápido.
-        const isEnabled = isOrderReady && isUserValid && hasCopies;
+        const isEnabled = isOrderReady && isUserValid && hasCopies && staticReady;
         btn.disabled = !isEnabled;
 
-        // Limpiar el botón a su texto original siempre
         btn.innerText = "Generar PDF Combinado";
+
+        if (staticPreloadErrors.length > 0) {
+          status.innerHTML = "⚠️ <span style='color: #ef4444;'>Error cargando plantillas de Drive</span>";
+          status.className = "";
+          const errorList = staticPreloadErrors.map(e => `Fallo en: ${e}`).join('<br>');
+          setPreloadBanner('error', `⚠️ <b>Error Crítico:</b><br>${errorList}<br>Verifique si los archivos existen y tienen permisos en Drive.`);
+          btn.disabled = true;
+          return;
+        }
 
         if (isOrderReady && !isEnabled && !status.innerText.includes("Impresión registrada")) {
           if (!isUserValid) {
@@ -516,9 +524,13 @@
             status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
             status.className = "error-text";
             setPreloadBanner('info', 'Seleccione al menos 1 copia de alguna plantilla.');
+          } else if (!staticReady) {
+            status.innerHTML = "⏳ <span style='color: #64748b;'>Cargando plantillas estáticas...</span>";
+            status.className = "";
+            btn.innerHTML = "<div class='spinner' style='width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 8px;'></div> Preparando...";
+            setPreloadBanner('info', '⏳ Descargando plantillas de Google Drive en segundo plano...');
           }
         } else if (isOrderReady && isEnabled && !status.innerText.includes("Impresión registrada")) {
-          // TODO CORRECTO Y CARGADO
           status.innerText = "✅ Documentos listos para impresión";
           status.className = "success-text";
           setPreloadBanner('success', '✅ Orden cargada con éxito.<br>✅ Documentos listos para impresión.');
@@ -528,41 +540,44 @@
         }
       }
       
-      // Función para precargar plantillas estáticas en segundo plano una a una
       function startBackgroundStaticPreload() {
         const staticTemplates = globalTemplates.filter(t => t.type !== 'Dynamic' && t.hasAccess && t.fileId);
+        if (staticTemplates.length === 0) return;
         
-        let i = 0;
-        function loadNext() {
-          if (i >= staticTemplates.length) {
-            updateGoButtonState();
+        isStaticPreloading = true;
+        console.log(`🚀 Iniciando precarga en paralelo de ${staticTemplates.length} plantillas estáticas...`);
+        
+        let pendingCount = staticTemplates.length;
+        staticPreloadErrors = [];
+
+        staticTemplates.forEach(t => {
+          if (preloadedStaticPdfs[t.key]) {
+            pendingCount--;
+            if (pendingCount === 0) { isStaticPreloading = false; updateGoButtonState(); }
             return;
           }
-          const t = staticTemplates[i];
-          i++;
-          
-          if (!preloadedStaticPdfs[t.key]) {
-            google.script.run.withSuccessHandler(base64 => {
-              if (base64) {
-                preloadedStaticPdfs[t.key] = base64;
-                console.log(`✓ [Background] Precargada plantilla: ${t.key}`);
-                updateGoButtonState(); // Actualiza si ya estaban esperando este doc
-              }
-              setTimeout(loadNext, 100); // Pequeña pausa para no bloquear el navegador
-            }).withFailureHandler(err => {
-              console.log(`⚠️ [Background] Error precargando ${t.key}:`, err);
-              setTimeout(loadNext, 500);
-            }).getStaticTemplateBase64(t.key, t.fileId);
-          } else {
-            loadNext();
-          }
-        }
-        
-        console.log('🚀 Iniciando precarga silenciosa de plantillas estáticas...');
-        loadNext();
+
+          google.script.run.withSuccessHandler(base64 => {
+            if (base64) {
+              preloadedStaticPdfs[t.key] = base64;
+              console.log(`✓ [Background] Precargada plantilla: ${t.key}`);
+            } else {
+              console.log(`⚠️ [Background] Plantilla vacía: ${t.key}`);
+              staticPreloadErrors.push(`${t.name} (Archivo vacío)`);
+            }
+            pendingCount--;
+            updateGoButtonState();
+            if (pendingCount === 0) { isStaticPreloading = false; }
+          }).withFailureHandler(err => {
+            console.log(`⚠️ [Background] Error precargando ${t.key}:`, err);
+            staticPreloadErrors.push(`${t.name || t.key}: ${err.message || err}`);
+            pendingCount--;
+            updateGoButtonState();
+            if (pendingCount === 0) { isStaticPreloading = false; }
+          }).getStaticTemplateBase64(t.key, t.fileId);
+        });
       }
 
-      // Background preloading function
       function preloadOrderData(orderNo) {
         const currentOrderNo = orderNo.trim();
         if (!currentOrderNo) {
