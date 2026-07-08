@@ -96,7 +96,12 @@ function findOrderPdfInFolder(folderId, orderNo) {
     throw new Error("DOC_ORDENES no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
   }
 
-  var folder = DriveApp.getFolderById(folderId);
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(folderId);
+  } catch (e) {
+    throw new Error("El ID de la carpeta DOC_ORDENES ('" + folderId + "') es inválido o no tienes acceso.");
+  }
   var normalizedOrderNo = orderNo.toString().trim().toLowerCase();
   var exactFiles = folder.getFilesByName(orderNo + ".pdf");
   if (exactFiles.hasNext()) {
@@ -130,7 +135,12 @@ function findAnalysisPdfInFolder(folderId, noAnalisis) {
     throw new Error("DOC_ANALISIS no está configurado en la hoja 'templates'. Configure el ID de la carpeta de análisis.");
   }
 
-  var folder = DriveApp.getFolderById(folderId);
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(folderId);
+  } catch (e) {
+    throw new Error("El ID de la carpeta DOC_ANALISIS ('" + folderId + "') es inválido o no tienes acceso.");
+  }
   var normalizedNoAnalisis = noAnalisis.toString().trim().toLowerCase();
   var exactFiles = folder.getFilesByName(noAnalisis + ".pdf");
   if (exactFiles.hasNext()) {
@@ -409,14 +419,7 @@ function preparePrintPayload(orderNo, templateConfig) {
         if (!folderId) {
           throw new Error("DOC_ORDENES no está configurado en la hoja 'templates'. Configure el ID de la carpeta de órdenes.");
         }
-        try {
-          file = findOrderPdfInFolder(folderId, orderNo);
-        } catch (driveError) {
-          if (driveError.message.indexOf("not found") !== -1 || driveError.message.indexOf("not exist") !== -1) {
-            throw new Error("No se puede acceder a la carpeta DOC_ORDENES (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
-          }
-          throw driveError;
-        }
+        file = findOrderPdfInFolder(folderId, orderNo);
         pdfsToProcess.push({ key: config.key, base64: Utilities.base64Encode(file.getBlob().getBytes()), copies: config.copies });
       } else if (config.key === "DOC_ANALISIS") {
         if (!folderAnalysisId) {
@@ -425,23 +428,7 @@ function preparePrintPayload(orderNo, templateConfig) {
         if (!noAnalisisStr) {
           throw new Error("La orden no tiene número de análisis (NoAnalisis). Complete este campo en la hoja 'Ordenes'.");
         }
-        try {
-          var aFolder = DriveApp.getFolderById(folderAnalysisId);
-          var aQuery = "title contains '" + noAnalisisStr + "' and mimeType = 'application/pdf' and trashed = false";
-          var aFiles = aFolder.searchFiles(aQuery);
-          while (aFiles.hasNext()) {
-            var candidate = aFiles.next();
-            if (candidate.getName().indexOf(noAnalisisStr) === 0) { file = candidate; break; }
-          }
-          if (!file) {
-            throw new Error("No se encontró el PDF de análisis que comience con '" + noAnalisisStr + "' en la carpeta configurada (ID: " + folderAnalysisId + ").");
-          }
-        } catch (driveError) {
-          if (driveError.message.indexOf("not found") !== -1 || driveError.message.indexOf("not exist") !== -1) {
-            throw new Error("No se puede acceder a la carpeta DOC_ANALISIS (ID: " + folderAnalysisId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
-          }
-          throw driveError;
-        }
+        file = findAnalysisPdfInFolder(folderAnalysisId, noAnalisisStr);
         pdfsToProcess.push({ key: config.key, base64: Utilities.base64Encode(file.getBlob().getBytes()), copies: config.copies });
       } else {
         // Static templates are skipped - they're already preloaded on the frontend
@@ -488,7 +475,12 @@ function saveFinalUnifiedPDF(base64Data, orderNo) {
       throw new Error("No se encontró la carpeta DOC_COMPLETO en la hoja templates.");
     }
     
-    var folder = DriveApp.getFolderById(folderId);
+    var folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+    } catch (e) {
+      throw new Error("El ID de la carpeta DOC_COMPLETO ('" + folderId + "') configurado en la hoja 'templates' es inválido o no tienes permisos de acceso.");
+    }
     
     // --- OBTENER CONSECUTIVO DESDE LA HOJA ORDENES ---
     var ss = SpreadsheetApp.getActiveSpreadsheet();
