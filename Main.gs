@@ -25,8 +25,6 @@ function onOpen() {
 
   // 3. Menú Principal (Gestionar OA)
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
-    .addItem('🔐 Validar mi Usuario (INICIAR)', 'abrirModalValidacion')
-    .addSeparator()
     .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad')
@@ -38,7 +36,7 @@ function onOpen() {
   try {
     getInitialData();
     syncVerifCantDisponible();
-    SpreadsheetApp.getActiveSpreadsheet().toast('⚠️ Para continuar, por favor ve al menú "Gestionar OA" y selecciona "Validar mi Usuario".', 'Sistema QMS', 15);
+    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo.', 'Sistema QMS', 5);
   } catch (e) {
     Logger.log("Error en warmup de caché: " + e.message);
   }

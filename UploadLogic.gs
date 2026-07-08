@@ -18,6 +18,8 @@
  * Muestra UploadCentralModal.html para subida masiva de documentos.
  */
 function abrirModalSubidaGeneral() {
+  // La validación de identidad se realiza inline dentro de UploadCentralModal.html al cargar
+  // (vía getInitialData() → activeEmail → match con hoja Usuarios)
   try {
     var template = HtmlService.createTemplateFromFile('UploadCentralModal');
     var html = template.evaluate()

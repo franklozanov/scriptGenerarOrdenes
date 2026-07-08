@@ -18,12 +18,14 @@
  * Muestra ModalRegistroNovedad.html para registrar entregas, devoluciones y cambios de estado.
  */
 function abrirModalRegistroNovedad() {
+  // La validación de identidad se realiza inline dentro de ModalRegistroNovedad.html al cargar
+  // (vía getInitialData() → activeEmail → match con hoja Usuarios)
   try {
     var template = HtmlService.createTemplateFromFile('ModalRegistroNovedad');
     var html = template.evaluate()
       .setWidth(600)
       .setHeight(650);
-    SpreadsheetApp.getUi().showModelessDialog(html, 'Registrar Entrega / Novedad');
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Registro de Entrega / Novedad OA');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }
