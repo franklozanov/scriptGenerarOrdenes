@@ -522,13 +522,6 @@
               '<span>Ingresaste como: <strong>' + userObj.nombreCompleto + '</strong></span>' +
             '</div>';
             
-            if (typeof Swal !== 'undefined') {
-              Swal.fire({
-                toast: true, position: 'top-end', icon: 'success',
-                title: 'Usuario validado', text: 'Bienvenido, ' + userObj.nombreCompleto,
-                showConfirmButton: false, timer: 3000, timerProgressBar: true
-              });
-            }
             validateForm();
             loadPendingOrders();
           }
