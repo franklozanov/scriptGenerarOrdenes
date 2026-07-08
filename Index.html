@@ -920,17 +920,34 @@
           // Respect the original order and copies from config
           // Build the final pdfs array by iterating through config (which has correct order and copies)
           const finalPdfs = [];
-          config.forEach(cfg => {
-            if (preloadedStaticPdfs[cfg.key]) {
-              // Static template - use preloaded base64
-              finalPdfs.push({
-                key: cfg.key,
-                base64: preloadedStaticPdfs[cfg.key],
-                copies: cfg.copies
-              });
-              console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+          for (const cfg of config) {
+            const templateMeta = globalTemplates.find(t => t.key === cfg.key);
+            const isStatic = templateMeta && templateMeta.type !== 'Dynamic' && cfg.key !== 'DOC_COMPLETO';
+            
+            if (isStatic) {
+              if (preloadedStaticPdfs[cfg.key]) {
+                finalPdfs.push({
+                  key: cfg.key,
+                  base64: preloadedStaticPdfs[cfg.key],
+                  copies: cfg.copies
+                });
+                console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+              } else {
+                status.innerText = `⏳ Descargando plantilla estática bajo demanda: ${templateMeta.name}...`;
+                console.log(`⏳ Descargando bajo demanda: ${cfg.key}`);
+                const staticBase64 = await new Promise((resolve, reject) => {
+                  google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getStaticTemplateBase64(cfg.key, cfg.fileId);
+                });
+                if (!staticBase64) throw new Error(`Error al obtener PDF para ${cfg.key}`);
+                preloadedStaticPdfs[cfg.key] = staticBase64;
+                finalPdfs.push({
+                  key: cfg.key,
+                  base64: staticBase64,
+                  copies: cfg.copies
+                });
+                console.log(`✓ Plantilla estática descargada: ${cfg.key}`);
+              }
             } else if (cfg.key === 'DOC_COMPLETO') {
-              // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
               console.log(`✓ Omitiendo DOC_COMPLETO (carpeta de destino)`);
             } else {
               // Dynamic template - use from payload
@@ -946,7 +963,7 @@
                 throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
               }
             }
-          });
+          }
           
           // Replace payload.pdfs with the merged array
           payload.pdfs = finalPdfs;
