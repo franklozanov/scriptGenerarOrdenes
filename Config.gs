@@ -38,7 +38,7 @@ var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 // Estructura requerida de hojas y columnas
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder'],
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'ImpresoPor', 'STATUS'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'ImpresoPor', 'ReimpresoPor', 'NoPags', 'Reimpresion', 'TotalPags', 'STATUS'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']

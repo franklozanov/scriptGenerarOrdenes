@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: var(--color-bg);
+    }
+    
+    .validation-container {
+      width: 100%;
+      max-width: 400px;
+      padding: var(--spacing-lg);
+      text-align: center;
+    }
+    
+    .logo-placeholder {
+      font-size: 3rem;
+      margin-bottom: var(--spacing-md);
+      color: var(--color-primary);
+    }
+    
+    .title {
+      font-size: 1.5rem;
+      color: var(--color-text);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .subtitle {
+      color: var(--color-text-light);
+      margin-bottom: var(--spacing-xl);
+      font-size: 0.9rem;
+    }
+    
+    .btn-large {
+      padding: var(--spacing-md) var(--spacing-xl);
+      font-size: 1.1rem;
+      width: 100%;
+    }
+    
+    #multi-user-section, #error-section, #success-section {
+      display: none;
+      width: 100%;
+    }
+    
+    #success-section {
+      color: var(--color-success);
+    }
+    
+    #error-section {
+      color: var(--color-danger);
+    }
+    
+    .user-select {
+      width: 100%;
+      padding: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius-sm);
+      font-size: 1rem;
+    }
+    
+    .retry-btn {
+      margin-top: var(--spacing-md);
+      background-color: transparent;
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+    }
+    
+    .retry-btn:hover {
+      background-color: var(--color-bg-alt);
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="validation-container" id="main-container">
+    <div class="logo-placeholder">🔐</div>
+    <h1 class="title">Sistema QMS</h1>
+    <p class="subtitle">Se requiere validar su identidad para continuar.</p>
+    
+    <div id="action-section">
+      <button class="btn btn-primary btn-large" id="btn-validate" onclick="iniciarValidacion()">
+        Validar Usuario
+      </button>
+    </div>
+    
+    <div id="multi-user-section">
+      <p>Se encontraron múltiples perfiles para su correo. Por favor seleccione uno:</p>
+      <select id="user-select" class="user-select"></select>
+      <button class="btn btn-primary btn-large" onclick="confirmarUsuarioSeleccionado()">Confirmar Selección</button>
+    </div>
+    
+    <div id="error-section">
+      <div style="font-size: 3rem; margin-bottom: 10px;">⛔</div>
+      <h2 id="error-title">Acceso Denegado</h2>
+      <p id="error-message" style="margin-bottom: 20px;"></p>
+      <button class="btn retry-btn" onclick="reiniciarValidacion()">Reintentar</button>
+    </div>
+    
+    <div id="success-section">
+      <div style="font-size: 3rem; margin-bottom: 10px;">✅</div>
+      <h2 id="success-title">¡Bienvenido!</h2>
+      <p id="success-message">Identidad confirmada exitosamente.</p>
+    </div>
+  </div>
+
+  <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
+  <script>
+    let usuariosMultiples = [];
+    
+    function setBotonCargando(isLoading) {
+      const btn = document.getElementById('btn-validate');
+      if (isLoading) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Validando...';
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = 'Validar Usuario';
+      }
+    }
+    
+    function mostrarSeccion(seccionId) {
+      document.getElementById('action-section').style.display = 'none';
+      document.getElementById('multi-user-section').style.display = 'none';
+      document.getElementById('error-section').style.display = 'none';
+      document.getElementById('success-section').style.display = 'none';
+      
+      document.getElementById(seccionId).style.display = 'block';
+    }
+    
+    function reiniciarValidacion() {
+      mostrarSeccion('action-section');
+    }
+
+    function iniciarValidacion() {
+      setBotonCargando(true);
+      
+      google.script.run
+        .withSuccessHandler(procesarRespuestaValidacion)
+        .withFailureHandler(function(error) {
+          setBotonCargando(false);
+          mostrarError("Error de conexión", error.message);
+        })
+        .validarIdentidadSesion();
+    }
+    
+    function procesarRespuestaValidacion(respuesta) {
+      setBotonCargando(false);
+      
+      if (respuesta.status === 'SUCCESS') {
+        mostrarExito(respuesta.user.nombreCompleto || respuesta.user.nombreCorto || respuesta.user.userId);
+      } else if (respuesta.status === 'MULTIPLE_USERS') {
+        usuariosMultiples = respuesta.users;
+        const select = document.getElementById('user-select');
+        select.innerHTML = '';
+        usuariosMultiples.forEach(u => {
+          const option = document.createElement('option');
+          option.value = u.userId;
+          option.textContent = `${u.userId} - ${u.nombreCorto} (${u.rol})`;
+          select.appendChild(option);
+        });
+        mostrarSeccion('multi-user-section');
+      } else {
+        mostrarError("Acceso Restringido", respuesta.message);
+      }
+    }
+    
+    function confirmarUsuarioSeleccionado() {
+      const select = document.getElementById('user-select');
+      const userId = select.value;
+      if (!userId) return;
+      
+      document.getElementById('multi-user-section').style.display = 'none';
+      showLoading("Confirmando...");
+      
+      google.script.run
+        .withSuccessHandler(function(respuesta) {
+          hideLoading();
+          if (respuesta.status === 'SUCCESS') {
+            mostrarExito(respuesta.user.nombreCompleto || respuesta.user.nombreCorto || respuesta.user.userId);
+          } else {
+            mostrarError("Error", respuesta.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          mostrarError("Error de conexión", error.message);
+        })
+        .establecerUsuarioActivo(userId);
+    }
+    
+    function mostrarExito(nombreUsuario) {
+      document.getElementById('success-message').textContent = `Identidad confirmada exitosamente.`;
+      if (nombreUsuario) {
+        document.getElementById('success-title').textContent = `¡Bienvenido, ${nombreUsuario}!`;
+      }
+      mostrarSeccion('success-section');
+      
+      // Ocultar automáticamente y cerrar el modal después de 2.5 segundos
+      setTimeout(function() {
+        google.script.host.close();
+      }, 2500);
+    }
+    
+    function mostrarError(titulo, mensaje) {
+      document.getElementById('error-title').textContent = titulo;
+      document.getElementById('error-message').textContent = mensaje;
+      mostrarSeccion('error-section');
+    }
+  </script>
+</body>
+</html>

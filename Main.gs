@@ -32,6 +32,16 @@ function onOpen() {
     .addSubMenu(configMenu)
     .addToUi();
   
+  // Mostrar modal de validación inicial
+  try {
+    var html = HtmlService.createTemplateFromFile('ModalValidacion').evaluate()
+      .setWidth(500)
+      .setHeight(400);
+    SpreadsheetApp.getUi().showModalDialog(html, 'Validación de Acceso al Sistema');
+  } catch (e) {
+    Logger.log("Error al mostrar ModalValidacion: " + e.message);
+  }
+  
   // Cache warmup: precargar datos silenciosamente
   try {
     getInitialData();

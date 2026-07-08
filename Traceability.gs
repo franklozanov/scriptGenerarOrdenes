@@ -290,7 +290,7 @@ function onEditInstalled(e) {
       var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
       var newValue = e.value !== undefined ? e.value : "(vacío)";
       var cellAddress = editedRange.getA1Notation();
-      var editDesc = "Se editó la celda " + cellAddress + " en la hoja '" + sheetName + "'. Valor anterior: '" + oldValue + "' -> Nuevo valor: '" + newValue + "'";
+      var editDesc = "En la hoja '" + sheetName + "', celda " + cellAddress + ": el valor cambió de '" + oldValue + "' a '" + newValue + "'.";
       var logType = (sheetName === 'RegistroNovedad') ? 'EDICION_MANUAL_NOVEDAD' : 'EDICION_CELDA';
       logChange(logType, editDesc, userIdentity);
     } else {
@@ -303,9 +303,9 @@ function onEditInstalled(e) {
         summaryRows.push("[" + rowStr + "]");
       }
       var valuesDesc = summaryRows.join(" | ");
-      if (values.length > 3) valuesDesc += " ... (+" + (values.length - 3) + " filas)";
+      if (values.length > 3) valuesDesc += " ... (y " + (values.length - 3) + " filas más)";
       
-      var massEditDesc = "Edición de " + (numRows * numCols) + " celdas en el rango " + rangeA1 + " de la hoja '" + sheetName + "'. Valores ingresados: " + valuesDesc;
+      var massEditDesc = "En la hoja '" + sheetName + "', se modificaron " + (numRows * numCols) + " celdas simultáneamente (rango " + rangeA1 + "). Valores ingresados: " + valuesDesc + ".";
       var logTypeMass = (sheetName === 'RegistroNovedad') ? 'EDICION_MASIVA_NOVEDAD' : 'EDICION_MASIVA';
       logChange(logTypeMass, massEditDesc, userIdentity);
     }

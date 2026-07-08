@@ -105,3 +105,105 @@ function requireAuthorizedUser_(params) {
   }
   return callingUserId;
 }
+
+/**
+ * Obtiene los registros de usuario asociados a un email.
+ * @param {string} email - Email a buscar
+ * @returns {Array} Array de objetos de usuario
+ */
+function getUserRecordsByEmail_(email) {
+  if (!email) return [];
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) return [];
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  var headers = data[0];
+  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
+  var colNombreCompletoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Nombre Completo', false);
+  var colNombreCortoIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreCorto', false);
+  var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false);
+  var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+
+  if (!colUserIdIdx || !colEmailIdx) return [];
+
+  colUserIdIdx -= 1;
+  colNombreCompletoIdx = colNombreCompletoIdx ? colNombreCompletoIdx - 1 : null;
+  colNombreCortoIdx = colNombreCortoIdx ? colNombreCortoIdx - 1 : null;
+  colEmailIdx -= 1;
+  colRolIdx = colRolIdx ? colRolIdx - 1 : null;
+
+  var targetEmail = email.toString().trim().toLowerCase();
+  var users = [];
+  
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim().toLowerCase() : "";
+    if (rowEmail === targetEmail) {
+      users.push({
+        userId: data[i][colUserIdIdx] ? data[i][colUserIdIdx].toString().trim() : "",
+        nombreCompleto: colNombreCompletoIdx !== null && data[i][colNombreCompletoIdx] ? data[i][colNombreCompletoIdx].toString().trim() : "",
+        nombreCorto: colNombreCortoIdx !== null && data[i][colNombreCortoIdx] ? data[i][colNombreCortoIdx].toString().trim() : "",
+        email: data[i][colEmailIdx] ? data[i][colEmailIdx].toString().trim() : "",
+        rol: colRolIdx !== null && data[i][colRolIdx] ? data[i][colRolIdx].toString().trim().toUpperCase() : ""
+      });
+    }
+  }
+  return users;
+}
+
+/**
+ * Función backend para validar la identidad de la sesión (llamada desde ModalValidacion).
+ * @returns {Object} Respuesta con estado y datos del usuario
+ */
+function validarIdentidadSesion() {
+  var email = Session.getActiveUser().getEmail();
+  if (!email) {
+    return { status: 'ERROR', message: 'No se pudo obtener el correo de la sesión. Asegúrese de estar logueado.' };
+  }
+  
+  var users = getUserRecordsByEmail_(email);
+  
+  if (users.length === 0) {
+    return { status: 'DENIED', message: 'El correo ' + email + ' no está registrado en el sistema. Contacte al administrador.' };
+  }
+  
+  if (users.length > 1) {
+    return { status: 'MULTIPLE_USERS', users: users };
+  }
+  
+  var user = users[0];
+  if (!isUserAuthorized(user.userId)) {
+    return { status: 'DENIED', message: 'Su usuario (' + user.userId + ') no tiene los permisos necesarios (Rol: ' + user.rol + ').' };
+  }
+  
+  // Guardar como usuario activo
+  PropertiesService.getUserProperties().setProperty('ACTIVE_USER_ID', user.userId);
+  
+  return { status: 'SUCCESS', user: user };
+}
+
+/**
+ * Establece el usuario activo cuando hay múltiples cuentas para el mismo email.
+ * @param {string} userId - UserID seleccionado
+ * @returns {Object} Respuesta con estado
+ */
+function establecerUsuarioActivo(userId) {
+  var email = Session.getActiveUser().getEmail();
+  var users = getUserRecordsByEmail_(email);
+  
+  var isValid = users.some(function(u) { return u.userId === userId; });
+  if (!isValid) {
+    return { status: 'ERROR', message: 'El usuario seleccionado no corresponde a su cuenta de correo.' };
+  }
+  
+  if (!isUserAuthorized(userId)) {
+    return { status: 'DENIED', message: 'El usuario seleccionado no tiene los permisos necesarios.' };
+  }
+  
+  PropertiesService.getUserProperties().setProperty('ACTIVE_USER_ID', userId);
+  
+  var user = getUserRecordByUserId_(userId);
+  return { status: 'SUCCESS', user: user };
+}
