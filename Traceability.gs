@@ -221,68 +221,70 @@ function onEditInstalled(e) {
         return;
       }
 
-      // Manejo de cambios en NoOrden (resetea AdjuntoOA)
+      // Manejo de cambios en NoOrden (Verifica existencia o resetea AdjuntoOA)
       if (colOrdenCol && editedRange.getColumn() === colOrdenCol) {
         var rowIdx = editedRange.getRow();
-        var estadoOA = colAdjuntoOACol ? sheet.getRange(rowIdx, colAdjuntoOACol).getValue() : "";
-        var estadoOAStr = estadoOA ? estadoOA.toString().trim() : "";
+        var nuevoValor = e.value !== undefined ? e.value.toString().trim() : "";
+        var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
         
-        // Si el documento OA está cargado, resetear al cambiar NoOrden
-        if (estadoOAStr === "✅ Cargado") {
-          var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
-          var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
-          
-          if (colAdjuntoOACol) {
-            sheet.getRange(rowIdx, colAdjuntoOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
+        if (colAdjuntoOACol) {
+          if (nuevoValor === "") {
+            sheet.getRange(rowIdx, colAdjuntoOACol).setValue("");
             sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
+          } else {
+            var fileExists = false;
+            try {
+              var config = getPrintConfig_();
+              findOrderPdfInFolder(config.DOC_ORDENES, nuevoValor);
+              fileExists = true;
+            } catch(err) {
+              fileExists = false;
+            }
+            var nuevoEstado = fileExists ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE;
+            sheet.getRange(rowIdx, colAdjuntoOACol).setValue(nuevoEstado);
+            sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
+            
+            var toastMsg = fileExists ? "Archivo OA encontrado en Drive. Estado: Cargado." : "Archivo OA no encontrado. Estado: Pendiente.";
+            SpreadsheetApp.getActiveSpreadsheet().toast(toastMsg, "Aviso del Sistema", 5);
           }
-          
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-          
-          logChange('RESET_CARGA_OA', 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado de AdjuntoOA devuelto a Pendiente.', userIdentity);
-          SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. El estado de la Orden de Acondicionamiento ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
-          return;
         }
         
-        // Si NoOrden se asigna por primera vez y AdjuntoOA está vacío, inicializar
-        if (estadoOAStr === "" && e.value !== undefined && e.value !== "") {
-          if (colAdjuntoOACol) sheet.getRange(rowIdx, colAdjuntoOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-          logChange('ASIGNACION_PENDIENTE_OA', 'NoOrden asignado. Estado de AdjuntoOA establecido a Pendiente.', userIdentity);
-          return;
-        }
+        actualizarEstadoCarga(sheet, rowIdx, headers);
+        logChange('CAMBIO_NO_ORDEN', 'NoOrden cambiado de ' + valorAnterior + ' a ' + (nuevoValor || '(vacío)'), userIdentity);
+        return;
       }
 
-      // Manejo de cambios en NoAnalisis (resetea AdjuntoCOA)
+      // Manejo de cambios en NoAnalisis (Verifica existencia o resetea AdjuntoCOA)
       if (colAnalisisCol && editedRange.getColumn() === colAnalisisCol) {
         var rowIdx = editedRange.getRow();
-        var estadoCOA = colAdjuntoCOACol ? sheet.getRange(rowIdx, colAdjuntoCOACol).getValue() : "";
-        var estadoCOAStr = estadoCOA ? estadoCOA.toString().trim() : "";
+        var nuevoValor = e.value !== undefined ? e.value.toString().trim() : "";
+        var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
         
-        // Si el documento COA está cargado, resetear al cambiar NoAnalisis
-        if (estadoCOAStr === "✅ Cargado") {
-          var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
-          var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
-          
-          if (colAdjuntoCOACol) {
-            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
+        if (colAdjuntoCOACol) {
+          if (nuevoValor === "") {
+            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue("");
             sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
+          } else {
+            var fileExists = false;
+            try {
+              var config = getPrintConfig_();
+              findAnalysisPdfInFolder(config.DOC_ANALISIS, nuevoValor);
+              fileExists = true;
+            } catch(err) {
+              fileExists = false;
+            }
+            var nuevoEstado = fileExists ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE;
+            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(nuevoEstado);
+            sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
+            
+            var toastMsg = fileExists ? "Certificado COA encontrado en Drive. Estado: Cargado." : "Certificado COA no encontrado. Estado: Pendiente.";
+            SpreadsheetApp.getActiveSpreadsheet().toast(toastMsg, "Aviso del Sistema", 5);
           }
-          
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-          
-          logChange('RESET_CARGA_COA', 'NoAnalisis cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado de AdjuntoCOA devuelto a Pendiente.', userIdentity);
-          SpreadsheetApp.getActiveSpreadsheet().toast("No. Análisis modificado. El estado del Certificado de Análisis ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
-          return;
         }
         
-        // Si NoAnalisis se asigna por primera vez y AdjuntoCOA está vacío, inicializar
-        if (estadoCOAStr === "" && e.value !== undefined && e.value !== "") {
-          if (colAdjuntoCOACol) sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-          logChange('ASIGNACION_PENDIENTE_COA', 'NoAnalisis asignado. Estado de AdjuntoCOA establecido a Pendiente.', userIdentity);
-          return;
-        }
+        actualizarEstadoCarga(sheet, rowIdx, headers);
+        logChange('CAMBIO_NO_ANALISIS', 'NoAnalisis cambiado de ' + valorAnterior + ' a ' + (nuevoValor || '(vacío)'), userIdentity);
+        return;
       }
     }
     
