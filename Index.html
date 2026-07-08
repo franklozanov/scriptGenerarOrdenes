@@ -445,7 +445,12 @@
 
       function renderPreloadResult(response) {
         if (response.ready) {
-          setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Documentos listos para impresión.');
+          const staticReady = areSelectedStaticTemplatesReady();
+          if (staticReady) {
+            setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Todos los documentos listos para impresión.');
+          } else {
+            setPreloadBanner('info', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>⏳ Descargando plantillas estáticas en segundo plano...');
+          }
           updateGoButtonState();
           return;
         }
@@ -509,11 +514,17 @@
           } else if (!staticReady) {
             status.innerText = "⏳ Descargando plantillas estáticas en segundo plano...";
             status.className = "info-text";
+            // Actualizar banner también
+            setPreloadBanner('info', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>⏳ Descargando plantillas estáticas en segundo plano...');
           }
-        } else if (isOrderReady && isEnabled && (status.innerText.includes("⚠️") || status.innerText.includes("⏳ Descargando"))) {
-          // Limpiar aviso si ya todo está correcto
+        } else if (isOrderReady && isEnabled && !status.innerText.includes("Impresión registrada")) {
+          // Todo correcto y cargado
           status.innerText = "✅ Documentos listos para impresión";
           status.className = "success-text";
+          // Actualizar banner a success
+          setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Todos los documentos listos para impresión.');
+        } else if (!isOrderReady && !status.innerText.includes("Impresión registrada") && orderInput.value.trim().length === 0) {
+           status.innerText = "";
         }
       }
       
@@ -602,12 +613,6 @@
             
             console.log(`✓ Datos precargados para orden ${currentOrderNo}`);
             renderPreloadResult(response);
-            
-            // Update status to show data is ready
-            if (status && !status.innerText.includes("Impresión registrada")) {
-              status.innerText = response.ready ? "✅ Documentos listos para impresión" : "⚠️ Faltan documentos requeridos";
-              status.className = response.ready ? "success-text" : "error-text";
-            }
           })
           .withFailureHandler(error => {
             // Race condition control: only accept error if it matches current orderNo

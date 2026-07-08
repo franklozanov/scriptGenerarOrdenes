@@ -55,6 +55,13 @@ function cacheStaticTemplateBase64_(key, base64) {
 }
 
 /**
+ * Public wrapper para obtener el base64 de una plantilla estática desde el cliente.
+ */
+function getStaticTemplateBase64(key, fileId) {
+  return getStaticTemplateBase64_(key, fileId);
+}
+
+/**
  * Obtiene el base64 de una plantilla estática (desde caché o Drive).
  */
 function getStaticTemplateBase64_(key, fileId) {
