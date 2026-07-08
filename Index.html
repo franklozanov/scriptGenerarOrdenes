@@ -3,6 +3,24 @@
   <head>
     <base target="_top">
     <script>
+      // Red de seguridad: si CUALQUIER error de JS no capturado ocurre en este
+      // documento, se muestra como texto visible dentro del modal en lugar de
+      // quedar silencioso en la consola del navegador (difícil de diagnosticar
+      // en un iframe anidado de Apps Script).
+      window.addEventListener('error', function (event) {
+        try {
+          var target = document.getElementById('loader') || document.body;
+          var msg = event.message || (event.error && event.error.message) || 'Error desconocido';
+          var src = event.filename ? (event.filename + ':' + event.lineno + ':' + event.colno) : '(origen desconocido)';
+          target.style.display = 'flex';
+          target.innerHTML = '<div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:16px;max-width:92%;font-family:monospace;font-size:11px;color:#991b1b;text-align:left;white-space:pre-wrap;overflow:auto;max-height:90vh;">'
+            + '⚠️ ERROR JS DETECTADO EN EL MODAL\n\n'
+            + 'Mensaje: ' + msg + '\n'
+            + 'Origen: ' + src
+            + '</div>';
+        } catch (e) {}
+      });
+
       // Carga pdf-lib de forma asíncrona y NO bloqueante: si el CDN está lento o
       // bloqueado por la red, el modal debe abrir y cargar igual; solo se espera
       // esta promesa justo antes de generar el PDF (ver processPdfGeneration).
