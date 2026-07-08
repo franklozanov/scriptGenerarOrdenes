@@ -290,12 +290,22 @@ function onEditInstalled(e) {
       var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
       var newValue = e.value !== undefined ? e.value : "(vacío)";
       var cellAddress = editedRange.getA1Notation();
-      var editDesc = "Cambió '" + oldValue + "' por '" + newValue + "' en la celda " + cellAddress + " de la hoja " + sheetName;
+      var editDesc = "Se editó la celda " + cellAddress + " en la hoja '" + sheetName + "'. Valor anterior: '" + oldValue + "' -> Nuevo valor: '" + newValue + "'";
       var logType = (sheetName === 'RegistroNovedad') ? 'EDICION_MANUAL_NOVEDAD' : 'EDICION_CELDA';
       logChange(logType, editDesc, userIdentity);
     } else {
       var rangeA1 = editedRange.getA1Notation();
-      var massEditDesc = "Edición masiva en el rango " + rangeA1 + " de la hoja " + sheetName;
+      var values = editedRange.getValues();
+      var summaryRows = [];
+      var maxRows = Math.min(3, values.length);
+      for (var r = 0; r < maxRows; r++) {
+        var rowStr = values[r].map(function(v) { return v === "" ? "(vacío)" : v; }).join(", ");
+        summaryRows.push("[" + rowStr + "]");
+      }
+      var valuesDesc = summaryRows.join(" | ");
+      if (values.length > 3) valuesDesc += " ... (+" + (values.length - 3) + " filas)";
+      
+      var massEditDesc = "Edición de " + (numRows * numCols) + " celdas en el rango " + rangeA1 + " de la hoja '" + sheetName + "'. Valores ingresados: " + valuesDesc;
       var logTypeMass = (sheetName === 'RegistroNovedad') ? 'EDICION_MASIVA_NOVEDAD' : 'EDICION_MASIVA';
       logChange(logTypeMass, massEditDesc, userIdentity);
     }
@@ -318,6 +328,24 @@ function onEditInstalled(e) {
  * @param {string} userIdentity - Identidad del usuario (formato: UserID - NombreCorto)
  */
 function logChange(tipoCambio, descripcion, userIdentity) {
+  var dictTipos = {
+    'GENERACION_PDF_FINAL': 'Generación de PDF',
+    'EDICION_MASIVA': 'Edición Masiva',
+    'ASIGNACION_PENDIENTE_OA': 'Asignación a Pendiente (OA)',
+    'EDICION_CELDA': 'Edición de Celda',
+    'CARGA_DOCUMENTO': 'Carga de Documento',
+    'ERROR_SISTEMA': 'Error del Sistema',
+    'REGISTRO_NOVEDAD': 'Registro de Novedad',
+    'VIOLACION_PERMISO': 'Violación de Permisos',
+    'RESET_CARGA_OA': 'Reinicio de Carga (OA)',
+    'RESET_CARGA_COA': 'Reinicio de Carga (COA)',
+    'ASIGNACION_PENDIENTE_COA': 'Asignación a Pendiente (COA)',
+    'INICIALIZACION': 'Inicialización del Sistema',
+    'EDICION_MANUAL_NOVEDAD': 'Edición de Novedad',
+    'EDICION_MASIVA_NOVEDAD': 'Edición Masiva de Novedades'
+  };
+  var tipoNatural = dictTipos[tipoCambio] ? dictTipos[tipoCambio] : tipoCambio;
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetLogs = ss.getSheetByName('Logs');
   
@@ -330,6 +358,6 @@ function logChange(tipoCambio, descripcion, userIdentity) {
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
   var user = userIdentity || "Sistema";
   
-  sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
-  Logger.log("✓ " + tipoCambio + " registrado en Logs");
+  sheetLogs.appendRow([timestamp, user, tipoNatural, descripcion]);
+  Logger.log("✓ " + tipoNatural + " registrado en Logs");
 }
