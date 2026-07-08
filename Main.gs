@@ -34,6 +34,10 @@ function onOpen() {
   
   // Cache warmup y aviso inicial
   try {
+    var email = Session.getActiveUser().getEmail();
+    if (email) {
+      CacheService.getUserCache().remove('selectedProfileIdx_' + email);
+    }
     getInitialData();
     syncVerifCantDisponible();
     SpreadsheetApp.getActiveSpreadsheet().toast('✅ Sistema listo.', 'Sistema QMS', 5);

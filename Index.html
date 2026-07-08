@@ -752,31 +752,38 @@
               onUserValidated(matchedUsers[0]);
               document.getElementById('loader').style.display = 'none';
             } else if (matchedUsers.length > 1) {
-              // Múltiples perfiles: mostrar selector nativo dentro del loader (sin Swal)
-              const loader = document.getElementById('loader');
-              const optionsHtml = matchedUsers.map((u, idx) =>
-                `<option value="${idx}">${u.nombreCompleto} (${u.rol || 'Sin rol'})</option>`
-              ).join('');
-              loader.innerHTML = `
-                <div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:'Inter',sans-serif;">
-                  <div style="font-size:2rem; margin-bottom:12px;">👥</div>
-                  <h3 style="margin:0 0 8px 0; color:#0f172a; font-size:1rem;">Selecciona tu perfil</h3>
-                  <p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>
-                  <select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white;">
-                    ${optionsHtml}
-                  </select>
-                  <button id="profileConfirmBtn" style="width:100%; padding:10px; background:#1976d2; color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer;">
-                    Ingresar
-                  </button>
-                </div>`;
-              document.getElementById('profileConfirmBtn').addEventListener('click', function() {
-                const idx = document.getElementById('profileSelect').value;
-                onUserValidated(matchedUsers[idx]);
+              if (data.savedProfileIdx !== undefined && data.savedProfileIdx !== null && matchedUsers[data.savedProfileIdx]) {
+                onUserValidated(matchedUsers[data.savedProfileIdx]);
                 document.getElementById('loader').style.display = 'none';
-                updateGoButtonState();
-              });
-              // Salimos aquí para que el loader espere a la confirmación
-              return;
+              } else {
+                // Múltiples perfiles sin selección previa: mostrar selector
+                const loader = document.getElementById('loader');
+                const optionsHtml = matchedUsers.map((u, idx) =>
+                  `<option value="${idx}">${u.nombreCompleto} (${u.rol || 'Sin rol'})</option>`
+                ).join('');
+                loader.innerHTML = `
+                  <div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:'Inter',sans-serif;">
+                    <div style="font-size:2rem; margin-bottom:12px;">👥</div>
+                    <h3 style="margin:0 0 8px 0; color:#0f172a; font-size:1rem;">Selecciona tu perfil</h3>
+                    <p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>
+                    <select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white;">
+                      ${optionsHtml}
+                    </select>
+                    <button id="profileConfirmBtn" style="width:100%; padding:10px; background:#1976d2; color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer;">
+                      Ingresar
+                    </button>
+                  </div>`;
+                document.getElementById('profileConfirmBtn').addEventListener('click', function() {
+                  const idx = document.getElementById('profileSelect').value;
+                  google.script.run.withSuccessHandler(function() {
+                    onUserValidated(matchedUsers[idx]);
+                    document.getElementById('loader').style.display = 'none';
+                    updateGoButtonState();
+                  }).saveUserProfileSelection(idx);
+                });
+                // Salimos aquí para que el loader espere a la confirmación
+                return;
+              }
             } else {
                // Bloquear UI
                document.body.innerHTML = `

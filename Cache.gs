@@ -76,7 +76,14 @@ function getInitialData() {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v2');
     var activeEmail = "";
-    try { activeEmail = Session.getActiveUser().getEmail() || ""; } catch(e) {}
+    var savedProfileIdx = null;
+    try { 
+      activeEmail = Session.getActiveUser().getEmail() || ""; 
+      if (activeEmail) {
+        var cachedIdx = CacheService.getUserCache().get('selectedProfileIdx_' + activeEmail);
+        if (cachedIdx !== null) savedProfileIdx = parseInt(cachedIdx, 10);
+      }
+    } catch(e) {}
     
     if (cached) {
       try { 
@@ -93,6 +100,7 @@ function getInitialData() {
           try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
         }
         parsedData.activeEmail = activeEmail;
+        parsedData.savedProfileIdx = savedProfileIdx;
         return parsedData; 
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
@@ -280,8 +288,7 @@ function getInitialData() {
 
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
-    var activeEmail = Session.getActiveUser().getEmail();
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl, activeEmail: activeEmail };
+    var result = { users: users, templates: templates, webAppUrl: webAppUrl, activeEmail: activeEmail, savedProfileIdx: savedProfileIdx };
     
     var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
@@ -298,6 +305,22 @@ function getInitialData() {
     Logger.log("CRITICAL ERROR in getInitialData: " + error.message);
     Logger.log("Stack trace: " + error.stack);
     throw new Error("Error cargando datos iniciales: " + error.message);
+  }
+}
+
+/**
+ * Guarda en caché de usuario el índice del perfil seleccionado para persistencia en sesión.
+ * @param {number} idx Índice del usuario en el array de coincidencias de email.
+ */
+function saveUserProfileSelection(idx) {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (email) {
+      // Guarda por 6 horas, que es más que suficiente para una "sesión" típica
+      CacheService.getUserCache().put('selectedProfileIdx_' + email, idx.toString(), 21600);
+    }
+  } catch(e) {
+    Logger.log("Error en saveUserProfileSelection: " + e.message);
   }
 }
 
