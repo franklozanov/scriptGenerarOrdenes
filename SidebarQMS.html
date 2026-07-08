@@ -378,11 +378,7 @@
             <strong>Instrucciones:</strong> Selecciona una Orden y carga su OA y/o COA simultáneamente.
           </div>
           
-          <div style="margin-bottom:12px;">
-             <label style="font-size:12px; font-weight:bold;">Usuario responsable:</label>
-             <select id="up_userSelect" class="form-input" style="width:100%; padding:6px; font-size:13px;"></select>
-          </div>
-          
+          <div style="margin-bottom:12px;"></div>
           <button class="btn-secondary-small" onclick="up_addCard()" style="width:100%; margin-bottom:12px;">+ Agregar Orden</button>
           
           <div id="up_cardsContainer">
@@ -547,11 +543,6 @@
             <datalist id="imp_ordenesList"></datalist>
           </div>
 
-          <div style="margin-bottom: 15px; flex-shrink: 0;">
-            <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Usuario</label>
-            <input type="text" id="imp_userName" list="imp_usersList" class="form-input" autocomplete="off" placeholder="Su nombre..." style="width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-            <datalist id="imp_usersList"></datalist>
-          </div>
 
           <div style="margin-bottom: 15px; flex-shrink: 0;">
             <label style="display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Tipo de Impresión</label>
@@ -1236,7 +1227,10 @@
       google.script.run
         .withSuccessHandler(function () {
           hideLoading();
-          showToast('Sesión cerrada. Se pedirá PIN en la próxima apertura.', 'success');
+          showToast('Sesión cerrada. El panel se cerrará ahora.', 'success');
+          setTimeout(function() {
+            google.script.host.close();
+          }, 1500);
         })
         .withFailureHandler(function (err) {
           hideLoading();
@@ -1884,18 +1878,6 @@
     let up_cardCount = 0;
 
     function up_initView() {
-      // Llenar select de usuarios si no está
-      const sel = document.getElementById('up_userSelect');
-      if (sel.options.length === 0 && sysData && sysData.users) {
-        sel.innerHTML = '<option value="">Seleccione usuario...</option>';
-        sysData.users.forEach(u => {
-          let opt = document.createElement('option');
-          opt.value = u.userId;
-          opt.text = u.nombreCompleto;
-          sel.appendChild(opt);
-        });
-        sel.addEventListener('change', up_validate);
-      }
 
       showLoading('Cargando órdenes pendientes...');
       google.script.run
@@ -2035,7 +2017,7 @@
     }
 
     function up_validate() {
-      let userId = document.getElementById('up_userSelect').value;
+      let userId = sysData.currentUser ? sysData.currentUser.userId : null;
       let btn = document.getElementById('up_btnUpload');
       if (!userId) { btn.disabled = true; return; }
       
@@ -2064,7 +2046,7 @@
     }
 
     async function up_uploadAll() {
-      let userId = document.getElementById('up_userSelect').value;
+      let userId = sysData.currentUser.userId;
       let cards = document.querySelectorAll('#up_cardsContainer .order-card');
       let tasks = [];
       
@@ -2670,24 +2652,7 @@
 
       showLoading('Cargando motor de impresión...');
       
-      // Users list
-      if (sysData && sysData.users) {
-        let activeEmail = sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
-        let validUsers = sysData.users;
-        if (activeEmail !== "") {
-          validUsers = sysData.users.filter(u => u.email && u.email.toLowerCase() === activeEmail);
-        }
-        document.getElementById('imp_usersList').innerHTML = validUsers.map(u => `<option value="${u.nombreCompleto}"></option>`).join('');
-        if (validUsers.length === 1) {
-          let inp = document.getElementById('imp_userName');
-          inp.value = validUsers[0].nombreCompleto;
-          inp.readOnly = true;
-          inp.style.backgroundColor = "#e8eaed";
-        }
-      }
-
       // Listeners
-      document.getElementById('imp_userName').addEventListener('input', imp_updateBtnState);
       const orderInput = document.getElementById('imp_orderNo');
       const debouncedPreload = debounce((value) => {
         if (value.trim().length >= 3) imp_preloadOrder(value);
@@ -2761,11 +2726,10 @@
     function imp_updateBtnState() {
       const btn = document.getElementById('imp_goBtn');
       const order = document.getElementById('imp_orderNo').value.trim();
-      const user = document.getElementById('imp_userName').value.trim();
+      const user = sysData.currentUser ? sysData.currentUser.nombreCompleto : null;
       
       const isReady = (imp_preloadState.orderNo === order && imp_preloadState.status === 'ready');
-      let activeEmail = sysData && sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
-      const isValidUser = sysData && sysData.users && sysData.users.some(u => u.nombreCompleto === user && (activeEmail === "" || (u.email && u.email.toLowerCase() === activeEmail)));
+      const isValidUser = !!user;
       
       let hasCopies = false;
       imp_globalTemplates.forEach(t => {
@@ -2837,7 +2801,9 @@
 
     async function imp_run() {
       const orderNo = document.getElementById('imp_orderNo').value.trim();
-      const userName = document.getElementById('imp_userName').value.trim();
+      const userObj = sysData.currentUser;
+      const userId = userObj ? userObj.userId : null;
+      const userName = userObj ? userObj.nombreCompleto : null;
       const printType = document.getElementById('imp_printType').value;
       const status = document.getElementById('imp_status');
       const btn = document.getElementById('imp_goBtn');
@@ -2846,10 +2812,6 @@
         key: t.key, fileId: t.fileId, hasAccess: t.hasAccess,
         copies: parseInt(document.getElementById('imp_val_' + t.key).value) || 0
       })).filter(c => c.copies > 0);
-
-      let activeEmail = sysData && sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
-      const userObj = sysData.users.find(u => u.nombreCompleto === userName && (activeEmail === "" || (u.email && u.email.toLowerCase() === activeEmail)));
-      const userId = userObj ? userObj.userId : null;
 
       if (!userId) return showError("Usuario no válido.");
 
@@ -3067,7 +3029,8 @@
 
     async function imp_enviarSolicitudExtra() {
       const orderNo = document.getElementById('imp_orderNo').value.trim();
-      const userName = document.getElementById('imp_userName').value.trim();
+      const userObj = sysData.currentUser;
+      const userName = userObj ? userObj.nombreCompleto : null;
       const tipo = document.getElementById('imp_solicitudTipo').value;
       const motivo = document.getElementById('imp_solicitudMotivo').value.trim();
       
@@ -3080,8 +3043,6 @@
       
       if (config.length === 0) return showToast("Seleccione al menos 1 copia.", 'error');
       
-      let activeEmail = sysData && sysData.activeEmail ? sysData.activeEmail.toLowerCase() : "";
-      const userObj = sysData.users.find(u => u.nombreCompleto === userName && (activeEmail === "" || (u.email && u.email.toLowerCase() === activeEmail)));
       if (!userObj) return showToast("Usuario no válido.", 'error');
       
       try {
