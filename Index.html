@@ -1146,33 +1146,47 @@
           btn.disabled = false;
           
           btn.onclick = function() {
+            // 1) Intentar abrir el PDF en una pestaña nueva.
+            //    IMPORTANTE: en el iframe sandbox de Apps Script, acceder a
+            //    newWindow.closed devuelve undefined por restricciones cross-origin
+            //    AUNQUE el popup se haya abierto bien. Por eso el ÚNICO indicador
+            //    confiable de bloqueo es que window.open() devuelva null/undefined.
+            //    No usamos .closed (daba falso positivo y abortaba el guardado).
             var newWindow = window.open(blobURL, "_blank");
-            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-              alert("Tu navegador bloqueó la ventana emergente. Por favor, habilita los pop-ups para este sitio en la barra de direcciones y vuelve a hacer clic.");
-              return;
-            }
-            
-            // Pop-up abierto correctamente. Liberar UI inmediatamente.
+            var popupBloqueado = !newWindow;
+
+            // 2) Disparar SIEMPRE el guardado en Drive + actualización de
+            //    consecutivo/HistorialImpresion. Esto NO debe depender de que el
+            //    popup abra: el PDF ya se generó y la impresión debe registrarse.
+            //    (Las notificaciones llegan vía Toast desde el backend.)
+            google.script.run
+              .processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType);
+
+            // 3) Liberar la UI para la siguiente orden.
             document.getElementById('orderNo').value = '';
             resetPreloadState();
             setPreloadBanner('', '');
             document.getElementById('orderNo').focus();
-            
+
             btn.innerText = "Generar PDF Combinado";
             btn.onclick = run;
             updateGoButtonState();
-            
-            status.innerText = "⏳ Guardando PDF en segundo plano...";
-            status.className = "info-text";
-            setTimeout(() => {
-              if (status.innerText.includes("Guardando PDF en segundo plano")) {
-                status.innerText = '';
-              }
-            }, 3000);
-            
-            // Disparar proceso en segundo plano (las notificaciones llegarán vía Toast desde el backend)
-            google.script.run
-              .processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType);
+
+            // 4) Feedback según si el popup abrió o no.
+            if (popupBloqueado) {
+              // El guardado ya se disparó; solo falta que el usuario vea el PDF.
+              status.innerHTML = "El PDF se está guardando. Su navegador bloqueó la pestaña; "
+                + "<a href='" + blobURL + "' target='_blank' style='color:#1976d2;font-weight:600;'>haga clic aquí para ver el PDF</a>.";
+              status.className = "info-text";
+            } else {
+              status.innerText = "⏳ Guardando PDF en segundo plano...";
+              status.className = "info-text";
+              setTimeout(() => {
+                if (status.innerText.includes("Guardando PDF en segundo plano")) {
+                  status.innerText = '';
+                }
+              }, 3000);
+            }
           };
 
         } catch (pdfError) {
