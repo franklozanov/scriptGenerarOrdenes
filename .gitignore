@@ -6,3 +6,7 @@ plans/
 .husky/
 *.txt
 .claspignore
+
+# Archivos de debug locales (extracciones de scripts, no forman parte del proyecto)
+combined.js
+test.js
