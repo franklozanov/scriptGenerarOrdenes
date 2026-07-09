@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <base target="_top">
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
     
@@ -500,6 +501,34 @@
         }
       }
 
+      // Precarga en paralelo de las plantillas estáticas al abrir el modal.
+      // NO bloquea la apertura: se dispara en segundo plano y va llenando
+      // preloadedStaticPdfs. Así, cuando el usuario genere el PDF, las estáticas
+      // ya están en memoria (percepción de velocidad máxima). Si alguna aún no
+      // terminó, processPdfGeneration la descarga on-demand como respaldo.
+      function startBackgroundStaticPreload() {
+        const staticTemplates = globalTemplates.filter(t =>
+          t.type !== 'Dynamic' && t.key !== 'DOC_COMPLETO' && t.hasAccess && t.fileId
+        );
+        if (staticTemplates.length === 0) return;
+        console.log(`🚀 Precargando ${staticTemplates.length} plantillas estáticas en segundo plano...`);
+        staticTemplates.forEach(t => {
+          if (preloadedStaticPdfs[t.key]) return; // ya en memoria
+          google.script.run
+            .withSuccessHandler(base64 => {
+              if (base64) {
+                preloadedStaticPdfs[t.key] = base64;
+                console.log(`✓ [Background] Precargada: ${t.key}`);
+              }
+            })
+            .withFailureHandler(err => {
+              // No es crítico: si falla, se reintenta on-demand al generar.
+              console.log(`⚠️ [Background] No se pudo precargar ${t.key}:`, err && err.message ? err.message : err);
+            })
+            .getStaticTemplateBase64(t.key, t.fileId);
+        });
+      }
+
       // Background preloading function
       function preloadOrderData(orderNo) {
         const currentOrderNo = orderNo.trim();
@@ -821,10 +850,12 @@
             if (matchedUsers.length === 1) {
               onUserValidated(matchedUsers[0]);
               document.getElementById('loader').style.display = 'none';
+              startBackgroundStaticPreload();
             } else if (matchedUsers.length > 1) {
               if (data.savedProfileIdx !== undefined && data.savedProfileIdx !== null && matchedUsers[data.savedProfileIdx]) {
                 onUserValidated(matchedUsers[data.savedProfileIdx]);
                 document.getElementById('loader').style.display = 'none';
+                startBackgroundStaticPreload();
               } else {
                 // Múltiples perfiles sin selección previa: mostrar selector
                 const loader = document.getElementById('loader');
@@ -849,6 +880,7 @@
                     onUserValidated(matchedUsers[idx]);
                     document.getElementById('loader').style.display = 'none';
                     updateGoButtonState();
+                    startBackgroundStaticPreload();
                   }).saveUserProfileSelection(idx);
                 });
                 // Salimos aquí para que el loader espere a la confirmación
@@ -883,38 +915,50 @@
         try {
           status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
 
-          // Merge dynamic templates from payload with preloaded static templates
-          // Respect the original order and copies from config
-          // Build the final pdfs array by iterating through config (which has correct order and copies)
+          // Merge dynamic templates from payload with preloaded static templates.
+          // Respetamos el orden y las copias de config. Usamos un for-of para poder
+          // await la descarga on-demand de una estática que aún no esté en memoria.
           const finalPdfs = [];
-          config.forEach(cfg => {
-            if (preloadedStaticPdfs[cfg.key]) {
-              // Static template - use preloaded base64
-              finalPdfs.push({
-                key: cfg.key,
-                base64: preloadedStaticPdfs[cfg.key],
-                copies: cfg.copies
-              });
-              console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
-            } else if (cfg.key === 'DOC_COMPLETO') {
+          for (const cfg of config) {
+            const templateMeta = globalTemplates.find(t => t.key === cfg.key);
+            const isStatic = templateMeta && templateMeta.type !== 'Dynamic' && cfg.key !== 'DOC_COMPLETO';
+
+            if (cfg.key === 'DOC_COMPLETO') {
               // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
               console.log(`✓ Omitiendo DOC_COMPLETO (carpeta de destino)`);
+              continue;
+            }
+
+            if (isStatic) {
+              // Estática: usar la precargada en background, o descargarla on-demand.
+              let base64 = preloadedStaticPdfs[cfg.key];
+              if (base64) {
+                console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+              } else {
+                status.innerText = `⏳ Descargando plantilla: ${templateMeta.name}...`;
+                console.log(`⏳ Descargando estática on-demand: ${cfg.key}`);
+                base64 = await new Promise((resolve, reject) => {
+                  google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(reject)
+                    .getStaticTemplateBase64(cfg.key, cfg.fileId);
+                });
+                if (!base64) throw new Error(`No se pudo obtener el PDF de la plantilla ${templateMeta.name} (${cfg.key}).`);
+                preloadedStaticPdfs[cfg.key] = base64;
+              }
+              finalPdfs.push({ key: cfg.key, base64: base64, copies: cfg.copies });
             } else {
-              // Dynamic template - use from payload
+              // Dinámica: usar la del payload (DOC_ORDENES / DOC_ANALISIS).
               const dynamicPdf = payload.pdfs.find(p => p.key === cfg.key);
               if (dynamicPdf) {
-                finalPdfs.push({
-                  key: cfg.key,
-                  base64: dynamicPdf.base64,
-                  copies: cfg.copies
-                });
+                finalPdfs.push({ key: cfg.key, base64: dynamicPdf.base64, copies: cfg.copies });
                 console.log(`✓ Usando plantilla dinámica del servidor: ${cfg.key}`);
               } else {
                 throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
               }
             }
-          });
-          
+          }
+
           // Replace payload.pdfs with the merged array
           payload.pdfs = finalPdfs;
 
