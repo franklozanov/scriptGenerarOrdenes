@@ -507,8 +507,12 @@
       // ya están en memoria (percepción de velocidad máxima). Si alguna aún no
       // terminó, processPdfGeneration la descarga on-demand como respaldo.
       function startBackgroundStaticPreload() {
+        // Excluir las claves dinámicas (se resuelven por No. de orden/análisis en el
+        // servidor) y DOC_COMPLETO (carpeta destino). Solo precargar plantillas
+        // estáticas reales que tengan fileId de un archivo y acceso.
+        const DYNAMIC_KEYS = ['DOC_ORDENES', 'DOC_ANALISIS', 'DOC_COMPLETO'];
         const staticTemplates = globalTemplates.filter(t =>
-          t.type !== 'Dynamic' && t.key !== 'DOC_COMPLETO' && t.hasAccess && t.fileId
+          DYNAMIC_KEYS.indexOf(t.key) === -1 && t.type !== 'Dynamic' && t.hasAccess && t.fileId
         );
         if (staticTemplates.length === 0) return;
         console.log(`🚀 Precargando ${staticTemplates.length} plantillas estáticas en segundo plano...`);
@@ -919,9 +923,13 @@
           // Respetamos el orden y las copias de config. Usamos un for-of para poder
           // await la descarga on-demand de una estática que aún no esté en memoria.
           const finalPdfs = [];
+          // Claves que SIEMPRE son dinámicas (vienen del servidor por No. de orden /
+          // No. de análisis), nunca estáticas, sin importar su 'type' en la hoja.
+          const DYNAMIC_KEYS = ['DOC_ORDENES', 'DOC_ANALISIS'];
           for (const cfg of config) {
             const templateMeta = globalTemplates.find(t => t.key === cfg.key);
-            const isStatic = templateMeta && templateMeta.type !== 'Dynamic' && cfg.key !== 'DOC_COMPLETO';
+            const isDynamic = DYNAMIC_KEYS.indexOf(cfg.key) !== -1 || (templateMeta && templateMeta.type === 'Dynamic');
+            const isStatic = templateMeta && !isDynamic && cfg.key !== 'DOC_COMPLETO';
 
             if (cfg.key === 'DOC_COMPLETO') {
               // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
