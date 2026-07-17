@@ -386,13 +386,19 @@
       </div>
 
       <div class="section">
-        <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="section-title">
           <span>Selección de Plantillas</span>
-          <button id="toggleValuesBtn" type="button" onclick="toggleTemplateValues()" style="padding: 4px 10px; font-size: 0.8rem; background-color: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s;">🔄 Llevar a 0</button>
         </div>
         <div class="field">
-          <label>Cantidad de Copias</label>
-          <div class="hint">Ajuste el número de copias para cada plantilla</div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
+            <div>
+              <label style="margin-bottom: 2px; display: block;">Cantidad de Copias</label>
+              <div class="hint" style="margin-bottom: 0;">Ajuste el número de copias para cada plantilla</div>
+            </div>
+            <button id="toggleValuesBtn" type="button" onclick="toggleTemplateValues()" style="padding: 4px 12px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none; margin-right: 2px;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
+              <span style="font-size: 0.85rem;">🔄</span> <span id="toggleValuesText">Llevar a 0</span>
+            </button>
+          </div>
           <div id="tplList" class="tpl-container"></div>
         </div>
       </div>
@@ -676,7 +682,7 @@
             }
           });
           templatesZeroed = true;
-          btn.innerText = "🔄 Valores Standard";
+          document.getElementById('toggleValuesText').innerText = "Valores Standard";
         } else {
           // Restaurar valores por defecto (standard)
           activeTemplates.forEach(t => {
@@ -686,7 +692,7 @@
             }
           });
           templatesZeroed = false;
-          btn.innerText = "🔄 Llevar a 0";
+          document.getElementById('toggleValuesText').innerText = "Llevar a 0";
         }
         updateGoButtonState();
       }
