@@ -22,7 +22,7 @@ Detalle técnico profundo de `Index.html` + `PrintLogic.gs` + `Cache.gs` + `Trac
 
 ```js
 let globalTemplates    = [];   // metadatos: {key, name, type, fileId, hasAccess, description, formOrder}
-let preloadedStaticPdfs = {};  // key → base64 (plantillas Type==='File' ya en memoria)
+let preloadedStaticPdfs = {};  // key → base64 (plantillas Type==='Estatica' ya en memoria)
 let preloadState = {           // máquina de estados de la precarga dinámica por orden
   orderNo, status,             // status: 'idle' | 'loading' | 'ready' | 'error'
   data, pdfsByKey, errors
@@ -59,7 +59,7 @@ En el success handler del cliente:
 ```js
 function startBackgroundStaticPreload() {
   const staticTemplates = globalTemplates.filter(t =>
-    t.type === 'File' && t.hasAccess && t.fileId   // ← SOLO Type==='File'
+    t.type === 'Estatica' && t.hasAccess && t.fileId   // ← SOLO Type==='Estatica'
   );
   staticTemplates.forEach(t => {
     if (preloadedStaticPdfs[t.key]) return;
@@ -72,7 +72,7 @@ function startBackgroundStaticPreload() {
 ```
 
 - Se dispara **después** de validar el usuario, **sin bloquear** la apertura del modal.
-- Solo procesa `Type === 'File'`. **NO** toca `DOC_ORDENES`/`DOC_ANALISIS` (Folder dinámicas), `DOC_COMPLETO` (destino) ni `COORD_*`.
+- Solo procesa `Type === 'Estatica'`. **NO** toca `DOC_ORDENES`/`DOC_ANALISIS` (Dinamica), `DOC_COMPLETO` (destino) ni `COORD_*`.
 - Si una falla, no es crítico: `processPdfGeneration` la baja on-demand al generar.
 
 ### Caché chunked (servidor, `Cache.gs`)
@@ -109,7 +109,7 @@ Al teclear el No. de orden, `fetchOrderData(orderNo)` (PrintLogic.gs L170):
 ```js
 for (const cfg of config) {
   const templateMeta = globalTemplates.find(t => t.key === cfg.key);
-  const isStatic = templateMeta && templateMeta.type === 'File';   // ← criterio correcto
+  const isStatic = templateMeta && templateMeta.type === 'Estatica';   // ← criterio correcto
 
   if (cfg.key === 'DOC_COMPLETO') { continue; }                    // carpeta destino: omitir
 
@@ -178,7 +178,7 @@ En julio 2026 el modal empezó a colgarse / fallar. La cadena de causas y correc
 | # | Síntoma | Causa real | Corrección |
 |---|---|---|---|
 | 1 | El PDF se abría pero **no se guardaba** en Drive ni se actualizaba el consecutivo | `if (!newWindow \|\| newWindow.closed \|\| typeof newWindow.closed === 'undefined')` daba **falso positivo** cross-origin y hacía `return`, saltándose `processAndSavePdfBackgroundForUser` | Detectar bloqueo **solo** por `window.open()===null`; disparar el guardado **siempre** |
-| 2 | "No se pudo obtener el PDF de la plantilla … (DOC_ORDENES)" | Se clasificaba estática = `type !== 'Dynamic'` (valor inexistente); `DOC_ORDENES`/`DOC_ANALISIS` (Type=`Folder`) se trataban como estáticas y se intentaba bajarlas con un ID de carpeta | Estática = `type === 'File'`; las Folder dinámicas van al payload |
+| 2 | "No se pudo obtener el PDF de la plantilla … (DOC_ORDENES)" | Se clasificaba estática = `type !== 'Dynamic'` (valor inexistente); `DOC_ORDENES`/`DOC_ANALISIS` (Type=`Folder`) se trataban como estáticas y se intentaba bajarlas con un ID de carpeta | Estática = `type === 'Estatica'`; las Dinamica van al payload |
 | 3 | Modal colgado / `SyntaxError` en `document.write` | Intentos previos de "arreglar" añadieron un `<script>` inline en el `<head>`, carga async de pdf-lib, watchdog y overlay que rompían el arranque | Se reconstruyó `Index.html` sobre la última versión buena y se re-aplicó **solo** la precarga estática |
 | — | (medida preventiva) | Sin `<meta charset>`, GAS puede corromper acentos/emojis al reinyectar el HTML | Añadido `<meta charset="UTF-8">` como primer elemento del `<head>` |
 

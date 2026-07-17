@@ -76,16 +76,17 @@ La columna **`Type`** tiene tres valores reales (⚠️ no existe "Dynamic"):
 
 | `Type` | Significado | Ejemplos de Clave |
 |---|---|---|
-| **`File`** | Plantilla **estática**: un PDF fijo. `Valor` = ID de archivo Drive. | `TPL_CODIFICADO`, `TPL_COC`, `TPL_CHECKLIST`, `TPL_ENTREGA_QA`, ... |
-| **`Folder`** | Carpeta de Drive. `Valor` = ID de carpeta. | `DOC_ORDENES`, `DOC_ANALISIS` (dinámicas), `DOC_COMPLETO` (destino) |
+| **`Estatica`** | Plantilla **estática**: un PDF fijo. `Valor` = ID de archivo Drive. | `TPL_CODIFICADO`, `TPL_COC`, `TPL_CHECKLIST`, `TPL_ENTREGA_QA`, ... |
+| **`Dinamica`** | Carpeta de Drive (ID). | `DOC_ORDENES`, `DOC_ANALISIS` (dinámicas) |
+| **`Config`** | Carpeta de Drive (ID). | `DOC_COMPLETO` (destino) |
 | **`Coordinate`** | Coordenadas x,y para estampar texto. `Valor` = `x: 360, y: 495`. | `COORD_FABRICANTE`, `COORD_EXP`, `COORD_NoANALISIS` |
 
 **Claves especiales:**
-- `DOC_ORDENES` (Folder) → carpeta donde se busca el PDF de la orden **por número de orden**. Es **dinámica**.
-- `DOC_ANALISIS` (Folder) → carpeta donde se busca el certificado **por NoAnalisis**. Es **dinámica**.
-- `DOC_COMPLETO` (Folder) → carpeta **destino** donde se guarda el PDF unificado final.
+- `DOC_ORDENES` (Dinamica) → carpeta donde se busca el PDF de la orden **por número de orden**. Es **dinámica**.
+- `DOC_ANALISIS` (Dinamica) → carpeta donde se busca el certificado **por NoAnalisis**. Es **dinámica**.
+- `DOC_COMPLETO` (Config) → carpeta **destino** donde se guarda el PDF unificado final.
 - `COORD_*` (Coordinate) → dónde se estampan Fabricante / Exp / NoAnalisis sobre el PDF de la orden.
-- `TPL_*` (File) → las 8 plantillas estáticas (ver `STATIC_TEMPLATE_KEYS_` en `Config.gs`).
+- `TPL_*` (Estatica) → las plantillas estáticas (ver `STATIC_TEMPLATE_KEYS_` en `Config.gs`).
 - `TPL_ORDEN` → excluida del listado de plantillas del cliente.
 
 ### Hoja `Ordenes` — datos de las órdenes
@@ -176,7 +177,7 @@ google.script.run.processAndSavePdfBackgroundForUser(...);
 El registro de impresión **nunca** debe depender de que la pestaña abra. Si el popup se bloquea, mostrar un link inline clickeable, no un `alert()+return`.
 
 ### 5.2 Clasificar plantillas por `Type === 'File'`, no por "Dynamic"
-La columna `Type` es `File | Folder | Coordinate`. No existe "Dynamic". Estática = `type === 'File'`. `DOC_ORDENES`/`DOC_ANALISIS` (Folder) van al payload dinámico; tratarlas como estáticas hace que se intente descargarlas con un ID de carpeta y falla ("No se pudo obtener el PDF de la plantilla…").
+La columna `Type` es `Estatica | Dinamica | Coordinate`. Estática = `type === 'Estatica'`. `DOC_ORDENES`/`DOC_ANALISIS` (Dinamica) van al payload dinámico; tratarlas como estáticas hace que se intente descargarlas con un ID de carpeta y falla ("No se pudo obtener el PDF de la plantilla…").
 
 ### 5.3 `<meta charset="UTF-8">` obligatorio en cada modal
 Todo `.html` de modal servido por `HtmlService` **debe** declarar `<meta charset="UTF-8">` como primer elemento del `<head>`. El HTML está lleno de acentos y emojis; sin charset, Apps Script puede corromper la codificación al reinyectar el markup vía `document.write` y romper el parseo.

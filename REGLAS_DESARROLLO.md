@@ -7,8 +7,8 @@ Checklist obligatorio para cualquier cambio en este proyecto de Google Apps Scri
 ## A. Datos y hojas
 
 - **A1. Mapear columnas por NOMBRE, nunca por índice fijo.** Usa `getColumnIndexByNameCaseInsensitive(headers, 'NombreColumna', ...)`. Los usuarios reordenan columnas; `row[5]` es una bomba de tiempo.
-- **A2. La columna `Type` de `templates` es `File | Folder | Coordinate`.** No existe "Dynamic". Estática ⇔ `Type === 'File'`.
-- **A3. Claves especiales de `templates`:** `DOC_ORDENES`/`DOC_ANALISIS` = Folder dinámicas (payload del servidor); `DOC_COMPLETO` = Folder destino (se omite al generar); `COORD_*` = coordenadas; `TPL_*` = estáticas File.
+- **A2. La columna `Type` de `templates` es `Estatica | Dinamica | Coordinate | Config`.** Estática ⇔ `Type === 'Estatica'`.
+- **A3. Claves especiales de `templates`:** `DOC_ORDENES`/`DOC_ANALISIS` = Dinamica (payload del servidor); `DOC_COMPLETO` = Config / destino (se omite al generar); `COORD_*` = coordenadas; `TPL_*` = estáticas (Estatica).
 - **A4. Tras cambiar columnas/permisos, correr "Inicializar Sistema Completo".** Si no, las protecciones y validaciones quedan inconsistentes.
 - **A5. Estructura canónica en `Config.gs → REQUIRED_SHEETS`.** Es la fuente de verdad de qué columnas debe tener cada hoja.
 
