@@ -456,7 +456,8 @@
       }
 
       function hasAnyCopiesSelected() {
-        return globalTemplates.some(t => {
+        const activeTemplates = globalTemplates.filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+        return activeTemplates.some(t => {
           const input = document.getElementById('val_' + t.key);
           return input && (parseInt(input.value) || 0) > 0;
         });
@@ -507,11 +508,11 @@
       // ya están en memoria (percepción de velocidad máxima). Si alguna aún no
       // terminó, processPdfGeneration la descarga on-demand como respaldo.
       function startBackgroundStaticPreload() {
-        // Solo las plantillas estáticas reales son Type === 'File' (un PDF fijo).
-        // Las Folder (DOC_ORDENES/DOC_ANALISIS dinámicas, DOC_COMPLETO destino) y
+        // Solo las plantillas estáticas reales son Type === 'Estatica' (un PDF fijo).
+        // Las Dinamica (DOC_ORDENES/DOC_ANALISIS dinámicas, DOC_COMPLETO destino) y
         // las Coordinate NO se precargan aquí.
         const staticTemplates = globalTemplates.filter(t =>
-          t.type === 'File' && t.hasAccess && t.fileId
+          t.type === 'Estatica' && t.hasAccess && t.fileId
         );
         if (staticTemplates.length === 0) return;
         console.log(`🚀 Precargando ${staticTemplates.length} plantillas estáticas en segundo plano...`);
@@ -664,9 +665,11 @@
 
       function toggleTemplateValues() {
         const btn = document.getElementById('toggleValuesBtn');
+        const activeTemplates = globalTemplates.filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+        
         if (!templatesZeroed) {
           // Llevar todo a cero
-          globalTemplates.forEach(t => {
+          activeTemplates.forEach(t => {
             const input = document.getElementById('val_' + t.key);
             if (input && !input.disabled) {
               input.value = "0";
@@ -676,13 +679,10 @@
           btn.innerText = "🔄 Valores Standard";
         } else {
           // Restaurar valores por defecto (standard)
-          globalTemplates.forEach(t => {
+          activeTemplates.forEach(t => {
             const input = document.getElementById('val_' + t.key);
             if (input && !input.disabled) {
-              let defVal = "1";
-              if (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") defVal = "0";
-              else if (t.key === "TPL_CONTROLES") defVal = "2";
-              input.value = defVal;
+              input.value = t.copias !== undefined ? t.copias.toString() : "1";
             }
           });
           templatesZeroed = false;
@@ -769,13 +769,10 @@
               }
             });
 
-            document.getElementById('tplList').innerHTML = data.templates.map(t => {
-              let defVal = "1"; // Valor por defecto general
-              if (t.key === "TPL_ESTUCHADO" || t.key === "TPL_TERMO") {
-                defVal = "0";
-              } else if (t.key === "TPL_CONTROLES") {
-                defVal = "2";
-              }
+            const activeTemplates = data.templates.filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+            
+            document.getElementById('tplList').innerHTML = activeTemplates.map(t => {
+              let defVal = t.copias !== undefined ? t.copias.toString() : "1";
               
               const noAccess = t.hasAccess === false;
               const rowStyle = noAccess ? 'opacity: 0.5;' : '';
@@ -923,13 +920,13 @@
           // await la descarga on-demand de una estática que aún no esté en memoria.
           const finalPdfs = [];
           // Clasificación según la columna 'Type' de la hoja templates:
-          //   Type === 'File'   -> plantilla estática (un PDF fijo por fileId).
-          //   Type === 'Folder' -> DOC_ORDENES/DOC_ANALISIS son dinámicas (se buscan
+          //   Type === 'Estatica' -> plantilla estática (un PDF fijo por fileId).
+          //   Type === 'Dinamica' -> DOC_ORDENES/DOC_ANALISIS son dinámicas (se buscan
           //                        por No. de orden/análisis y vienen en el payload);
           //                        DOC_COMPLETO es solo carpeta destino y se omite.
           for (const cfg of config) {
             const templateMeta = globalTemplates.find(t => t.key === cfg.key);
-            const isStatic = templateMeta && templateMeta.type === 'File';
+            const isStatic = templateMeta && templateMeta.type === 'Estatica';
 
             if (cfg.key === 'DOC_COMPLETO') {
               // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
@@ -1200,12 +1197,23 @@
       }
 
       function buildConfigFromUI() {
-        return globalTemplates.map(t => ({
-          key: t.key,
-          fileId: t.fileId,
-          hasAccess: t.hasAccess,
-          copies: parseInt(document.getElementById('val_' + t.key) ? document.getElementById('val_' + t.key).value : '0') || 0
-        })).filter(c => c.copies > 0);
+        const config = [];
+        globalTemplates.forEach(t => {
+          let copies = 0;
+          if (t.estado === "Activa" && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate') {
+             const input = document.getElementById('val_' + t.key);
+             copies = input ? (parseInt(input.value) || 0) : 0;
+          }
+          if (copies > 0) {
+            config.push({
+              key: t.key,
+              fileId: t.fileId,
+              hasAccess: t.hasAccess,
+              copies: copies
+            });
+          }
+        });
+        return config;
       }
 
       async function run() {

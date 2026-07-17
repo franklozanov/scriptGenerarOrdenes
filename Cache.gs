@@ -180,6 +180,8 @@ function getInitialData() {
       var colNombreTemplateIdx = getColumnIndexByNameCaseInsensitive(headers, 'NombreTemplate', false);
       var colDescriptionIdx = getColumnIndexByNameCaseInsensitive(headers, 'Description', false);
       var colFormOrderIdx = getColumnIndexByNameCaseInsensitive(headers, 'FormOrder', false);
+      var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'Estado', false);
+      var colCopiasIdx = getColumnIndexByNameCaseInsensitive(headers, 'Copias', false);
       
       if (!colClaveIdx) colClaveIdx = 1;
       if (!colValorIdx) colValorIdx = 2;
@@ -190,15 +192,22 @@ function getInitialData() {
       if (colNombreTemplateIdx) colNombreTemplateIdx = colNombreTemplateIdx - 1;
       if (colDescriptionIdx) colDescriptionIdx = colDescriptionIdx - 1;
       if (colFormOrderIdx) colFormOrderIdx = colFormOrderIdx - 1;
+      if (colEstadoIdx) colEstadoIdx = colEstadoIdx - 1;
+      if (colCopiasIdx) colCopiasIdx = colCopiasIdx - 1;
       
       for (var k = 1; k < tplData.length; k++) {
         var key = tplData[k][colClaveIdx] ? tplData[k][colClaveIdx].toString().trim() : "";
         var value = tplData[k][colValorIdx] ? tplData[k][colValorIdx].toString().trim() : "";
-        var typeVal = (colTypeIdx !== undefined && colTypeIdx !== null && tplData[k][colTypeIdx]) ? tplData[k][colTypeIdx].toString().trim() : "File";
+        var typeVal = (colTypeIdx !== undefined && colTypeIdx !== null && tplData[k][colTypeIdx]) ? tplData[k][colTypeIdx].toString().trim() : "Estatica";
         var descriptionVal = (colDescriptionIdx !== undefined && colDescriptionIdx !== null && tplData[k][colDescriptionIdx]) ? tplData[k][colDescriptionIdx].toString().trim() : "";
         var formOrderRaw = (colFormOrderIdx !== undefined && colFormOrderIdx !== null && tplData[k][colFormOrderIdx]) ? tplData[k][colFormOrderIdx] : 999;
         var formOrderVal = parseInt(formOrderRaw, 10);
         if (isNaN(formOrderVal)) formOrderVal = 999;
+        
+        var estadoVal = (colEstadoIdx !== undefined && colEstadoIdx !== null && tplData[k][colEstadoIdx]) ? tplData[k][colEstadoIdx].toString().trim() : "";
+        var copiasRaw = (colCopiasIdx !== undefined && colCopiasIdx !== null && tplData[k][colCopiasIdx]) ? tplData[k][colCopiasIdx] : 1;
+        var copiasVal = parseInt(copiasRaw, 10);
+        if (isNaN(copiasVal) || copiasVal < 0) copiasVal = 1;
       
         if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
           var displayName = key;
@@ -244,7 +253,7 @@ function getInitialData() {
               }
             }
           }
-          templates.push({ key: key, fileId: value, name: displayName, description: descriptionVal, type: typeVal, formOrder: formOrderVal, hasAccess: hasAccess, base64: base64 });
+          templates.push({ key: key, fileId: value, name: displayName, description: descriptionVal, type: typeVal, formOrder: formOrderVal, estado: estadoVal, copias: copiasVal, hasAccess: hasAccess, base64: base64 });
         }
         
         if (key === "DOC_ORDENES") {
@@ -257,7 +266,7 @@ function getInitialData() {
             }
           }
           
-          templates.push({ key: key, fileId: value, name: displayName, description: descriptionVal, type: typeVal, formOrder: formOrderVal, hasAccess: true, base64: null });
+          templates.push({ key: key, fileId: value, name: displayName, description: descriptionVal, type: typeVal, formOrder: formOrderVal, estado: estadoVal, copias: copiasVal, hasAccess: true, base64: null });
         }
         
         if (key === "DOC_ANALISIS") {
@@ -270,7 +279,7 @@ function getInitialData() {
             }
           }
           
-          templates.push({ key: key, fileId: value, name: displayName, description: descriptionVal, type: typeVal, formOrder: formOrderVal, hasAccess: true, base64: null });
+          templates.push({ key: key, fileId: value, name: displayName, description: descriptionVal, type: typeVal, formOrder: formOrderVal, estado: estadoVal, copias: copiasVal, hasAccess: true, base64: null });
         }
       }
       
@@ -297,7 +306,7 @@ function getInitialData() {
     var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];
-      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, type: t.type, formOrder: t.formOrder, hasAccess: t.hasAccess });
+      dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, type: t.type, formOrder: t.formOrder, estado: t.estado, copias: t.copias, hasAccess: t.hasAccess });
     }
     
     try { cache.put('initialData_v2', JSON.stringify(dataToCache), 600); } catch (e) {
