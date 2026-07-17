@@ -81,7 +81,7 @@ function getStaticTemplateBase64_(key, fileId) {
 function getInitialData() {
   try {
     var cache = CacheService.getScriptCache();
-    var cached = cache.get('initialData_v2');
+    var cached = cache.get('initialData_v3');
     var activeEmail = "";
     var savedProfileIdx = null;
     try { 
@@ -309,7 +309,7 @@ function getInitialData() {
       dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, type: t.type, formOrder: t.formOrder, estado: t.estado, copias: t.copias, hasAccess: t.hasAccess });
     }
     
-    try { cache.put('initialData_v2', JSON.stringify(dataToCache), 600); } catch (e) {
+    try { cache.put('initialData_v3', JSON.stringify(dataToCache), 600); } catch (e) {
       Logger.log("Error caching data: " + e.message);
     }
     return result;
@@ -344,6 +344,7 @@ function clearInitialDataCache() {
   var cache = CacheService.getScriptCache();
   cache.remove('initialData_v1');
   cache.remove('initialData_v2');
+  cache.remove('initialData_v3');
   cache.remove('printConfig_v1');
   for (var i = 0; i < STATIC_TEMPLATE_KEYS_.length; i++) {
     var prefix = getStaticTemplateCachePrefix_(STATIC_TEMPLATE_KEYS_[i]);
