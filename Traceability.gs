@@ -314,7 +314,12 @@ function onEditInstalled(e) {
       var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
       var newValue = e.value !== undefined ? e.value : "(vacío)";
       var cellAddress = editedRange.getA1Notation();
-      var editDesc = "En la hoja '" + sheetName + "', celda " + cellAddress + ": el valor cambió de '" + oldValue + "' a '" + newValue + "'.";
+      
+      var editDesc = "📍 Hoja: " + sheetName + "\n" +
+                     "🎯 Celda: " + cellAddress + "\n" +
+                     "🔴 Antes: " + oldValue + "\n" +
+                     "🟢 Ahora: " + newValue;
+                     
       var logType = (sheetName === 'RegistroNovedad') ? 'EDICION_MANUAL_NOVEDAD' : 'EDICION_CELDA';
       logChange(logType, editDesc, userIdentity);
     } else {
@@ -323,13 +328,19 @@ function onEditInstalled(e) {
       var summaryRows = [];
       var maxRows = Math.min(3, values.length);
       for (var r = 0; r < maxRows; r++) {
-        var rowStr = values[r].map(function(v) { return v === "" ? "(vacío)" : v; }).join(", ");
-        summaryRows.push("[" + rowStr + "]");
+        var rowStr = values[r].map(function(v) { 
+          if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy");
+          return v === "" ? "(vacío)" : v; 
+        }).join(" | ");
+        summaryRows.push("▶ Fila " + (r + 1) + ": [" + rowStr + "]");
       }
-      var valuesDesc = summaryRows.join(" | ");
-      if (values.length > 3) valuesDesc += " ... (y " + (values.length - 3) + " filas más)";
+      var valuesDesc = summaryRows.join("\n");
+      if (values.length > 3) valuesDesc += "\n... (y " + (values.length - 3) + " filas más)";
       
-      var massEditDesc = "En la hoja '" + sheetName + "', se modificaron " + (numRows * numCols) + " celdas simultáneamente (rango " + rangeA1 + "). Valores ingresados: " + valuesDesc + ".";
+      var massEditDesc = "📋 Edición Masiva en: " + sheetName + "\n" +
+                         "📍 Rango: " + rangeA1 + " (" + (numRows * numCols) + " celdas)\n" +
+                         "Valores ingresados:\n" + valuesDesc;
+                         
       var logTypeMass = (sheetName === 'RegistroNovedad') ? 'EDICION_MASIVA_NOVEDAD' : 'EDICION_MASIVA';
       logChange(logTypeMass, massEditDesc, userIdentity);
     }
