@@ -238,11 +238,66 @@ function onEditInstalled(e) {
           if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validación masiva completada.", "Sistema QMS", 3);
           
           logChange('CAMBIO_NO_ORDEN_ANALISIS', 'Revisión en Drive disparada por cambio en NoOrden/NoAnalisis para ' + processNumRows + ' filas.', userIdentity);
-          
-          // Si es edición simple, también hacemos return temprano como en la lógica antigua
-          if (numRows === 1 && numCols === 1) return;
         }
       }
+
+      // 3. Auto-tracking de "SolicitadoPor" (quién pegó/editó la fila)
+      var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false) || getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
+      
+      if (colSolicitadoPor && (startCol > colSolicitadoPor || endCol < colSolicitadoPor)) {
+        var iterStartRow = editedRange.getRow();
+        var iterNumRows = numRows;
+        
+        if (iterStartRow === 1) {
+          iterStartRow = 2;
+          iterNumRows--;
+        }
+        
+        if (iterNumRows > 0) {
+          var targetRange = sheet.getRange(iterStartRow, colSolicitadoPor, iterNumRows, 1);
+          var currentValues = targetRange.getValues();
+          // Validamos usando las primeras 3 columnas (Proceso, Codigo, Descripcion)
+          var firstColRange = sheet.getRange(iterStartRow, 1, iterNumRows, 3).getValues(); 
+          var updateNeeded = false;
+          
+          var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yy HH:mm");
+          var shortUser = userIdentity.split('@')[0]; 
+          var baseStamp = shortUser + " (" + timestamp + ")";
+          
+          for (var i = 0; i < iterNumRows; i++) {
+            var hasData = firstColRange[i].join("").trim() !== "";
+            var currVal = currentValues[i][0] ? currentValues[i][0].toString() : "";
+            
+            if (!hasData) {
+              if (currVal !== "") {
+                currentValues[i][0] = "";
+                updateNeeded = true;
+              }
+              continue;
+            }
+            
+            if (currVal === "") {
+               currentValues[i][0] = "Crea: " + baseStamp;
+               updateNeeded = true;
+            } else {
+               var lines = currVal.split("\n");
+               var newLine = lines[0]; // Mantiene original
+               newLine += "\nMod: " + baseStamp;
+               if (currVal !== newLine) {
+                 currentValues[i][0] = newLine;
+                 updateNeeded = true;
+               }
+            }
+          }
+          
+          if (updateNeeded) {
+            targetRange.setValues(currentValues);
+          }
+        }
+      }
+      
+      // Si es edición simple en NoOrden/NoAnalisis, retornar temprano para no saturar Logs de celda
+      if (numRows === 1 && numCols === 1 && editIntersectsRefs) return;
     }
     
     if (numRows === 1 && numCols === 1) {
