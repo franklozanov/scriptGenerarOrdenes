@@ -326,20 +326,46 @@ function onEditInstalled(e) {
       var rangeA1 = editedRange.getA1Notation();
       var values = editedRange.getValues();
       var summaryRows = [];
-      var maxRows = Math.min(3, values.length);
+      var maxRows = Math.min(10, values.length);
+      var allEmpty = true;
+      
       for (var r = 0; r < maxRows; r++) {
+        var isRowEmpty = true;
         var rowStr = values[r].map(function(v) { 
+          if (v !== "") { allEmpty = false; isRowEmpty = false; }
           if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy");
           return v === "" ? "(vacío)" : v; 
         }).join(" | ");
-        summaryRows.push("▶ Fila " + (r + 1) + ": [" + rowStr + "]");
+        
+        if (!isRowEmpty) {
+          summaryRows.push("▶ Fila " + (r + 1) + ": [" + rowStr + "]");
+        } else {
+          summaryRows.push("▶ Fila " + (r + 1) + ": [Borrada / Vacía]");
+        }
       }
-      var valuesDesc = summaryRows.join("\n");
-      if (values.length > 3) valuesDesc += "\n... (y " + (values.length - 3) + " filas más)";
       
-      var massEditDesc = "📋 Edición Masiva en: " + sheetName + "\n" +
-                         "📍 Rango: " + rangeA1 + " (" + (numRows * numCols) + " celdas)\n" +
-                         "Valores ingresados:\n" + valuesDesc;
+      // Chequear todo el rango más allá de las maxRows para ver si fue un borrado total
+      for (var rr = maxRows; rr < values.length && allEmpty; rr++) {
+        for (var cc = 0; cc < values[rr].length; cc++) {
+          if (values[rr][cc] !== "") { allEmpty = false; break; }
+        }
+      }
+      
+      var valuesDesc = "";
+      var massEditDesc = "";
+      
+      if (allEmpty) {
+        massEditDesc = "📋 Borrado Masivo en: " + sheetName + "\n" +
+                       "📍 Rango: " + rangeA1 + " (" + (numRows * numCols) + " celdas)\n" +
+                       "🔴 Todas las celdas de este rango fueron borradas o vaciadas.";
+      } else {
+        valuesDesc = summaryRows.join("\n");
+        if (values.length > 10) valuesDesc += "\n... (y " + (values.length - 10) + " filas más)";
+        
+        massEditDesc = "📋 Edición Masiva en: " + sheetName + "\n" +
+                       "📍 Rango: " + rangeA1 + " (" + (numRows * numCols) + " celdas)\n" +
+                       "Nuevos Valores ingresados:\n" + valuesDesc;
+      }
                          
       var logTypeMass = (sheetName === 'RegistroNovedad') ? 'EDICION_MASIVA_NOVEDAD' : 'EDICION_MASIVA';
       logChange(logTypeMass, massEditDesc, userIdentity);
