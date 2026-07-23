@@ -269,7 +269,6 @@ function fetchOrderData(orderNo) {
       };
     }
   }
-  }
   // --- FIN VALIDACIÓN DE STATUS ---
   
   // --- VALIDACIÓN DE DECISION (ALERTA DE FÓRMULA) ---
