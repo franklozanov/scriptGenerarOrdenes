@@ -326,36 +326,11 @@ function onEditInstalled(e) {
                updateNeeded = true;
             } else {
                var lines = currVal.split("\n");
-               var newLine = lines[0]; // Mantiene original Crea:
-               
-               var allowMod = false;
-               // Solo actualizar "Mod:" si es una edición individual (evita arrastre/drag-fill masivo)
-               if (iterNumRows === 1) {
-                 var creaMatch = newLine.match(/Crea: .* \((.*?)\)/);
-                 var creaMs = 0;
-                 if (creaMatch) {
-                   var p = creaMatch[1].split(" ");
-                   if (p.length === 2) {
-                     var d = p[0].split("/");
-                     var t = p[1].split(":");
-                     if (d.length === 3 && t.length === 2) {
-                       creaMs = new Date(2000 + parseInt(d[2], 10), parseInt(d[1], 10) - 1, parseInt(d[0], 10), parseInt(t[0], 10), parseInt(t[1], 10)).getTime();
-                     }
-                   }
-                 }
-                 var nowMs = new Date().getTime();
-                 // Permitir "Mod:" si pasaron más de 30 minutos (1800000 ms) o si ya existía un Mod previo
-                 if ((nowMs - creaMs > 1800000) || lines.length > 1) {
-                   allowMod = true;
-                 }
-               }
-               
-               if (allowMod) {
-                 newLine += "\nMod: " + baseStamp;
-                 if (currVal !== newLine) {
-                   currentValues[i][0] = newLine;
-                   updateNeeded = true;
-                 }
+               var newLine = lines[0]; // Mantiene original
+               newLine += "\nMod: " + baseStamp;
+               if (currVal !== newLine) {
+                 currentValues[i][0] = newLine;
+                 updateNeeded = true;
                }
             }
           }
