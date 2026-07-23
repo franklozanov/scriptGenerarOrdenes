@@ -187,14 +187,62 @@ function onEditInstalled(e) {
     if (sheetName === 'Ordenes') {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
-      // 1. Manejo dinámico e histórico de CantDispAFecha
+      var colProceso = getColumnIndexByNameCaseInsensitive(headers, 'Proceso', false);
+      var colCodigo = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', false);
+      var colDescripcion = getColumnIndexByNameCaseInsensitive(headers, 'Descripcion', false);
       var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
+      var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+      var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false) || getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
       var verifCantCol = getColumnIndexByNameCaseInsensitive(headers, 'VerifCant. Disponible', false) || getColumnIndexByNameCaseInsensitive(headers, 'VerifCant.Disponible', false);
       
+      var startRow = editedRange.getRow();
+      var processNumRows = numRows;
+      
+      if (startRow > 1) { // Ignorar el encabezado
+        // ==========================================
+        // FASE 0: LIMPIEZA UNIFICADA DE FILAS
+        // ==========================================
+        var isClearedArray = []; 
+        var procValues = colProceso ? sheet.getRange(startRow, colProceso, processNumRows, 1).getValues() : [];
+        var codValues = colCodigo ? sheet.getRange(startRow, colCodigo, processNumRows, 1).getValues() : [];
+        var descValues = colDescripcion ? sheet.getRange(startRow, colDescripcion, processNumRows, 1).getValues() : [];
+        var anyRowCleared = false;
+        
+        for (var r = 0; r < processNumRows; r++) {
+          var proc = procValues.length > 0 ? procValues[r][0].toString().trim() : "";
+          var cod = codValues.length > 0 ? codValues[r][0].toString().trim() : "";
+          var desc = descValues.length > 0 ? descValues[r][0].toString().trim() : "";
+          
+          if (proc === "" && cod === "" && desc === "") {
+            isClearedArray.push(true);
+            anyRowCleared = true;
+          } else {
+            isClearedArray.push(false);
+          }
+        }
+        
+        if (anyRowCleared) {
+          var dispValues = cantDispAFechaCol ? sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1).getValues() : [];
+          var estValues = colEstadoIdx ? sheet.getRange(startRow, colEstadoIdx, processNumRows, 1).getValues() : [];
+          var solValues = colSolicitadoPor ? sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).getValues() : [];
+          
+          var changedDisp = false, changedEst = false, changedSol = false;
+          
+          for (var r = 0; r < processNumRows; r++) {
+            if (isClearedArray[r]) {
+              if (cantDispAFechaCol && dispValues[r][0] !== "") { dispValues[r][0] = ""; changedDisp = true; }
+              if (colEstadoIdx && estValues[r][0] !== "") { estValues[r][0] = ""; changedEst = true; }
+              if (colSolicitadoPor && solValues[r][0] !== "") { solValues[r][0] = ""; changedSol = true; }
+            }
+          }
+          
+          if (changedDisp) sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1).setValues(dispValues);
+          if (changedEst) sheet.getRange(startRow, colEstadoIdx, processNumRows, 1).setValues(estValues);
+          if (changedSol) sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).setValues(solValues);
+        }
+
+      // 1. Manejo dinámico e histórico de CantDispAFecha
       if (cantDispAFechaCol && verifCantCol) {
-        var startRow = editedRange.getRow();
-        if (startRow > 1) { // Ignorar el encabezado
-          var processNumRows = numRows;
           
           // Forzar recálculo para asegurar que las fórmulas de VerifCant evaluaron la edición actual
           SpreadsheetApp.flush();
@@ -212,6 +260,7 @@ function onEditInstalled(e) {
           var updateNeeded = false;
           
           for (var r = 0; r < processNumRows; r++) {
+            if (isClearedArray[r]) continue;
             var actualVerif = verifValues[r][0];
             var actualCantDisp = cantDispValues[r][0];
             var hasLote = lotes ? (lotes[r][0] !== "") : true;
@@ -278,6 +327,9 @@ function onEditInstalled(e) {
           if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validando documentos en Drive para " + processNumRows + " filas...", "Sistema QMS", 3);
           
           for (var r = 0; r < processNumRows; r++) {
+            // Ajuste de indice ya que Block 2 puede evitar el encabezado dinamicamente
+            var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
+            if (isClearedArray[isClearedIdx]) continue;
             actualizarEstadoDocumentosEnHoja(sheet, startRow + r, headers);
           }
           
@@ -314,6 +366,9 @@ function onEditInstalled(e) {
             var baseStamp = nombreCorto + " (" + timestamp + ")";
             
             for (var i = 0; i < iterNumRows; i++) {
+              var isClearedIdx = (iterStartRow === 2 && editedRange.getRow() === 1) ? i + 1 : i;
+              if (isClearedArray[isClearedIdx]) continue;
+              
               var hasData = firstColRange[i].join("").trim() !== "";
               var currVal = currentValues[i][0] ? currentValues[i][0].toString() : "";
               
