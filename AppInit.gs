@@ -383,8 +383,8 @@ function fixHeaders(ui) {
 // --- VALIDACIONES DE DATOS ---
 
 /**
- * Aplica validaciones de datos tipo dropdown a las columnas de estado de carga.
- * Asegura que solo se usen valores predefinidos en AdjuntoCOA, AdjuntoOA y EstadoCarga.
+ * Aplica validaciones de datos tipo dropdown a la columna de estado unificado.
+ * Asegura que solo se usen valores predefinidos en EstadoDocumentos.
  * 
  * IMPORTANTE: Ejecutar después de agregar las columnas o cuando se necesite reforzar las validaciones.
  * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicialización)
@@ -400,55 +400,45 @@ function aplicarValidacionesEstadoCarga(silent) {
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // Obtener índices de columnas
-    var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-    var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
-    var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    // Obtener índices de la nueva columna unificada
+    var colEstadoDocumentosIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
     
-    if (!colAdjuntoCOAIdx || !colAdjuntoOAIdx || !colEstadoCargaIdx) {
-      throw new Error("No se encontraron las columnas AdjuntoCOA, AdjuntoOA o EstadoCarga. Asegúrese de que existan.");
+    if (!colEstadoDocumentosIdx) {
+      throw new Error("No se encontró la columna EstadoDocumentos. Asegúrese de que exista o inicialice el sistema.");
     }
     
-    var lastRow = sheet.getMaxRows();
+    var lastRow = Math.max(sheet.getMaxRows(), 2);
     
-    // Valores permitidos para AdjuntoCOA y AdjuntoOA (usar constantes de Config.gs)
-    var valoresDocumento = [VALORES_DOCUMENTO.PENDIENTE, VALORES_DOCUMENTO.CARGADO];
-    var ruleDocumento = SpreadsheetApp.newDataValidation()
-      .requireValueInList(valoresDocumento, true)
-      .setAllowInvalid(false)
-      .setHelpText("Seleccione: " + valoresDocumento.join(" o "))
-      .build();
-    
-    // Valores permitidos para EstadoCarga (usar constantes de Config.gs)
-    var valoresEstadoCarga = [
-      VALORES_ESTADO_CARGA.PENDIENTE_AMBOS,
-      VALORES_ESTADO_CARGA.PENDIENTE_OA,
-      VALORES_ESTADO_CARGA.PENDIENTE_COA,
-      VALORES_ESTADO_CARGA.CARGADOS
+    // Valores permitidos para EstadoDocumentos (usar constantes de Config.gs)
+    var valoresEstadoDocumentos = [
+      VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS,
+      VALORES_ESTADO_DOCUMENTOS.FALTA_OA,
+      VALORES_ESTADO_DOCUMENTOS.FALTA_COA,
+      VALORES_ESTADO_DOCUMENTOS.LISTOS
     ];
-    var ruleEstadoCarga = SpreadsheetApp.newDataValidation()
-      .requireValueInList(valoresEstadoCarga, true)
+    
+    var ruleEstadoDocumentos = SpreadsheetApp.newDataValidation()
+      .requireValueInList(valoresEstadoDocumentos, true)
       .setAllowInvalid(false)
-      .setHelpText("Estado calculado automáticamente. Valores: " + valoresEstadoCarga.join(", "))
+      .setHelpText("Estado calculado automáticamente. Valores: " + valoresEstadoDocumentos.join(", "))
       .build();
     
-    // Aplicar validación a AdjuntoCOA (desde fila 2 hasta el final)
-    var rangeCOA = sheet.getRange(2, colAdjuntoCOAIdx, lastRow - 1, 1);
-    rangeCOA.setDataValidation(ruleDocumento);
-    Logger.log("✓ Validación aplicada a columna AdjuntoCOA");
+    // Aplicar validación a EstadoDocumentos (desde fila 2 hasta el final)
+    var rangeEstado = sheet.getRange(2, colEstadoDocumentosIdx, lastRow - 1, 1);
+    rangeEstado.setDataValidation(ruleEstadoDocumentos);
+    Logger.log("✓ Validación aplicada a columna EstadoDocumentos");
     
-    // Aplicar validación a AdjuntoOA
-    var rangeOA = sheet.getRange(2, colAdjuntoOAIdx, lastRow - 1, 1);
-    rangeOA.setDataValidation(ruleDocumento);
-    Logger.log("✓ Validación aplicada a columna AdjuntoOA");
-    
-    // Aplicar validación a EstadoCarga
-    var rangeEstado = sheet.getRange(2, colEstadoCargaIdx, lastRow - 1, 1);
-    rangeEstado.setDataValidation(ruleEstadoCarga);
-    Logger.log("✓ Validación aplicada a columna EstadoCarga");
+    // Proteger la columna para que el usuario no la edite manualmente
+    var protection = rangeEstado.protect().setDescription('Bloqueo de EstadoDocumentos');
+    var me = Session.getEffectiveUser();
+    protection.addEditor(me);
+    protection.removeEditors(protection.getEditors());
+    if (protection.canDomainEdit()) {
+      protection.setDomainEdit(false);
+    }
+    Logger.log("✓ Columna EstadoDocumentos protegida de edición manual");
     
     // LIMPIEZA DE COLUMNAS MANUALES (Ej: SolicitadaPor)
-    // Para prevenir y corregir que columnas manuales tengan validaciones residuales
     var colSolicitadaIdx = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
     if (!colSolicitadaIdx) {
       colSolicitadaIdx = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false);
@@ -465,11 +455,8 @@ function aplicarValidacionesEstadoCarga(silent) {
         var ui = SpreadsheetApp.getUi();
         ui.alert(
           '✅ Validaciones Aplicadas',
-          'Se aplicaron validaciones de datos tipo dropdown a las columnas:\n\n' +
-          '• AdjuntoCOA: Pendiente, ✅ Cargado\n' +
-          '• AdjuntoOA: Pendiente, ✅ Cargado\n' +
-          '• EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados\n\n' +
-          'Ahora solo se podrán ingresar valores válidos en estas columnas.',
+          'Se aplicaron validaciones de datos a la columna unificada:\n\n' +
+          '• EstadoDocumentos: Protegida con 4 estados automáticos.\n',
           ui.ButtonSet.OK
         );
       } catch (uiError) {
@@ -506,7 +493,7 @@ function aplicarValidacionesEstadoCarga(silent) {
  * Prompt para aplicar validaciones con autenticación admin.
  */
 function promptAplicarValidacionesEstadoCarga() {
-  withAdminAuth('Aplicar Validaciones de Estado de Carga', function(ui) {
+  withAdminAuth('Aplicar Validaciones de Estado de Documentos', function(ui) {
     aplicarValidacionesEstadoCarga();
   });
 }

@@ -7,16 +7,11 @@
 // --- CONSTANTES DE VALORES DE DROPDOWN ---
 // Estos valores deben coincidir EXACTAMENTE con los configurados en las validaciones de datos
 
-var VALORES_DOCUMENTO = {
-  PENDIENTE: "Pendiente",
-  CARGADO: "✅ Cargado"
-};
-
-var VALORES_ESTADO_CARGA = {
-  PENDIENTE_AMBOS: "Pendiente COA/OA",
-  PENDIENTE_OA: "Pendiente OA",
-  PENDIENTE_COA: "Pendiente COA",
-  CARGADOS: "✅ Cargados"
+var VALORES_ESTADO_DOCUMENTOS = {
+  FALTAN_AMBOS: "🔴 Faltan Ambos",
+  FALTA_OA: "🟡 Falta OA",
+  FALTA_COA: "🟡 Falta COA",
+  LISTOS: "🟢 Listos para Imprimir"
 };
 
 var VALORES_STATUS = {
@@ -38,7 +33,7 @@ var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 // Estructura requerida de hojas y columnas
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder', 'Estado', 'Copias'],
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'ImpresoPor', 'ReimpresoPor', 'NoPags', 'Reimpresion', 'TotalPags', 'STATUS', 'HistorialImpresion'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'EstadoDocumentos', 'ConsecutivoImp', 'ImpresoPor', 'ReimpresoPor', 'NoPags', 'Reimpresion', 'TotalPags', 'STATUS', 'HistorialImpresion'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']

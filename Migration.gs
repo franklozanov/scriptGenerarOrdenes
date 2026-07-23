@@ -274,3 +274,91 @@ function verificarEstadoMigracion(silent) {
     throw e;
   }
 }
+
+/**
+ * Migra los estados de las 3 columnas antiguas (AdjuntoCOA, AdjuntoOA, EstadoCarga)
+ * hacia la nueva columna unificada "EstadoDocumentos".
+ * 
+ * IMPORTANTE: Antes de ejecutar esta función:
+ * 1. Asegúrese de haber actualizado el código de inicialización
+ * 2. Ejecute Inicializar Sistema Completo para que se cree la columna EstadoDocumentos
+ * 3. Luego ejecute esta función
+ * 4. Finalmente, elimine manualmente las columnas AdjuntoCOA, AdjuntoOA y EstadoCarga
+ */
+function migrarHaciaColumnaUnificada() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    
+    if (!sheet) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    var colEstadoDocumentosIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+    var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    
+    if (!colEstadoDocumentosIdx) {
+      throw new Error("La columna 'EstadoDocumentos' no existe. Por favor, inicialice el sistema completo primero.");
+    }
+    
+    if (!colEstadoCargaIdx) {
+      throw new Error("La columna 'EstadoCarga' ya no existe. Posiblemente la migración ya se realizó y se eliminaron las columnas antiguas.");
+    }
+    
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      var ui = SpreadsheetApp.getUi();
+      ui.alert('Migración', 'No hay datos para migrar.', ui.ButtonSet.OK);
+      return;
+    }
+    
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    var data = dataRange.getValues();
+    var valuesToSet = [];
+    var rowsMigrated = 0;
+    
+    Logger.log("=== INICIANDO MIGRACIÓN A COLUMNA UNIFICADA ===");
+    
+    for (var i = 0; i < data.length; i++) {
+      var estadoCargaValue = data[i][colEstadoCargaIdx - 1];
+      var estadoCargaStr = estadoCargaValue ? estadoCargaValue.toString().trim() : "";
+      
+      var nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
+      
+      if (estadoCargaStr === "✅ Cargados" || estadoCargaStr.indexOf("✅") !== -1) {
+        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.LISTOS;
+      } else if (estadoCargaStr === "Pendiente OA") {
+        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
+      } else if (estadoCargaStr === "Pendiente COA") {
+        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
+      } else {
+        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
+      }
+      
+      valuesToSet.push([nuevoEstado]);
+      rowsMigrated++;
+    }
+    
+    // Escribir todos los estados unificados de una vez (batch write)
+    sheet.getRange(2, colEstadoDocumentosIdx, valuesToSet.length, 1).setValues(valuesToSet);
+    
+    Logger.log("=== MIGRACIÓN COMPLETADA ===");
+    Logger.log("Filas migradas: " + rowsMigrated);
+    
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(
+      'Migración Completada',
+      'Se migraron ' + rowsMigrated + ' filas exitosamente hacia la columna EstadoDocumentos.\n\n' +
+      'AHORA PUEDE ELIMINAR MANUAMENTE LAS SIGUIENTES COLUMNAS DE LA HOJA:\n' +
+      '- AdjuntoCOA\n- AdjuntoOA\n- EstadoCarga',
+      ui.ButtonSet.OK
+    );
+    
+  } catch (e) {
+    Logger.log("ERROR en migración: " + e.message);
+    var ui = SpreadsheetApp.getUi();
+    if(ui) ui.alert('Error', 'Error durante la migración:\n' + e.message, ui.ButtonSet.OK);
+  }
+}
