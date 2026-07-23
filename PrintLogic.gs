@@ -204,8 +204,9 @@ function fetchOrderData(orderNo) {
 
   var targetRowData = dataSheet.getRange(targetRowIndex, 1, 1, dataSheet.getLastColumn()).getValues()[0];
   
-  // Declarar arrays de errores y PDFs al inicio
+  // Declarar arrays de errores, advertencias y PDFs al inicio
   var errors = [];
+  var warnings = [];
   var dynamicPdfs = [];
   
   // --- VALIDACIÓN DE STATUS PARA IMPRESIÓN ---
@@ -268,6 +269,15 @@ function fetchOrderData(orderNo) {
       };
     }
   }
+  
+  // Si no es un estado bloqueante, verificar si es una alerta de la fórmula de validación
+  if (statusValue !== "" && statusValue !== "-" && statusValue.indexOf("OK") === -1 && 
+      statusValue !== "RecibidaQA" && statusValue !== "DevueltaQA" && statusValue !== "Cerrada") {
+    warnings.push({
+      key: "STATUS_FORMULA_ALERT",
+      message: statusValue
+    });
+  }
   // --- FIN VALIDACIÓN DE STATUS ---
   
   var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
@@ -319,7 +329,8 @@ function fetchOrderData(orderNo) {
     formData: formData,
     coords: dynamicCoords,
     pdfs: dynamicPdfs,
-    errors: errors
+    errors: errors,
+    warnings: warnings
   };
 }
 

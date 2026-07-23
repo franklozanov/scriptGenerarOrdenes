@@ -1256,6 +1256,14 @@
 
 
         if (config.length === 0) { alert("Error: Seleccione al menos 1 copia de alguna plantilla."); return; }
+        
+        if (preloadState.data && preloadState.data.warnings && preloadState.data.warnings.length > 0) {
+          const warningMessages = preloadState.data.warnings.map(w => w.message).join('\n');
+          const confirmMsg = "⚠️ ALERTA DE VALIDACIÓN ⚠️\n\nEsta orden presenta las siguientes alertas en su validación:\n" + warningMessages + "\n\n¿Está seguro que desea continuar e imprimir la orden de todos modos?";
+          if (!confirm(confirmMsg)) {
+            return;
+          }
+        }
 
         if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
           setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca “Documentos listos para impresión”.');
