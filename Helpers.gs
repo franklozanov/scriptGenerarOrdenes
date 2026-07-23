@@ -78,48 +78,95 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
 }
 
 /**
- * Calcula el estado consolidado de carga basado en los estados de COA y OA.
- * @param {string} estadoCOA - Estado del Certificado de Análisis ("Pendiente" o "✅ Cargado")
- * @param {string} estadoOA - Estado de la Orden de Acondicionamiento ("Pendiente" o "✅ Cargado")
- * @returns {string} Estado consolidado
+ * Verifica en Drive si existen los PDFs para NoOrden y NoAnalisis.
+ * Usa caché en memoria (volátil) para no consultar Drive múltiples veces por el mismo archivo.
  */
-function calcularEstadoCarga(estadoCOA, estadoOA) {
-  var coa = estadoCOA ? estadoCOA.toString().trim() : "";
-  var oa = estadoOA ? estadoOA.toString().trim() : "";
+var docCache_ = {};
+
+function verificarDocumentosEnDrive(noOrden, noAnalisis) {
+  var tieneOA = false;
+  var tieneCOA = false;
   
-  var coaCargado = (coa === VALORES_DOCUMENTO.CARGADO);
-  var oaCargado = (oa === VALORES_DOCUMENTO.CARGADO);
+  var noOrdenStr = noOrden ? String(noOrden).trim().toLowerCase() : "";
+  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim().toLowerCase() : "";
   
-  if (coaCargado && oaCargado) {
-    return VALORES_ESTADO_CARGA.CARGADOS;
-  } else if (coaCargado && !oaCargado) {
-    return VALORES_ESTADO_CARGA.PENDIENTE_OA;
-  } else if (!coaCargado && oaCargado) {
-    return VALORES_ESTADO_CARGA.PENDIENTE_COA;
+  if (!noOrdenStr && !noAnalisisStr) {
+    return { tieneOA: false, tieneCOA: false };
+  }
+  
+  var config;
+  try { config = getPrintConfig_(); } catch(e) {}
+  
+  if (noOrdenStr && config) {
+    var key = "OA_" + noOrdenStr;
+    if (docCache_[key] !== undefined) {
+      tieneOA = docCache_[key];
+    } else {
+      try {
+        findOrderPdfInFolder(config.DOC_ORDENES, noOrdenStr);
+        tieneOA = true;
+      } catch(e) {
+        tieneOA = false;
+      }
+      docCache_[key] = tieneOA;
+    }
+  }
+  
+  if (noAnalisisStr && config) {
+    var key = "COA_" + noAnalisisStr;
+    if (docCache_[key] !== undefined) {
+      tieneCOA = docCache_[key];
+    } else {
+      try {
+        findAnalysisPdfInFolder(config.DOC_ANALISIS, noAnalisisStr);
+        tieneCOA = true;
+      } catch(e) {
+        tieneCOA = false;
+      }
+      docCache_[key] = tieneCOA;
+    }
+  }
+  
+  return { tieneOA: tieneOA, tieneCOA: tieneCOA };
+}
+
+/**
+ * Calcula el EstadoDocumentos a partir de la existencia de archivos.
+ */
+function calcularEstadoDocumentos(tieneOA, tieneCOA) {
+  if (tieneOA && tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.LISTOS;
+  } else if (tieneOA && !tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
+  } else if (!tieneOA && tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
   } else {
-    return VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
+    return VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
   }
 }
 
 /**
- * Actualiza el estado consolidado de carga en una fila específica.
- * @param {Sheet} sheet - Hoja de cálculo 'Ordenes'
- * @param {number} rowIndex - Número de fila (base-1)
- * @param {Array} headers - Array de encabezados de la hoja
+ * Actualiza el estado consolidado (EstadoDocumentos) de una fila revisando Drive.
  */
-function actualizarEstadoCarga(sheet, rowIndex, headers) {
-  var colCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-  var colOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
-  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+  if (!colEstadoIdx) return;
   
-  if (!colCOAIdx || !colOAIdx || !colEstadoIdx) {
-    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoCarga");
+  var colOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
+  var colAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+  
+  var noOrden = colOrdenIdx ? sheet.getRange(rowIndex, colOrdenIdx).getValue() : "";
+  var noAnalisis = colAnalisisIdx ? sheet.getRange(rowIndex, colAnalisisIdx).getValue() : "";
+  
+  // Si la fila está vacía, borrar estado
+  if ((!noOrden || noOrden.toString().trim() === "") && 
+      (!noAnalisis || noAnalisis.toString().trim() === "")) {
+    sheet.getRange(rowIndex, colEstadoIdx).setValue("");
     return;
   }
   
-  var estadoCOA = sheet.getRange(rowIndex, colCOAIdx).getValue();
-  var estadoOA = sheet.getRange(rowIndex, colOAIdx).getValue();
+  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
+  var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
   
-  var estadoConsolidado = calcularEstadoCarga(estadoCOA, estadoOA);
-  sheet.getRange(rowIndex, colEstadoIdx).setValue(estadoConsolidado);
+  sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
 }

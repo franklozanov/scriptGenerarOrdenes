@@ -52,8 +52,7 @@ function getPendingOrdersList() {
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-    var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-    var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+    var colEstadoDocumentosCol = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
     var colNoAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
     
     var lastRow = sheet.getLastRow();
@@ -69,25 +68,27 @@ function getPendingOrdersList() {
     
     for (var i = 0; i < data.length; i++) {
       var noOrden = data[i][colNoOrdenCol - 1];
-      var estadoCOA = colAdjuntoCOACol ? data[i][colAdjuntoCOACol - 1] : "Pendiente";
-      var estadoOA = colAdjuntoOACol ? data[i][colAdjuntoOACol - 1] : "Pendiente";
+      var estadoDoc = colEstadoDocumentosCol ? data[i][colEstadoDocumentosCol - 1] : "🔴 Faltan Ambos";
       var noAnalisis = colNoAnalisisCol ? data[i][colNoAnalisisCol - 1] : null;
       
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
-      var estadoCOAStr = estadoCOA ? estadoCOA.toString().trim() : "Pendiente";
-      var estadoOAStr = estadoOA ? estadoOA.toString().trim() : "Pendiente";
+      var estadoDocStr = estadoDoc ? estadoDoc.toString().trim() : "🔴 Faltan Ambos";
       var noAnalisisStr = noAnalisis ? noAnalisis.toString().trim() : "";
       
       if (!noOrdenStr) continue;
       
-      // Agregar a lista de OA pendientes si AdjuntoOA != "✅ Cargado"
-      if (estadoOAStr !== "✅ Cargado") {
-        ordenesPendientesOA.push(noOrdenStr);
+      // Agregar a lista de OA pendientes si el estado incluye Faltan Ambos o Falta OA
+      if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta OA") !== -1) {
+        if (ordenesPendientesOA.indexOf(noOrdenStr) === -1) {
+          ordenesPendientesOA.push(noOrdenStr);
+        }
       }
       
-      // Agregar a lista de COA pendientes si AdjuntoCOA != "✅ Cargado" Y tiene NoAnalisis
-      if (estadoCOAStr !== "✅ Cargado" && noAnalisisStr) {
-        ordenesPendientesCOA.push(noAnalisisStr); // Usar NoAnalisis para COA
+      // Agregar a lista de COA pendientes si el estado incluye Faltan Ambos o Falta COA Y tiene NoAnalisis
+      if (noAnalisisStr && (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta COA") !== -1)) {
+        if (ordenesPendientesCOA.indexOf(noAnalisisStr) === -1) {
+          ordenesPendientesCOA.push(noAnalisisStr);
+        }
       }
     }
     
@@ -136,29 +137,24 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var headers = data[0]; // La primera fila son los encabezados
     
     // Mapeo de columnas por nombre de encabezado (base-1 para getRange)
-    var colAdjuntoCOAIdx = getColumnIndexByName(headers, 'AdjuntoCOA', false);
-    var colAdjuntoOAIdx = getColumnIndexByName(headers, 'AdjuntoOA', false);
-    var colEstadoCargaIdx = getColumnIndexByName(headers, 'EstadoCarga', false);
+    var colEstadoDocumentosIdx = getColumnIndexByName(headers, 'EstadoDocumentos', false);
     var colNoOrdenIdx = getColumnIndexByName(headers, 'NoOrden', true);
     var colNoAnalisisIdx = getColumnIndexByName(headers, 'NoAnalisis', false);
     
     // Determinar la columna objetivo según docType (para búsqueda en array data)
     var targetColName = "";
     var folderKey = "";
-    var targetAdjuntoCol = null;
     
     if (docType === "Orden de Acondicionamiento") {
       targetColName = "NoOrden";
       folderKey = "DOC_ORDENES";
-      targetAdjuntoCol = colAdjuntoOAIdx;
     } else if (docType === "Certificado de Analisis") {
       targetColName = "NoAnalisis";
       folderKey = "DOC_ANALISIS";
-      targetAdjuntoCol = colAdjuntoCOAIdx;
     }
     
-    // Validación de seguridad para folderKey y targetAdjuntoCol
-    if (folderKey === "" || !targetAdjuntoCol) {
+    // Validación de seguridad para folderKey
+    if (folderKey === "") {
       return { status: 'error', message: "Tipo de documento no reconocido o columnas no configuradas: " + docType };
     }
     
@@ -171,8 +167,8 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     Logger.log("Indice de Columna Objetivo (0-based): " + targetColIdx);
     Logger.log("Referencia a buscar: " + String(referenceNo).trim().toLowerCase());
     
-    // Bucle de búsqueda de la fila (empezamos en 1 para saltar el encabezado)
-    var targetRowIndex = -1;
+    // Bucle de búsqueda para TODAS las filas que coincidan
+    var targetRowIndices = [];
     var referenceNoStr = String(referenceNo).trim().toLowerCase();
     
     for (var i = 1; i < data.length; i++) {
@@ -180,21 +176,12 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
       
       if (cellValueStr === referenceNoStr) {
-        targetRowIndex = i + 1; // +1 porque el array es base 0, y las filas de la hoja son base 1
-        break;
+        targetRowIndices.push(i + 1); // +1 porque el array es base 0, y las filas de la hoja son base 1
       }
     }
 
-    if (targetRowIndex === -1) {
+    if (targetRowIndices.length === 0) {
       return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja. Puede haber sido eliminada mientras el modal estaba abierto.' };
-    }
-
-    // Validación: verificar que el documento específico esté pendiente
-    var currentEstadoDoc = data[targetRowIndex - 1][targetAdjuntoCol - 1];
-    var currentEstadoDocStr = currentEstadoDoc ? currentEstadoDoc.toString().trim() : "Pendiente";
-    
-    if (currentEstadoDocStr === "✅ Cargado") {
-      return { status: 'error', message: 'El documento "' + docType + '" para "' + referenceNo + '" ya está cargado. Actualice el modal.' };
     }
 
     // Obtener carpeta desde templates
@@ -260,7 +247,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       } else if (!overwriteConfirmed) {
         // Retornar status 'exists' para que el frontend pida confirmación
         Logger.log("Retornando status 'exists' para pedir confirmación al usuario");
-        return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndex };
+        return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndices[0] };
       } else {
         // Si overwriteConfirmed es true, proceder con el reemplazo
         while (existingFiles.hasNext()) {
@@ -281,12 +268,9 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       fileUrl = newFile.getUrl();
     }
 
-    var targetCell = sheetOrdenes.getRange(targetRowIndex, targetAdjuntoCol);
-    targetCell.setValue(VALORES_DOCUMENTO.CARGADO);
-    
-    // Actualizar estado consolidado
-    if (colEstadoCargaIdx) {
-      actualizarEstadoCarga(sheetOrdenes, targetRowIndex, headers);
+    // Actualizar estado consolidado para TODAS las filas afectadas
+    for (var j = 0; j < targetRowIndices.length; j++) {
+      actualizarEstadoDocumentosEnHoja(sheetOrdenes, targetRowIndices[j], headers);
     }
 
     // Auditoría obligatoria

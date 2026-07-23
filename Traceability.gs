@@ -173,118 +173,75 @@ function onEditInstalled(e) {
     var numRows = editedRange.getNumRows();
     var numCols = editedRange.getNumColumns();
 
-    if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
+    if (sheetName === 'Ordenes') {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-
-      var editedColName = headers[editedRange.getColumn() - 1];
       
-      if (editedColName === 'VerifCant. Disponible') {
-        var oldValue = e.oldValue;
-        var newValue = e.value;
+      // 1. Manejo de auto-copia de VerifCant (solo si es edición simple de 1 celda)
+      if (numRows === 1 && numCols === 1) {
+        var editedColName = headers[editedRange.getColumn() - 1];
+        if (editedColName === 'VerifCant. Disponible') {
+          var oldValue = e.oldValue;
+          var newValue = e.value;
 
-        if (oldValue === '-' && newValue !== undefined && newValue !== '' && !isNaN(newValue)) {
-          var numNewValue = Number(newValue);
-          if (numNewValue > 0) {
-            var rowIdx = editedRange.getRow();
-            var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
-            
-            if (cantDispAFechaCol) {
-              sheet.getRange(rowIdx, cantDispAFechaCol).setValue(numNewValue);
-              logChange(
-                'AUTO_COPY_VERIFCANT', 
-                'Copiado automáticamente ' + numNewValue + ' de "VerifCant. Disponible" a "CantDispAFecha" en fila ' + rowIdx, 
-                userIdentity
-              );
-              SpreadsheetApp.getActiveSpreadsheet().toast(
-                'Cantidad disponible copiada automáticamente: ' + numNewValue,
-                'Sistema QMS',
-                3
-              );
-            } else {
-              Logger.log("ADVERTENCIA: Columna 'CantDispAFecha' no encontrada para auto-copia.");
+          if (oldValue === '-' && newValue !== undefined && newValue !== '' && !isNaN(newValue)) {
+            var numNewValue = Number(newValue);
+            if (numNewValue > 0) {
+              var rowIdx = editedRange.getRow();
+              var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
+              
+              if (cantDispAFechaCol) {
+                sheet.getRange(rowIdx, cantDispAFechaCol).setValue(numNewValue);
+                logChange(
+                  'AUTO_COPY_VERIFCANT', 
+                  'Copiado automáticamente ' + numNewValue + ' de "VerifCant. Disponible" a "CantDispAFecha" en fila ' + rowIdx, 
+                  userIdentity
+                );
+                SpreadsheetApp.getActiveSpreadsheet().toast(
+                  'Cantidad disponible copiada automáticamente: ' + numNewValue,
+                  'Sistema QMS',
+                  3
+                );
+              }
             }
           }
         }
       }
-
-      var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-      var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+      
+      // 2. Manejo de cambios en NoOrden o NoAnalisis (para validación masiva y simple)
       var colOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
       var colAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
       
-      // NUEVO: Detectar cambios en AdjuntoCOA o AdjuntoOA y actualizar EstadoCarga automáticamente
-      if ((colAdjuntoCOACol && editedRange.getColumn() === colAdjuntoCOACol) || 
-          (colAdjuntoOACol && editedRange.getColumn() === colAdjuntoOACol)) {
-        var rowIdx = editedRange.getRow();
-        actualizarEstadoCarga(sheet, rowIdx, headers);
-        Logger.log("✓ EstadoCarga actualizado automáticamente en fila " + rowIdx + " después de editar " + editedColName);
-        return;
-      }
-
-      // Manejo de cambios en NoOrden (Verifica existencia o resetea AdjuntoOA)
-      if (colOrdenCol && editedRange.getColumn() === colOrdenCol) {
-        var rowIdx = editedRange.getRow();
-        var nuevoValor = e.value !== undefined ? e.value.toString().trim() : "";
-        var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
+      var editIntersectsRefs = false;
+      var startCol = editedRange.getColumn();
+      var endCol = startCol + numCols - 1;
+      
+      if (colOrdenCol && startCol <= colOrdenCol && endCol >= colOrdenCol) editIntersectsRefs = true;
+      if (colAnalisisCol && startCol <= colAnalisisCol && endCol >= colAnalisisCol) editIntersectsRefs = true;
+      
+      if (editIntersectsRefs) {
+        var startRow = editedRange.getRow();
+        var processNumRows = numRows;
         
-        if (colAdjuntoOACol) {
-          if (nuevoValor === "") {
-            sheet.getRange(rowIdx, colAdjuntoOACol).setValue("");
-            sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
-          } else {
-            var fileExists = false;
-            try {
-              var config = getPrintConfig_();
-              findOrderPdfInFolder(config.DOC_ORDENES, nuevoValor);
-              fileExists = true;
-            } catch(err) {
-              fileExists = false;
-            }
-            var nuevoEstado = fileExists ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE;
-            sheet.getRange(rowIdx, colAdjuntoOACol).setValue(nuevoEstado);
-            sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
-            
-            var toastMsg = fileExists ? "Archivo OA encontrado en Drive. Estado: Cargado." : "Archivo OA no encontrado. Estado: Pendiente.";
-            SpreadsheetApp.getActiveSpreadsheet().toast(toastMsg, "Aviso del Sistema", 5);
-          }
+        // Evitar procesar encabezado
+        if (startRow === 1) {
+          startRow = 2;
+          processNumRows--;
         }
         
-        actualizarEstadoCarga(sheet, rowIdx, headers);
-        logChange('CAMBIO_NO_ORDEN', 'NoOrden cambiado de ' + valorAnterior + ' a ' + (nuevoValor || '(vacío)'), userIdentity);
-        return;
-      }
-
-      // Manejo de cambios en NoAnalisis (Verifica existencia o resetea AdjuntoCOA)
-      if (colAnalisisCol && editedRange.getColumn() === colAnalisisCol) {
-        var rowIdx = editedRange.getRow();
-        var nuevoValor = e.value !== undefined ? e.value.toString().trim() : "";
-        var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
-        
-        if (colAdjuntoCOACol) {
-          if (nuevoValor === "") {
-            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue("");
-            sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
-          } else {
-            var fileExists = false;
-            try {
-              var config = getPrintConfig_();
-              findAnalysisPdfInFolder(config.DOC_ANALISIS, nuevoValor);
-              fileExists = true;
-            } catch(err) {
-              fileExists = false;
-            }
-            var nuevoEstado = fileExists ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE;
-            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(nuevoEstado);
-            sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
-            
-            var toastMsg = fileExists ? "Certificado COA encontrado en Drive. Estado: Cargado." : "Certificado COA no encontrado. Estado: Pendiente.";
-            SpreadsheetApp.getActiveSpreadsheet().toast(toastMsg, "Aviso del Sistema", 5);
+        if (processNumRows > 0) {
+          if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validando documentos en Drive para " + processNumRows + " filas...", "Sistema QMS", 3);
+          
+          for (var r = 0; r < processNumRows; r++) {
+            actualizarEstadoDocumentosEnHoja(sheet, startRow + r, headers);
           }
+          
+          if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validación masiva completada.", "Sistema QMS", 3);
+          
+          logChange('CAMBIO_NO_ORDEN_ANALISIS', 'Revisión en Drive disparada por cambio en NoOrden/NoAnalisis para ' + processNumRows + ' filas.', userIdentity);
+          
+          // Si es edición simple, también hacemos return temprano como en la lógica antigua
+          if (numRows === 1 && numCols === 1) return;
         }
-        
-        actualizarEstadoCarga(sheet, rowIdx, headers);
-        logChange('CAMBIO_NO_ANALISIS', 'NoAnalisis cambiado de ' + valorAnterior + ' a ' + (nuevoValor || '(vacío)'), userIdentity);
-        return;
       }
     }
     
@@ -362,4 +319,56 @@ function logChange(tipoCambio, descripcion, userIdentity) {
   
   sheetLogs.appendRow([timestamp, user, tipoNatural, descripcion]);
   Logger.log("✓ " + tipoNatural + " registrado en Logs");
+}
+
+/**
+ * Función manual ejecutada desde el menú para forzar la actualización del estado
+ * de los documentos en base a lo que realmente hay en Drive.
+ * Se aplica a las filas seleccionadas o a todas si solo hay una celda seleccionada.
+ */
+function forzarActualizacionEstadoDocumentos() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getActiveSheet();
+    
+    if (sheet.getName() !== 'Ordenes') {
+      SpreadsheetApp.getUi().alert('Esta función solo se puede usar en la hoja Ordenes.');
+      return;
+    }
+    
+    var selection = sheet.getActiveRange();
+    var startRow = selection.getRow();
+    var numRows = selection.getNumRows();
+    var maxRows = sheet.getLastRow();
+    
+    // Si seleccionaron toda la hoja (o solo 1 celda), preguntar si quieren procesar todo
+    if (numRows === 1 || startRow === 1) {
+      var ui = SpreadsheetApp.getUi();
+      var response = ui.alert('Confirmación', '¿Desea escanear y actualizar toda la hoja contra Drive? (Esto puede tardar unos segundos)', ui.ButtonSet.YES_NO);
+      if (response !== ui.Button.YES) return;
+      
+      startRow = 2; // Ignorar encabezado
+      numRows = maxRows - 1;
+    }
+    
+    if (numRows < 1) return;
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    SpreadsheetApp.getActiveSpreadsheet().toast("Escaneando " + numRows + " filas en Drive...", "Sistema QMS", 5);
+    
+    var actualizadas = 0;
+    for (var r = 0; r < numRows; r++) {
+      var currentRow = startRow + r;
+      if (currentRow > maxRows) break;
+      
+      actualizarEstadoDocumentosEnHoja(sheet, currentRow, headers);
+      actualizadas++;
+    }
+    
+    SpreadsheetApp.getActiveSpreadsheet().toast("✅ " + actualizadas + " filas validadas exitosamente.", "Sistema QMS", 5);
+  } catch (e) {
+    Logger.log("Error en forzarActualizacionEstadoDocumentos: " + e.message);
+    SpreadsheetApp.getUi().alert("Error", "Ocurrió un error al validar: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
