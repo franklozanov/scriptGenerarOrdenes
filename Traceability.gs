@@ -155,7 +155,18 @@ function onEditInstalled(e) {
       }
     }
     
-    var userIdentity = "Usuario no identificado (edición directa)";
+    var email = (e.user && e.user.getEmail()) ? e.user.getEmail() : Session.getActiveUser().getEmail();
+    var userIdentity = email || "Usuario no identificado (edición directa)";
+    var nombreCorto = email ? email.split('@')[0] : "Usuario";
+    
+    // Obtener NombreCorto desde la hoja Usuarios usando Auth.gs si está disponible
+    if (email && typeof getUserRecordsByEmail_ === 'function') {
+      var userRecords = getUserRecordsByEmail_(email);
+      if (userRecords && userRecords.length > 0) {
+        userIdentity = userRecords[0].userId + " - " + (userRecords[0].nombreCorto || userRecords[0].userId);
+        nombreCorto = userRecords[0].nombreCorto || userRecords[0].userId;
+      }
+    }
     
     if (!hasPermission) {
       editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
@@ -261,8 +272,7 @@ function onEditInstalled(e) {
           var updateNeeded = false;
           
           var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yy HH:mm");
-          var shortUser = userIdentity.split('@')[0]; 
-          var baseStamp = shortUser + " (" + timestamp + ")";
+          var baseStamp = nombreCorto + " (" + timestamp + ")";
           
           for (var i = 0; i < iterNumRows; i++) {
             var hasData = firstColRange[i].join("").trim() !== "";
