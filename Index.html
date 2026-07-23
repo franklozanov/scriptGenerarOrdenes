@@ -452,7 +452,12 @@
 
       function renderPreloadResult(response) {
         if (response.ready) {
-          setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Documentos listos para impresión.');
+          if (response.warnings && response.warnings.length > 0) {
+            const warningMessages = response.warnings.map(w => '⚠️ ' + w.message).join('<br>');
+            setPreloadBanner('warning', '⚠️ <b>ALERTA DE VALIDACIÓN:</b><br>' + warningMessages);
+          } else {
+            setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Documentos listos para impresión.');
+          }
           updateGoButtonState();
           return;
         }
