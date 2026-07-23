@@ -321,24 +321,36 @@ function migrarHaciaColumnaUnificada() {
     
     Logger.log("=== INICIANDO MIGRACIÓN A COLUMNA UNIFICADA ===");
     
+    var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
+    var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+    
     for (var i = 0; i < data.length; i++) {
       var estadoCargaValue = data[i][colEstadoCargaIdx - 1];
       var estadoCargaStr = estadoCargaValue ? estadoCargaValue.toString().trim() : "";
       
-      var nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
+      var noOrdenValue = colNoOrdenIdx ? data[i][colNoOrdenIdx - 1] : null;
+      var noAnalisisValue = colNoAnalisisIdx ? data[i][colNoAnalisisIdx - 1] : null;
       
-      if (estadoCargaStr === "✅ Cargados" || estadoCargaStr.indexOf("✅") !== -1) {
-        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.LISTOS;
-      } else if (estadoCargaStr === "Pendiente OA") {
-        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
-      } else if (estadoCargaStr === "Pendiente COA") {
-        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
-      } else {
-        nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
+      var tieneOrden = noOrdenValue && noOrdenValue.toString().trim() !== "";
+      var tieneAnalisis = noAnalisisValue && noAnalisisValue.toString().trim() !== "";
+      
+      var nuevoEstado = ""; // Por defecto vacío para filas sin datos
+      
+      // Solo asignar estado si hay una orden o análisis en la fila
+      if (tieneOrden || tieneAnalisis || estadoCargaStr !== "") {
+        if (estadoCargaStr === "✅ Cargados" || estadoCargaStr.indexOf("✅") !== -1) {
+          nuevoEstado = VALORES_ESTADO_DOCUMENTOS.LISTOS;
+        } else if (estadoCargaStr === "Pendiente OA") {
+          nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
+        } else if (estadoCargaStr === "Pendiente COA") {
+          nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
+        } else {
+          nuevoEstado = VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
+        }
       }
       
       valuesToSet.push([nuevoEstado]);
-      rowsMigrated++;
+      if (nuevoEstado !== "") rowsMigrated++;
     }
     
     // Escribir todos los estados unificados de una vez (batch write)
