@@ -290,53 +290,92 @@ function onEditInstalled(e) {
       // 3. Auto-tracking de "SolicitadoPor" (quién pegó/editó la fila)
       var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false) || getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
       
-      if (colSolicitadoPor && (startCol > colSolicitadoPor || endCol < colSolicitadoPor)) {
-        var iterStartRow = editedRange.getRow();
-        var iterNumRows = numRows;
+      if (colSolicitadoPor) {
+        var intersectsSolicitadoPor = (startCol <= colSolicitadoPor && endCol >= colSolicitadoPor);
         
-        if (iterStartRow === 1) {
-          iterStartRow = 2;
-          iterNumRows--;
-        }
-        
-        if (iterNumRows > 0) {
-          var targetRange = sheet.getRange(iterStartRow, colSolicitadoPor, iterNumRows, 1);
-          var currentValues = targetRange.getValues();
-          // Validamos usando las primeras 3 columnas (Proceso, Codigo, Descripcion)
-          var firstColRange = sheet.getRange(iterStartRow, 1, iterNumRows, 3).getValues(); 
-          var updateNeeded = false;
+        // Procesamos la trazabilidad si no editaron SOLO esa columna manualmente
+        if (!(intersectsSolicitadoPor && numCols === 1)) {
+          var iterStartRow = editedRange.getRow();
+          var iterNumRows = numRows;
           
-          var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yy HH:mm");
-          var baseStamp = nombreCorto + " (" + timestamp + ")";
-          
-          for (var i = 0; i < iterNumRows; i++) {
-            var hasData = firstColRange[i].join("").trim() !== "";
-            var currVal = currentValues[i][0] ? currentValues[i][0].toString() : "";
-            
-            if (!hasData) {
-              if (currVal !== "") {
-                currentValues[i][0] = "";
-                updateNeeded = true;
-              }
-              continue;
-            }
-            
-            if (currVal === "") {
-               currentValues[i][0] = "Crea: " + baseStamp;
-               updateNeeded = true;
-            } else {
-               var lines = currVal.split("\n");
-               var newLine = lines[0]; // Mantiene original
-               newLine += "\nMod: " + baseStamp;
-               if (currVal !== newLine) {
-                 currentValues[i][0] = newLine;
-                 updateNeeded = true;
-               }
-            }
+          if (iterStartRow === 1) {
+            iterStartRow = 2;
+            iterNumRows--;
           }
           
-          if (updateNeeded) {
-            targetRange.setValues(currentValues);
+          if (iterNumRows > 0) {
+            var targetRange = sheet.getRange(iterStartRow, colSolicitadoPor, iterNumRows, 1);
+            var currentValues = targetRange.getValues();
+            // Validamos usando las primeras 3 columnas (Proceso, Codigo, Descripcion)
+            var firstColRange = sheet.getRange(iterStartRow, 1, iterNumRows, 3).getValues(); 
+            var updateNeeded = false;
+            
+            var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yy HH:mm");
+            var baseStamp = nombreCorto + " (" + timestamp + ")";
+            
+            for (var i = 0; i < iterNumRows; i++) {
+              var hasData = firstColRange[i].join("").trim() !== "";
+              var currVal = currentValues[i][0] ? currentValues[i][0].toString() : "";
+              
+              if (!hasData) {
+                if (currVal !== "") {
+                  currentValues[i][0] = "";
+                  updateNeeded = true;
+                }
+                continue;
+              }
+              
+              // Si la celda está vacía O si el usuario pegó una fila completa (arrastrando basura vieja en esta col)
+              if (currVal === "" || intersectsSolicitadoPor) {
+                 currentValues[i][0] = "Crea: " + baseStamp;
+                 updateNeeded = true;
+              } else {
+                 var lines = currVal.split("\n");
+                 var newLine = lines[0]; // Mantiene original Crea:
+                 
+                 var allowMod = false;
+                 
+                 // Arquitectura Híbrida: Solo evaluamos "Mod:" en ediciones individuales
+                 if (iterNumRows === 1) {
+                   // 1. Cambio Duro (Sobreescritura / Borrado): e.oldValue tiene datos
+                   if (e.oldValue !== undefined && e.oldValue !== "") {
+                     allowMod = true;
+                   } 
+                   // 2. Llenado de celda en blanco: verificamos madurez de la fila (30 mins)
+                   else {
+                     var creaMatch = newLine.match(/Crea: .* \((.*?)\)/);
+                     var creaMs = 0;
+                     if (creaMatch) {
+                       var p = creaMatch[1].split(" ");
+                       if (p.length === 2) {
+                         var d = p[0].split("/");
+                         var t = p[1].split(":");
+                         if (d.length === 3 && t.length === 2) {
+                           creaMs = new Date(2000 + parseInt(d[2], 10), parseInt(d[1], 10) - 1, parseInt(d[0], 10), parseInt(t[0], 10), parseInt(t[1], 10)).getTime();
+                         }
+                       }
+                     }
+                     var nowMs = new Date().getTime();
+                     // Si pasaron más de 30 minutos (1800000 ms) o si ya tenía un Mod previo
+                     if ((nowMs - creaMs > 1800000) || lines.length > 1) {
+                       allowMod = true;
+                     }
+                   }
+                 }
+                 
+                 if (allowMod) {
+                   newLine += "\nMod: " + baseStamp;
+                   if (currVal !== newLine) {
+                     currentValues[i][0] = newLine;
+                     updateNeeded = true;
+                   }
+                 }
+              }
+            }
+            
+            if (updateNeeded) {
+              targetRange.setValues(currentValues);
+            }
           }
         }
       }
