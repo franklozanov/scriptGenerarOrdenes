@@ -515,19 +515,49 @@
           preloadState.pdfsByKey.DOC_ANALISIS;
       }
 
+      function getTemplateFriendlyName(key) {
+        if (!key) return "Documento";
+        const tpl = globalTemplates.find(t => t.key === key);
+        if (tpl && tpl.name) return tpl.name;
+        if (key === 'DOC_ORDENES') return 'Orden de Producción';
+        if (key === 'DOC_ANALISIS') return 'Certificado de Análisis';
+        return key;
+      }
+
       function renderPreloadResult(response) {
-        if (response.ready) {
-          if (response.warnings && response.warnings.length > 0) {
-            const warningMessages = response.warnings.map(w => '⚠️ ' + w.message).join('<br>');
-            setPreloadBanner('warning', '⚠️ <b>ALERTA DE VALIDACIÓN:</b><br>' + warningMessages);
+        const warnings = response.warnings || [];
+        const errors = response.errors || [];
+        
+        if (errors.length === 0 && warnings.length === 0) {
+          setPreloadBanner('success', '✅ Orden lista para impresión');
+        } else {
+          let html = '⚠️ <b>Novedades encontradas:</b><br><ul style="margin: 4px 0 0 20px; padding: 0; line-height: 1.4;">';
+          
+          errors.forEach(err => {
+            let msg = err.message;
+            if (err.key) {
+               msg = 'Falta Documento: <b>' + getTemplateFriendlyName(err.key) + '</b>';
+            }
+            html += '<li>' + msg + '</li>';
+          });
+          
+          warnings.forEach(w => {
+            let msg = w.message;
+            if (w.key === 'DECISION_FORMULA_ALERT' || w.key === 'STATUS_FORMULA_ALERT') {
+               msg = 'Alerta en validación: <b>' + w.message + '</b>';
+            }
+            html += '<li>' + msg + '</li>';
+          });
+          
+          html += '</ul>';
+          
+          if (errors.length > 0) {
+            setPreloadBanner('error', html);
           } else {
-            setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Documentos listos para impresión.');
+            setPreloadBanner('warning', html);
           }
-          updateGoButtonState();
-          return;
         }
-        const messages = (response.errors || []).map(err => '⚠️ ' + err.message);
-        setPreloadBanner('error', messages.join('<br>') || '⚠️ No fue posible preparar los documentos dinámicos.');
+        
         updateGoButtonState();
       }
 
@@ -573,7 +603,7 @@
           }
         } else if (isOrderReady && isEnabled && status.innerText.includes("⚠️")) {
           // Limpiar aviso si ya todo está correcto
-          status.innerText = "✅ Documentos listos para impresión";
+          status.innerText = "✅ Documentos completos";
           status.className = "success-text";
         }
       }
@@ -663,7 +693,7 @@
             
             // Update status to show data is ready
             if (status && !status.innerText.includes("Impresión registrada")) {
-              status.innerText = response.ready ? "✅ Documentos listos para impresión" : "⚠️ Faltan documentos requeridos";
+              status.innerText = response.ready ? "✅ Documentos completos" : "⚠️ Faltan documentos requeridos";
               status.className = response.ready ? "success-text" : "error-text";
             }
           })
