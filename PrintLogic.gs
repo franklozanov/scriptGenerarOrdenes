@@ -278,7 +278,13 @@ function fetchOrderData(orderNo) {
     decisionValue = targetRowData[colDecisionCol - 1] ? targetRowData[colDecisionCol - 1].toString().trim() : "";
   }
   
-  if (decisionValue !== "" && decisionValue !== "-" && decisionValue.indexOf("OK") === -1) {
+  // Agregar siempre un warning de debug para ver qué está leyendo el sistema
+  warnings.push({
+    key: "DEBUG_DECISION",
+    message: "[DEBUG] Columna: " + colDecisionCol + " | Valor leído: '" + decisionValue + "'"
+  });
+  
+  if (decisionValue !== "" && decisionValue !== "-" && decisionValue.toUpperCase().indexOf("OK") === -1) {
     warnings.push({
       key: "DECISION_FORMULA_ALERT",
       message: decisionValue
