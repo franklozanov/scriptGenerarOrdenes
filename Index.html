@@ -272,6 +272,12 @@
         border: 1.5px solid #a7f3d0;
         box-shadow: 0 2px 4px rgba(5, 150, 105, 0.1);
       }
+      .warning-text { 
+        color: #b45309; 
+        background: #fffbeb;
+        border: 1.5px solid #fde68a;
+        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+      }
       .info-text { 
         color: #1976d2; 
         background: #e3f2fd;
@@ -601,10 +607,14 @@
             status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
             status.className = "error-text";
           }
-        } else if (isOrderReady && isEnabled && status.innerText.includes("⚠️")) {
-          // Limpiar aviso si ya todo está correcto
-          status.innerText = "✅ Documentos completos";
-          status.className = "success-text";
+        } else if (isOrderReady && isEnabled) {
+          if (preloadState.data && preloadState.data.warnings && preloadState.data.warnings.length > 0) {
+            status.innerText = "⚠️ Imprimir con alertas";
+            status.className = "warning-text";
+          } else {
+            status.innerText = "✅ Documentos completos";
+            status.className = "success-text";
+          }
         }
       }
 
@@ -693,8 +703,18 @@
             
             // Update status to show data is ready
             if (status && !status.innerText.includes("Impresión registrada")) {
-              status.innerText = response.ready ? "✅ Documentos completos" : "⚠️ Faltan documentos requeridos";
-              status.className = response.ready ? "success-text" : "error-text";
+              if (response.ready) {
+                if (response.warnings && response.warnings.length > 0) {
+                  status.innerText = "⚠️ Imprimir con alertas";
+                  status.className = "warning-text";
+                } else {
+                  status.innerText = "✅ Documentos completos";
+                  status.className = "success-text";
+                }
+              } else {
+                status.innerText = "⚠️ Faltan documentos requeridos";
+                status.className = "error-text";
+              }
             }
           })
           .withFailureHandler(error => {
@@ -1415,6 +1435,14 @@
         maxWidth: 1200,
         maxHeight: 1000
       });
+
+      // Resize dynamically to 80% of available screen height for better UX on large screens
+      try {
+        const targetHeight = Math.min(Math.max(window.screen.availHeight * 0.8, 600), 1000);
+        google.script.host.setHeight(Math.round(targetHeight));
+      } catch (e) {
+        console.log("Could not auto-resize height:", e);
+      }
     </script>
   </body>
 </html>
