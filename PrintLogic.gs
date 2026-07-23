@@ -269,16 +269,23 @@ function fetchOrderData(orderNo) {
       };
     }
   }
-  
-  // Si no es un estado bloqueante, verificar si es una alerta de la fórmula de validación
-  if (statusValue !== "" && statusValue !== "-" && statusValue.indexOf("OK") === -1 && 
-      statusValue !== "RecibidaQA" && statusValue !== "DevueltaQA" && statusValue !== "Cerrada") {
-    warnings.push({
-      key: "STATUS_FORMULA_ALERT",
-      message: statusValue
-    });
   }
   // --- FIN VALIDACIÓN DE STATUS ---
+  
+  // --- VALIDACIÓN DE DECISION (ALERTA DE FÓRMULA) ---
+  var colDecisionCol = getColumnIndexByNameCaseInsensitive(headers, 'Decision', false);
+  var decisionValue = "";
+  if (colDecisionCol) {
+    decisionValue = targetRowData[colDecisionCol - 1] ? targetRowData[colDecisionCol - 1].toString().trim() : "";
+  }
+  
+  if (decisionValue !== "" && decisionValue !== "-" && decisionValue.indexOf("OK") === -1) {
+    warnings.push({
+      key: "DECISION_FORMULA_ALERT",
+      message: decisionValue
+    });
+  }
+  // --- FIN VALIDACIÓN DE DECISION ---
   
   var fieldNames = ["Proceso", "Codigo", "Descripcion", "Lote", "Exp", "Cantidad", "NoAnalisis", "NoOrden", "Fabricante"];
   var formData = {};
