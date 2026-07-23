@@ -187,33 +187,68 @@ function onEditInstalled(e) {
     if (sheetName === 'Ordenes') {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
-      // 1. Manejo de auto-copia de VerifCant (solo si es edición simple de 1 celda)
-      if (numRows === 1 && numCols === 1) {
-        var editedColName = headers[editedRange.getColumn() - 1];
-        if (editedColName === 'VerifCant. Disponible') {
-          var oldValue = e.oldValue;
-          var newValue = e.value;
-
-          if (oldValue === '-' && newValue !== undefined && newValue !== '' && !isNaN(newValue)) {
-            var numNewValue = Number(newValue);
-            if (numNewValue > 0) {
-              var rowIdx = editedRange.getRow();
-              var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
-              
-              if (cantDispAFechaCol) {
-                sheet.getRange(rowIdx, cantDispAFechaCol).setValue(numNewValue);
-                logChange(
-                  'AUTO_COPY_VERIFCANT', 
-                  'Copiado automáticamente ' + numNewValue + ' de "VerifCant. Disponible" a "CantDispAFecha" en fila ' + rowIdx, 
-                  userIdentity
-                );
-                SpreadsheetApp.getActiveSpreadsheet().toast(
-                  'Cantidad disponible copiada automáticamente: ' + numNewValue,
-                  'Sistema QMS',
-                  3
-                );
+      // 1. Manejo dinámico e histórico de CantDispAFecha
+      var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
+      var verifCantCol = getColumnIndexByNameCaseInsensitive(headers, 'VerifCant. Disponible', false) || getColumnIndexByNameCaseInsensitive(headers, 'VerifCant.Disponible', false);
+      
+      if (cantDispAFechaCol && verifCantCol) {
+        var startRow = editedRange.getRow();
+        if (startRow > 1) { // Ignorar el encabezado
+          var processNumRows = numRows;
+          
+          // Forzar recálculo para asegurar que las fórmulas de VerifCant evaluaron la edición actual
+          SpreadsheetApp.flush();
+          
+          var targetRangeCantDisp = sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1);
+          var targetRangeVerif = sheet.getRange(startRow, verifCantCol, processNumRows, 1);
+          
+          var colLote = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
+          var colCodigo = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', false);
+          var lotes = colLote ? sheet.getRange(startRow, colLote, processNumRows, 1).getValues() : null;
+          var codigos = colCodigo ? sheet.getRange(startRow, colCodigo, processNumRows, 1).getValues() : null;
+          
+          var cantDispValues = targetRangeCantDisp.getValues();
+          var verifValues = targetRangeVerif.getValues();
+          var updateNeeded = false;
+          
+          for (var r = 0; r < processNumRows; r++) {
+            var actualVerif = verifValues[r][0];
+            var actualCantDisp = cantDispValues[r][0];
+            var hasLote = lotes ? (lotes[r][0] !== "") : true;
+            var hasCodigo = codigos ? (codigos[r][0] !== "") : true;
+            
+            // Regla A: Si CantDispAFecha está vacía, y ya hay Lote y Codigo, capturamos el inventario actual
+            if (actualCantDisp === "" && actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && hasLote && hasCodigo) {
+              cantDispValues[r][0] = actualVerif;
+              updateNeeded = true;
+              logChange('AUTO_COPY_VERIFCANT', 'Captura inicial: ' + actualVerif + ' a CantDispAFecha en fila ' + (startRow + r), userIdentity);
+            } 
+            else if (actualCantDisp !== "") {
+              // Regla B: Si ya se capturó antes, pero el usuario edita Cantidad o NoAnalisis (edición individual)
+              if (numRows === 1 && numCols === 1) {
+                var editedColName = headers[editedRange.getColumn() - 1];
+                if (editedColName === 'Cantidad' || editedColName === 'NoAnalisis') {
+                   // Validar que exista un número nuevo válido y diferente al histórico
+                   if (actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && actualVerif !== actualCantDisp) {
+                     var ui = SpreadsheetApp.getUi();
+                     var response = ui.alert(
+                       'Actualización de Inventario',
+                       'Has modificado la columna "' + editedColName + '" en la fila ' + startRow + '.\n\n¿Deseas actualizar el registro histórico de "CantDispAFecha" con el valor de inventario actual disponible (' + actualVerif + ')?\n\n(Valor guardado actualmente: ' + actualCantDisp + ')',
+                       ui.ButtonSet.YES_NO
+                     );
+                     if (response === ui.Button.YES) {
+                       cantDispValues[r][0] = actualVerif;
+                       updateNeeded = true;
+                       logChange('ACTUALIZACION_CANT_DISP', 'Usuario actualizó CantDispAFecha de ' + actualCantDisp + ' a ' + actualVerif + ' tras modificar ' + editedColName + ' en fila ' + startRow, userIdentity);
+                     }
+                   }
+                }
               }
             }
+          }
+          
+          if (updateNeeded) {
+            targetRangeCantDisp.setValues(cantDispValues);
           }
         }
       }
