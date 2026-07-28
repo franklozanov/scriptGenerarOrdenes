@@ -224,3 +224,36 @@ function setWebAppUrl(url) {
   Logger.log("WEB_APP_URL guardada correctamente: " + cleanUrl);
   return "WEB_APP_URL guardada correctamente.";
 }
+
+/**
+ * Redirige una solicitud al Web App a través del servidor para evitar problemas de CORS y múltiples cuentas.
+ * @param {string} payloadString - El payload JSON como string
+ * @returns {string} La respuesta del Web App como string JSON
+ */
+function proxyWebAppPost(payloadString) {
+  var url = getWebAppUrl();
+  var options = {
+    method: 'post',
+    contentType: 'text/plain',
+    payload: payloadString,
+    headers: {
+      Authorization: 'Bearer ' + ScriptApp.getOAuthToken()
+    },
+    muteHttpExceptions: true
+  };
+  
+  var response = UrlFetchApp.fetch(url, options);
+  var responseCode = response.getResponseCode();
+  var responseText = response.getContentText();
+  
+  // Si la respuesta es HTML (p. ej., página de inicio de sesión de Google)
+  if (responseText && responseText.trim().indexOf('<!DOCTYPE') === 0) {
+    throw new Error('El Web App devolvió una página HTML en lugar de JSON. Verifique los permisos de publicación o actualice la URL del Web App.');
+  }
+  
+  if (responseCode !== 200 && responseCode !== 302) {
+    throw new Error('Error del servidor proxy (' + responseCode + '): ' + responseText.substring(0, 100));
+  }
+  
+  return responseText;
+}
