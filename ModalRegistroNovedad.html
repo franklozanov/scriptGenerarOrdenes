@@ -351,26 +351,29 @@
 
       showLoading('Registrando novedad...');
 
-      google.script.run
-        .withSuccessHandler(function(responseText) {
-          hideLoading();
-          try {
-            var result = JSON.parse(responseText);
-            if (result.status === 'success') {
-              showAlert('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
-              resetearCamposNovedad();
-            } else {
-              showError('Error al registrar novedad: ' + (result.message || 'Error desconocido'));
-            }
-          } catch(e) {
-            showError('Error al parsear respuesta: ' + e.message);
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideLoading();
-          showError('Error de conexión proxy: ' + error.message);
-        })
-        .proxyWebAppPost(JSON.stringify(params));
+      fetch(globalWebAppUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify(params)
+      })
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(result) {
+        hideLoading();
+        if (result.status === 'success') {
+          showAlert('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
+          resetearCamposNovedad();
+        } else {
+          showError('Error al registrar novedad: ' + (result.message || 'Error desconocido'));
+        }
+      })
+      .catch(function(error) {
+        hideLoading();
+        showError('Error al registrar novedad: ' + error.message);
+      });
     }
 
     function resetearCamposNovedad() {

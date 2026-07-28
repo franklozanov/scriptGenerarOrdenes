@@ -999,30 +999,29 @@
           return;
         }
         
-        var payloadStr = JSON.stringify({
-          operation: 'uploadDocument',
-          base64Data: cached.base64Content,
-          mimeType: cached.metadata.type,
-          fileName: cached.metadata.name,
-          referenceNo: referenceNo,
-          docType: docType,
-          overwriteConfirmed: overwriteConfirmed,
-          userId: userId
+        fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            operation: 'uploadDocument',
+            base64Data: cached.base64Content,
+            mimeType: cached.metadata.type,
+            fileName: cached.metadata.name,
+            referenceNo: referenceNo,
+            docType: docType,
+            overwriteConfirmed: overwriteConfirmed,
+            userId: userId
+          })
+        })
+        .then(function(response) {
+          return response.json();
+        })
+        .then(function(result) {
+          resolve(result);
+        })
+        .catch(function(error) {
+          reject(new Error('Error al comunicarse con la Web App: ' + error.message));
         });
-        
-        google.script.run
-          .withSuccessHandler(function(responseText) {
-            try {
-              var result = JSON.parse(responseText);
-              resolve(result);
-            } catch(e) {
-              reject(new Error('Error al parsear respuesta: ' + e.message));
-            }
-          })
-          .withFailureHandler(function(error) {
-            reject(new Error('Error al comunicarse con la Web App (proxy): ' + error.message));
-          })
-          .proxyWebAppPost(payloadStr);
       });
     }
 
@@ -1186,30 +1185,29 @@
             return;
           }
 
-          var payloadStr = JSON.stringify({
-            operation: 'uploadDocument',
-            base64Data: base64Content,
-            mimeType: file.type,
-            fileName: file.name,
-            referenceNo: referenceNo,
-            docType: docType,
-            overwriteConfirmed: overwriteConfirmed,
-            userId: userId
+          fetch(globalWebAppUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              operation: 'uploadDocument',
+              base64Data: base64Content,
+              mimeType: file.type,
+              fileName: file.name,
+              referenceNo: referenceNo,
+              docType: docType,
+              overwriteConfirmed: overwriteConfirmed,
+              userId: userId
+            })
+          })
+          .then(function(response) {
+            return response.json();
+          })
+          .then(function(result) {
+            resolve(result);
+          })
+          .catch(function(error) {
+            reject(new Error('Error al comunicarse con la Web App: ' + error.message));
           });
-
-          google.script.run
-            .withSuccessHandler(function(responseText) {
-              try {
-                var result = JSON.parse(responseText);
-                resolve(result);
-              } catch(e) {
-                reject(new Error('Error al parsear respuesta: ' + e.message));
-              }
-            })
-            .withFailureHandler(function(error) {
-              reject(new Error('Error al comunicarse con la Web App (proxy): ' + error.message));
-            })
-            .proxyWebAppPost(payloadStr);
         };
         
         reader.onerror = function() {
