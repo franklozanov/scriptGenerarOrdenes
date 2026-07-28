@@ -231,7 +231,7 @@ function getInitialData() {
               if (displayName === key) {
                 displayName = file.getName();
               }
-              if (STATIC_TEMPLATE_KEYS_.indexOf(key) !== -1) {
+              if (typeVal === 'Estatica') {
                 // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí
                 base64 = null;
               }
@@ -240,7 +240,7 @@ function getInitialData() {
               Logger.log("  - ID del archivo: " + value);
               Logger.log("  - Error: " + e.message);
               
-              if (STATIC_TEMPLATE_KEYS_.indexOf(key) === -1) {
+              if (typeVal !== 'Estatica') {
                 displayName = displayName + " (Sin acceso)";
                 hasAccess = false;
                 accessErrors.push({
@@ -347,19 +347,28 @@ function clearInitialDataCache() {
   cache.remove('initialData_v3');
   cache.remove('initialData_v4');
   cache.remove('printConfig_v1');
-  for (var i = 0; i < STATIC_TEMPLATE_KEYS_.length; i++) {
-    var prefix = getStaticTemplateCachePrefix_(STATIC_TEMPLATE_KEYS_[i]);
-    var meta = cache.get(prefix + 'meta');
-    if (meta) {
-      try {
-        var parsedMeta = JSON.parse(meta);
-        for (var j = 0; j < parsedMeta.chunkCount; j++) {
-          cache.remove(prefix + j);
+  // Leer todas las llaves directamente de la hoja de Google Sheets
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tplSheet = ss.getSheetByName('templates');
+  if (tplSheet) {
+    var data = tplSheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var key = data[i][0]; // Columna A: Clave
+      if (key) {
+        var prefix = getStaticTemplateCachePrefix_(key.toString().trim());
+        var meta = cache.get(prefix + 'meta');
+        if (meta) {
+          try {
+            var parsedMeta = JSON.parse(meta);
+            for (var j = 0; j < parsedMeta.chunkCount; j++) {
+              cache.remove(prefix + j);
+            }
+          } catch (e) {
+            Logger.log("Error limpiando caché estático " + key + ": " + e.message);
+          }
         }
-      } catch (e) {
-        Logger.log("Error limpiando caché estático " + STATIC_TEMPLATE_KEYS_[i] + ": " + e.message);
+        cache.remove(prefix + 'meta');
       }
     }
-    cache.remove(prefix + 'meta');
   }
 }

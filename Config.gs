@@ -25,8 +25,7 @@ var VALORES_STATUS = {
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 
-// Claves de plantillas estáticas para caché
-var STATIC_TEMPLATE_KEYS_ = ["TPL_CODIFICADO", "TPL_ESTUCHADO", "TPL_TERMO", "TPL_INSPECCION", "TPL_COC", "TPL_CONTROLES", "TPL_CHECKLIST", "TPL_ENTREGA_QA"];
+// Configuración de plantillas estáticas para caché
 var STATIC_TEMPLATE_CACHE_TTL_ = 21600;
 var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 

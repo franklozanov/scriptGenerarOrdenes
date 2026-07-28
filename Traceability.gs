@@ -184,6 +184,12 @@ function onEditInstalled(e) {
     var numRows = editedRange.getNumRows();
     var numCols = editedRange.getNumColumns();
 
+    if (sheetName === 'templates') {
+      clearInitialDataCache();
+      logChange('ACTUALIZACION_PLANTILLAS', 'Se detectó modificación en la hoja de plantillas. Caché limpiado automáticamente.', userIdentity);
+      return;
+    }
+
     if (sheetName === 'Ordenes') {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
