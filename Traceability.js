@@ -431,7 +431,7 @@ function onEditInstalled(e) {
               var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
               if (isClearedArray[isClearedIdx]) continue;
               
-              var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              var currStatus = (colStatusIdx && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
               if (currStatus !== "Impreso" && currStatus !== "Reimpreso") {
                 if (colEstadoDocs) {
                   estadoDocsValues[r][0] = "⏳ Pendiente Validar";
@@ -451,7 +451,7 @@ function onEditInstalled(e) {
               var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
               if (isClearedArray[isClearedIdx]) continue;
               
-              var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              var currStatus = (colStatusIdx && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
               var shouldValidate = true;
               
               if (currStatus === "Impreso" || currStatus === "Reimpreso") {
