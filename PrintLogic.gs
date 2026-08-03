@@ -675,42 +675,63 @@ function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
 function processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType, templatesSummary) {
   if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
   
+  var checkSymbol = "✅";
+  var errorMessages = [];
+  var saveResult = null;
+  var finalConsecutivo = null;
+  
   try {
-    // 1. Guardar PDF y obtener consecutivo
-    var saveResult = saveFinalUnifiedPDF(base64Data, orderNo);
-    
-    // 2. Trazabilidad
-    internalUpdateTraceability(orderNo, userId, totalPages, printType);
-    
-    // 3. Post guardado (Seguridad)
-    finalizeFinalPdfPostSave(orderNo, saveResult.fileId, saveResult.archivoReemplazado, userId);
-    
-    // Éxito: Escribir en HistorialImpresion
-    var logMessage = "✅ PDF Guardado exitosamente. Consecutivo: " + saveResult.consecutivo;
-    if (templatesSummary) {
-      logMessage += "\nPlantillas impresas: " + templatesSummary;
+    // 1. Trazabilidad (ACTUALIZAR CANTIDAD IMPRESA PRIMERO)
+    try {
+      internalUpdateTraceability(orderNo, userId, totalPages, printType);
+    } catch (e) {
+      errorMessages.push("Trazabilidad: " + e.message);
+      checkSymbol = "❌";
     }
-    logHistorialImpresion_(orderNo, userId, logMessage);
     
-    // Notificar al usuario vía Toast
-    SpreadsheetApp.getActiveSpreadsheet().toast("✅ Orden " + orderNo + " guardada en Drive con consecutivo " + saveResult.consecutivo, "Guardado Exitoso", 5);
+    // 2. Guardar PDF y obtener consecutivo
+    try {
+      saveResult = saveFinalUnifiedPDF(base64Data, orderNo);
+      finalConsecutivo = saveResult.consecutivo;
+    } catch (e) {
+      errorMessages.push("Guardado PDF: " + e.message);
+      checkSymbol = "❌";
+    }
     
-    return true;
-  } catch (error) {
-    Logger.log("Error en processAndSavePdfBackgroundForUser: " + error.message);
-    logHistorialImpresion_(orderNo, userId, "❌ ERROR AL GUARDAR: " + error.message);
+    // 3. Post guardado (Seguridad) - Solo si hubo saveResult
+    if (saveResult) {
+      try {
+        finalizeFinalPdfPostSave(orderNo, saveResult.fileId, saveResult.archivoReemplazado, userId);
+      } catch (e) {
+        errorMessages.push("Post-guardado: " + e.message);
+        checkSymbol = "❌";
+      }
+    }
     
-    // Notificar al usuario vía Toast
-    SpreadsheetApp.getActiveSpreadsheet().toast("❌ Error al guardar Orden " + orderNo + ": " + error.message, "Error en Guardado", 10);
+    logHistorialImpresion_(orderNo, userId, checkSymbol, totalPages, templatesSummary, errorMessages);
     
-    throw error;
+    if (checkSymbol === "❌") {
+      SpreadsheetApp.getActiveSpreadsheet().toast("❌ Error en impresión: " + errorMessages.join(" | "), "Error parcial/total", 10);
+      throw new Error("Errores durante la impresión: " + errorMessages.join(" | "));
+    } else {
+      SpreadsheetApp.getActiveSpreadsheet().toast("✅ Orden " + orderNo + " impresa y guardada" + (finalConsecutivo ? (" (Cons: " + finalConsecutivo + ")") : ""), "Impresión Exitosa", 5);
+      return true;
+    }
+    
+  } catch (globalError) {
+    if (checkSymbol !== "❌") {
+       errorMessages.push("Error general: " + globalError.message);
+       logHistorialImpresion_(orderNo, userId, "❌", totalPages, templatesSummary, errorMessages);
+       SpreadsheetApp.getActiveSpreadsheet().toast("❌ Error general al procesar Orden " + orderNo, "Error", 10);
+    }
+    throw globalError;
   }
 }
 
 /**
  * Escribe el log en la columna HistorialImpresion de la hoja Ordenes.
  */
-function logHistorialImpresion_(orderNo, userId, message) {
+function logHistorialImpresion_(orderNo, userId, checkSymbol, totalPages, templatesSummary, errorMessages) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
@@ -743,10 +764,22 @@ function logHistorialImpresion_(orderNo, userId, message) {
       var now = new Date();
       var formattedDate = Utilities.formatDate(now, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
       var userIdentity = getUserIdentityStringByUserId_(userId);
-      var logEntry = "[" + formattedDate + "] - [" + userIdentity + "] - " + message;
+      
+      var logEntry = checkSymbol + " " + formattedDate + " - " + userIdentity;
+      
+      if (totalPages != null) {
+        logEntry += " (" + totalPages + ")";
+      }
+      if (templatesSummary) {
+        logEntry += ": " + templatesSummary;
+      }
+      
+      if (errorMessages && errorMessages.length > 0) {
+        logEntry += "\nError: " + errorMessages.join(" | ");
+      }
       
       var currentValue = sheet.getRange(rowIndex, colHistorial).getValue();
-      var newValue = currentValue ? currentValue + "\n" + logEntry : logEntry;
+      var newValue = currentValue ? currentValue + "\n\n" + logEntry : logEntry;
       
       sheet.getRange(rowIndex, colHistorial).setValue(newValue);
     }
