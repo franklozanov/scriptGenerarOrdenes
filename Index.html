@@ -1109,8 +1109,11 @@
           const now = new Date();
           const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
+          let templatesPrintedInfo = [];
+
           for (const item of payload.pdfs) {
             status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
+            let pagesForThisTemplate = 0;
 
             const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
             for (let i = 0; i < item.copies; i++) {
@@ -1157,6 +1160,7 @@
               const copied = await finalPdf.copyPages(doc, doc.getPageIndices());
               copied.forEach(p => finalPdf.addPage(p));
               totalPages += copied.length;
+              pagesForThisTemplate += copied.length;
 
               // --- AGREGAR PÁGINA EN BLANCO SI ESTA PLANTILLA TIENE NÚMERO IMPAR DE PÁGINAS ---
               console.log(`Plantilla: ${item.key}, Copia: ${i+1}, Páginas: ${copied.length}, Es impar: ${copied.length % 2 !== 0}`);
@@ -1175,10 +1179,14 @@
                   opacity: 1.0
                 });
                 totalPages += 1;
+                pagesForThisTemplate += 1;
                 console.log(`✓ Página en blanco añadida después de ${item.key}`);
               }
             }
+            templatesPrintedInfo.push(`${item.key} (${pagesForThisTemplate})`);
           }
+
+          const templatesSummary = templatesPrintedInfo.join(", ");
 
           // --- INYECCIÓN DE PIE DE PÁGINA (Orientación Dinámica + Espacio Fijo) ---
           const allPages = finalPdf.getPages();
@@ -1283,7 +1291,7 @@
             //    popup abra: el PDF ya se generó y la impresión debe registrarse.
             //    (Las notificaciones llegan vía Toast desde el backend.)
             google.script.run
-              .processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType);
+              .processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType, templatesSummary);
 
             // 3) Liberar la UI para la siguiente orden.
             document.getElementById('orderNo').value = '';

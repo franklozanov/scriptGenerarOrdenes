@@ -672,7 +672,7 @@ function updateTraceabilityForUser(orderNo, userId, pagesPrinted, printType) {
 /**
  * Procesa el guardado en segundo plano llamado por el nuevo esquema asíncrono.
  */
-function processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType) {
+function processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType, templatesSummary) {
   if (!isUserAuthorized(userId)) throw new Error('ACCESS_DENIED: Acceso denegado para UserID ' + userId + '.');
   
   try {
@@ -686,7 +686,11 @@ function processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPa
     finalizeFinalPdfPostSave(orderNo, saveResult.fileId, saveResult.archivoReemplazado, userId);
     
     // Éxito: Escribir en HistorialImpresion
-    logHistorialImpresion_(orderNo, userId, "✅ PDF Guardado exitosamente. Consecutivo: " + saveResult.consecutivo);
+    var logMessage = "✅ PDF Guardado exitosamente. Consecutivo: " + saveResult.consecutivo;
+    if (templatesSummary) {
+      logMessage += "\nPlantillas impresas: " + templatesSummary;
+    }
+    logHistorialImpresion_(orderNo, userId, logMessage);
     
     // Notificar al usuario vía Toast
     SpreadsheetApp.getActiveSpreadsheet().toast("✅ Orden " + orderNo + " guardada en Drive con consecutivo " + saveResult.consecutivo, "Guardado Exitoso", 5);
