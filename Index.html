@@ -1273,43 +1273,44 @@
           status.innerText = "✅ PDF listo en memoria. Haga clic en 'Ver PDF Generado' para abrirlo y guardarlo.";
           status.className = "success-text";
           
-          btn.innerText = "👉 Ver PDF Generado";
-          btn.disabled = false;
+          // Ocultar botón original y crear enlace con la misma apariencia
+          btn.style.display = 'none';
           
-          btn.onclick = function() {
-            // 1) Intentar abrir el PDF en una pestaña nueva.
-            //    IMPORTANTE: en el iframe sandbox de Apps Script, acceder a
-            //    newWindow.closed devuelve undefined por restricciones cross-origin
-            //    AUNQUE el popup se haya abierto bien. Por eso el ÚNICO indicador
-            //    confiable de bloqueo es que window.open() devuelva null/undefined.
-            //    No usamos .closed (daba falso positivo y abortaba el guardado).
-            var newWindow = window.open(blobURL, "_blank");
-            var popupBloqueado = !newWindow;
-
-            // 2) Disparar SIEMPRE el guardado en Drive + actualización de
-            //    consecutivo/HistorialImpresion. Esto NO debe depender de que el
-            //    popup abra: el PDF ya se generó y la impresión debe registrarse.
-            //    (Las notificaciones llegan vía Toast desde el backend.)
+          let downloadLink = document.getElementById('pdfDownloadLink');
+          if (!downloadLink) {
+            downloadLink = document.createElement('a');
+            downloadLink.id = 'pdfDownloadLink';
+            downloadLink.className = btn.className;
+            downloadLink.style.textDecoration = 'none';
+            downloadLink.style.textAlign = 'center';
+            downloadLink.style.display = 'inline-block';
+            btn.parentNode.insertBefore(downloadLink, btn.nextSibling);
+          }
+          downloadLink.href = blobURL;
+          downloadLink.target = '_blank';
+          downloadLink.innerText = "👉 Ver PDF Generado";
+          downloadLink.style.display = 'inline-block';
+          
+          downloadLink.onclick = function() {
+            // 1) Disparar SIEMPRE el guardado en Drive + actualización de trazabilidad.
             google.script.run
               .processAndSavePdfBackgroundForUser(base64Data, orderNo, userId, totalPages, printType, templatesSummary);
 
-            // 3) Liberar la UI para la siguiente orden.
-            document.getElementById('orderNo').value = '';
-            resetPreloadState();
-            setPreloadBanner('', '');
-            document.getElementById('orderNo').focus();
+            // 2) Liberar la UI para la siguiente orden, retrasado ligeramente 
+            // para no interferir con la apertura nativa de la pestaña
+            setTimeout(() => {
+              downloadLink.style.display = 'none';
+              btn.style.display = 'inline-block';
+              
+              document.getElementById('orderNo').value = '';
+              resetPreloadState();
+              setPreloadBanner('', '');
+              document.getElementById('orderNo').focus();
 
-            btn.innerText = "Generar PDF Combinado";
-            btn.onclick = run;
-            updateGoButtonState();
+              btn.innerText = "Generar PDF Combinado";
+              btn.onclick = run;
+              updateGoButtonState();
 
-            // 4) Feedback según si el popup abrió o no.
-            if (popupBloqueado) {
-              // El guardado ya se disparó; solo falta que el usuario vea el PDF.
-              status.innerHTML = "El PDF se está guardando. Su navegador bloqueó la pestaña; "
-                + "<a href='" + blobURL + "' target='_blank' style='color:#1976d2;font-weight:600;'>haga clic aquí para ver el PDF</a>.";
-              status.className = "info-text";
-            } else {
               status.innerText = "⏳ Guardando PDF en segundo plano...";
               status.className = "info-text";
               setTimeout(() => {
@@ -1317,7 +1318,7 @@
                   status.innerText = '';
                 }
               }, 3000);
-            }
+            }, 50);
           };
 
         } catch (pdfError) {
