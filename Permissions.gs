@@ -331,6 +331,7 @@ function applyStatusDataValidation(silent) {
     
     // Usar constantes de Config.gs para asegurar consistencia
     var statusOptions = [
+      VALORES_STATUS.PENDIENTE,
       VALORES_STATUS.IMPRESO,
       VALORES_STATUS.REIMPRESO,
       VALORES_STATUS.RECIBIDA_QA,
@@ -394,6 +395,11 @@ function applyStatusDataValidation(silent) {
       
       // Definir colores para cada estado
       var colorRules = [
+        {
+          status: 'Pendiente',
+          bgColor: '#fce5cd',    // Naranja claro
+          textColor: '#b45f06'   // Naranja oscuro
+        },
         {
           status: 'Impreso',
           bgColor: '#d9d9d9',    // Gris claro

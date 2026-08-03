@@ -15,6 +15,7 @@ var VALORES_ESTADO_DOCUMENTOS = {
 };
 
 var VALORES_STATUS = {
+  PENDIENTE: "Pendiente",
   IMPRESO: "Impreso",
   REIMPRESO: "Reimpreso",
   RECIBIDA_QA: "RecibidaQA",

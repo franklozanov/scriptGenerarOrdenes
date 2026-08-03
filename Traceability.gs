@@ -247,121 +247,19 @@ function onEditInstalled(e) {
           if (changedSol) sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).setValues(solValues);
         }
 
-      // 1. Manejo dinámico e histórico de CantDispAFecha
-      if (cantDispAFechaCol && verifCantCol) {
-          
-          // Forzar recálculo para asegurar que las fórmulas de VerifCant evaluaron la edición actual
-          SpreadsheetApp.flush();
-          
-          var targetRangeCantDisp = sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1);
-          var targetRangeVerif = sheet.getRange(startRow, verifCantCol, processNumRows, 1);
-          
-          var colLote = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
-          var colCodigo = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', false);
-          var lotes = colLote ? sheet.getRange(startRow, colLote, processNumRows, 1).getValues() : null;
-          var codigos = colCodigo ? sheet.getRange(startRow, colCodigo, processNumRows, 1).getValues() : null;
-          
-          var cantDispValues = targetRangeCantDisp.getValues();
-          var verifValues = targetRangeVerif.getValues();
-          var updateNeeded = false;
-          
-          for (var r = 0; r < processNumRows; r++) {
-            if (isClearedArray[r]) continue;
-            var actualVerif = verifValues[r][0];
-            var actualCantDisp = cantDispValues[r][0];
-            var hasLote = lotes ? (lotes[r][0] !== "") : true;
-            var hasCodigo = codigos ? (codigos[r][0] !== "") : true;
-            
-            // Regla A: Si CantDispAFecha está vacía, y ya hay Lote y Codigo, capturamos el inventario actual
-            if (actualCantDisp === "" && actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && hasLote && hasCodigo) {
-              cantDispValues[r][0] = actualVerif;
-              updateNeeded = true;
-              logChange('AUTO_COPY_VERIFCANT', 'Captura inicial: ' + actualVerif + ' a CantDispAFecha en fila ' + (startRow + r), userIdentity);
-            } 
-            else if (actualCantDisp !== "") {
-              // Regla B: Si ya se capturó antes, pero el usuario edita Cantidad o NoAnalisis (edición individual)
-              if (numRows === 1 && numCols === 1) {
-                var editedColName = headers[editedRange.getColumn() - 1];
-                if (editedColName === 'Cantidad' || editedColName === 'NoAnalisis') {
-                   // Validar que exista un número nuevo válido y diferente al histórico
-                   if (actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && actualVerif !== actualCantDisp) {
-                     var ui = SpreadsheetApp.getUi();
-                     var response = ui.alert(
-                       'Actualización de Inventario',
-                       'Has modificado la columna "' + editedColName + '" en la fila ' + startRow + '.\n\n¿Deseas actualizar el registro histórico de "CantDispAFecha" con el valor de inventario actual disponible (' + actualVerif + ')?\n\n(Valor guardado actualmente: ' + actualCantDisp + ')',
-                       ui.ButtonSet.YES_NO
-                     );
-                     if (response === ui.Button.YES) {
-                       cantDispValues[r][0] = actualVerif;
-                       updateNeeded = true;
-                       logChange('ACTUALIZACION_CANT_DISP', 'Usuario actualizó CantDispAFecha de ' + actualCantDisp + ' a ' + actualVerif + ' tras modificar ' + editedColName + ' en fila ' + startRow, userIdentity);
-                     }
-                   }
-                }
-              }
-            }
-          }
-          
-          if (updateNeeded) {
-            targetRangeCantDisp.setValues(cantDispValues);
-          }
-        }
-      }
-      
-      // 2. Manejo de cambios en NoOrden o NoAnalisis (para validación masiva y simple)
-      var colOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
-      var colAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
-      
-      var editIntersectsRefs = false;
-      var startCol = editedRange.getColumn();
-      var endCol = startCol + numCols - 1;
-      
-      if (colOrdenCol && startCol <= colOrdenCol && endCol >= colOrdenCol) editIntersectsRefs = true;
-      if (colAnalisisCol && startCol <= colAnalisisCol && endCol >= colAnalisisCol) editIntersectsRefs = true;
-      
-      if (editIntersectsRefs) {
-        var startRow = editedRange.getRow();
-        var processNumRows = numRows;
-        
-        // Evitar procesar encabezado
-        if (startRow === 1) {
-          startRow = 2;
-          processNumRows--;
-        }
-        
-        if (processNumRows > 0) {
-          if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validando documentos en Drive para " + processNumRows + " filas...", "Sistema QMS", 3);
-          
-          for (var r = 0; r < processNumRows; r++) {
-            // Ajuste de indice ya que Block 2 puede evitar el encabezado dinamicamente
-            var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
-            if (isClearedArray[isClearedIdx]) continue;
-            actualizarEstadoDocumentosEnHoja(sheet, startRow + r, headers);
-          }
-          
-          if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validación masiva completada.", "Sistema QMS", 3);
-          
-          logChange('CAMBIO_NO_ORDEN_ANALISIS', 'Revisión en Drive disparada por cambio en NoOrden/NoAnalisis para ' + processNumRows + ' filas.', userIdentity);
-        }
-      }
-
-      // 3. Auto-tracking de "SolicitadoPor" (quién pegó/editó la fila)
+      // 1. Auto-tracking de "SolicitadoPor" (quién pegó/editó la fila) - [MOVIDO AL INICIO POR RENDIMIENTO]
       var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false) || getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
       
       if (colSolicitadoPor) {
         var intersectsSolicitadoPor = (startCol <= colSolicitadoPor && endCol >= colSolicitadoPor);
-        
-        // 1. Definimos explícitamente las columnas objetivo que deben disparar el registro
         var targetHeaders = ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden'];
         var targetColIndices = [];
         
-        // 2. Buscamos dinámicamente el índice actual de cada una
         for (var h = 0; h < targetHeaders.length; h++) {
           var idx = getColumnIndexByNameCaseInsensitive(headers, targetHeaders[h], false);
           if (idx) targetColIndices.push(idx);
         }
         
-        // 3. Validamos si la edición (desde startCol hasta endCol) tocó alguna de estas columnas
         var tocaColumnasDatos = false;
         for (var c = startCol; c <= endCol; c++) {
           if (targetColIndices.indexOf(c) !== -1) {
@@ -370,8 +268,6 @@ function onEditInstalled(e) {
           }
         }
         
-        // Procesamos la trazabilidad SOLO si la edición tocó las columnas de datos
-        // y no editaron SOLO esa columna de SolicitadoPor manualmente
         if (tocaColumnasDatos && !(intersectsSolicitadoPor && numCols === 1)) {
           var iterStartRow = editedRange.getRow();
           var iterNumRows = numRows;
@@ -384,7 +280,6 @@ function onEditInstalled(e) {
           if (iterNumRows > 0) {
             var targetRange = sheet.getRange(iterStartRow, colSolicitadoPor, iterNumRows, 1);
             var currentValues = targetRange.getValues();
-            // Validamos usando las primeras 3 columnas (Proceso, Codigo, Descripcion)
             var firstColRange = sheet.getRange(iterStartRow, 1, iterNumRows, 3).getValues(); 
             var updateNeeded = false;
             
@@ -406,24 +301,18 @@ function onEditInstalled(e) {
                 continue;
               }
               
-              // Si la celda está vacía O si el usuario pegó una fila completa (arrastrando basura vieja en esta col)
               if (currVal === "" || intersectsSolicitadoPor) {
                  currentValues[i][0] = "Crea: " + baseStamp;
                  updateNeeded = true;
               } else {
                  var lines = currVal.split("\n");
-                 var newLine = lines[0]; // Mantiene original Crea:
-                 
+                 var newLine = lines[0]; 
                  var allowMod = false;
                  
-                 // Arquitectura Híbrida: Solo evaluamos "Mod:" en ediciones individuales
                  if (iterNumRows === 1) {
-                   // 1. Cambio Duro (Sobreescritura / Borrado): e.oldValue tiene datos
                    if (e.oldValue !== undefined && e.oldValue !== "") {
                      allowMod = true;
-                   } 
-                   // 2. Llenado de celda en blanco: verificamos madurez de la fila (30 mins)
-                   else {
+                   } else {
                      var creaMatch = newLine.match(/Crea: .* \((.*?)\)/);
                      var creaMs = 0;
                      if (creaMatch) {
@@ -437,7 +326,6 @@ function onEditInstalled(e) {
                        }
                      }
                      var nowMs = new Date().getTime();
-                     // Si pasaron más de 30 minutos (1800000 ms) o si ya tenía un Mod previo
                      if ((nowMs - creaMs > 1800000) || lines.length > 1) {
                        allowMod = true;
                      }
@@ -453,9 +341,145 @@ function onEditInstalled(e) {
                  }
               }
             }
+            if (updateNeeded) targetRange.setValues(currentValues);
+          }
+        }
+      }
+
+      // 2. Manejo dinámico e histórico de CantDispAFecha
+      if (cantDispAFechaCol && verifCantCol) {
+          SpreadsheetApp.flush();
+          var targetRangeCantDisp = sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1);
+          var targetRangeVerif = sheet.getRange(startRow, verifCantCol, processNumRows, 1);
+          
+          var colLote = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
+          var colCodigo = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', false);
+          var lotes = colLote ? sheet.getRange(startRow, colLote, processNumRows, 1).getValues() : null;
+          var codigos = colCodigo ? sheet.getRange(startRow, colCodigo, processNumRows, 1).getValues() : null;
+          
+          var cantDispValues = targetRangeCantDisp.getValues();
+          var verifValues = targetRangeVerif.getValues();
+          var updateNeeded = false;
+          
+          for (var r = 0; r < processNumRows; r++) {
+            if (isClearedArray[r]) continue;
+            var actualVerif = verifValues[r][0];
+            var actualCantDisp = cantDispValues[r][0];
+            var hasLote = lotes ? (lotes[r][0] !== "") : true;
+            var hasCodigo = codigos ? (codigos[r][0] !== "") : true;
             
-            if (updateNeeded) {
-              targetRange.setValues(currentValues);
+            if (actualCantDisp === "" && actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && hasLote && hasCodigo) {
+              cantDispValues[r][0] = actualVerif;
+              updateNeeded = true;
+              logChange('AUTO_COPY_VERIFCANT', 'Captura inicial: ' + actualVerif + ' a CantDispAFecha en fila ' + (startRow + r), userIdentity);
+            } 
+            else if (actualCantDisp !== "") {
+              if (numRows === 1 && numCols === 1) {
+                var editedColName = headers[editedRange.getColumn() - 1];
+                if (editedColName === 'Cantidad' || editedColName === 'NoAnalisis') {
+                   if (actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && actualVerif !== actualCantDisp) {
+                     var ui = SpreadsheetApp.getUi();
+                     var response = ui.alert(
+                       'Actualización de Inventario',
+                       'Has modificado la columna "' + editedColName + '" en la fila ' + startRow + '.\n\n¿Deseas actualizar el registro histórico de "CantDispAFecha" con el valor de inventario actual disponible (' + actualVerif + ')?\n\n(Valor guardado actualmente: ' + actualCantDisp + ')',
+                       ui.ButtonSet.YES_NO
+                     );
+                     if (response === ui.Button.YES) {
+                       cantDispValues[r][0] = actualVerif;
+                       updateNeeded = true;
+                       logChange('ACTUALIZACION_CANT_DISP', 'Usuario actualizó CantDispAFecha de ' + actualCantDisp + ' a ' + actualVerif + ' tras modificar ' + editedColName + ' en fila ' + startRow, userIdentity);
+                     }
+                   }
+                }
+              }
+            }
+          }
+          if (updateNeeded) targetRangeCantDisp.setValues(cantDispValues);
+      }
+      
+      // 3. Manejo de cambios en NoOrden o NoAnalisis (para validación masiva y simple con STATUS)
+      var colOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
+      var colAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+      
+      var editIntersectsRefs = false;
+      var startCol = editedRange.getColumn();
+      var endCol = startCol + numCols - 1;
+      
+      if (colOrdenCol && startCol <= colOrdenCol && endCol >= colOrdenCol) editIntersectsRefs = true;
+      if (colAnalisisCol && startCol <= colAnalisisCol && endCol >= colAnalisisCol) editIntersectsRefs = true;
+      
+      if (editIntersectsRefs) {
+        var startRow = editedRange.getRow();
+        var processNumRows = numRows;
+        
+        if (startRow === 1) {
+          startRow = 2;
+          processNumRows--;
+        }
+        
+        if (processNumRows > 0) {
+          var colStatusIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+          var colEstadoDocs = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+          
+          var statusValues = colStatusIdx ? sheet.getRange(startRow, colStatusIdx, processNumRows, 1).getValues() : [];
+          var estadoDocsValues = colEstadoDocs ? sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).getValues() : [];
+          
+          // PEGADO MASIVO: No bloquear a los usuarios con validaciones lentas en Drive
+          if (processNumRows > 3) {
+            var changedMassive = false;
+            for (var r = 0; r < processNumRows; r++) {
+              var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
+              if (isClearedArray[isClearedIdx]) continue;
+              
+              var currStatus = (colStatusIdx && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              if (currStatus !== "Impreso" && currStatus !== "Reimpreso") {
+                if (colEstadoDocs) {
+                  estadoDocsValues[r][0] = "⏳ Pendiente Validar";
+                  changedMassive = true;
+                }
+              }
+            }
+            if (changedMassive) {
+              sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).setValues(estadoDocsValues);
+              SpreadsheetApp.getActiveSpreadsheet().toast("Se pegaron varias filas. Usa 'Refrescar Estado de Documentos' del menú superior para validarlas todas juntas.", "Validación Diferida", 8);
+              logChange('CAMBIO_MASIVO', 'Pegado de ' + processNumRows + ' filas. Se marcó como Pendiente Validar para optimizar.', userIdentity);
+            }
+          } 
+          // EDICIÓN INDIVIDUAL O PEQUEÑA:
+          else {
+            for (var r = 0; r < processNumRows; r++) {
+              var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
+              if (isClearedArray[isClearedIdx]) continue;
+              
+              var currStatus = (colStatusIdx && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              var shouldValidate = true;
+              
+              if (currStatus === "Impreso" || currStatus === "Reimpreso") {
+                if (numRows === 1) { // Solo preguntar si es una sola edición
+                  var ui = SpreadsheetApp.getUi();
+                  var response = ui.alert(
+                    '⚠️ Orden ya procesada',
+                    'Estás modificando datos de una orden que ya fue impresa (Fila ' + (startRow + r) + ').\n\n¿Deseas devolver el STATUS a "Pendiente" para que sus documentos se vuelvan a validar en Drive?',
+                    ui.ButtonSet.YES_NO
+                  );
+                  if (response === ui.Button.YES) {
+                    if (colStatusIdx) sheet.getRange(startRow + r, colStatusIdx).setValue("Pendiente");
+                    shouldValidate = true;
+                    logChange('ESTADO_REVERTIDO', 'Usuario modificó fila impresa y aceptó regresar el STATUS a Pendiente', userIdentity);
+                  } else {
+                    shouldValidate = false;
+                  }
+                } else {
+                  // Si pegan 2 o 3 filas sobre órdenes ya impresas, por defecto no validamos para proteger el histórico
+                  shouldValidate = false;
+                }
+              }
+              
+              if (shouldValidate) {
+                if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validando documentos en Drive...", "Sistema QMS", 3);
+                actualizarEstadoDocumentosEnHoja(sheet, startRow + r, headers);
+                if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validación en Drive completada.", "Sistema QMS", 3);
+              }
             }
           }
         }
@@ -597,12 +621,19 @@ function forzarActualizacionEstadoDocumentos() {
     var startRow = selection.getRow();
     var numRows = selection.getNumRows();
     var maxRows = sheet.getLastRow();
+    var soloPendientes = false;
     
     // Si seleccionaron toda la hoja (o solo 1 celda), preguntar si quieren procesar todo
     if (numRows === 1 || startRow === 1) {
       var ui = SpreadsheetApp.getUi();
-      var response = ui.alert('Confirmación', '¿Desea escanear y actualizar toda la hoja contra Drive? (Esto puede tardar unos segundos)', ui.ButtonSet.YES_NO);
-      if (response !== ui.Button.YES) return;
+      var respuesta = ui.alert(
+        'Confirmación',
+        '¿Desea escanear SOLO las órdenes Pendientes? (Recomendado y rápido).\n\nSeleccione "No" para forzar el escaneo de toda la hoja.',
+        ui.ButtonSet.YES_NO_CANCEL
+      );
+      
+      if (respuesta === ui.Button.CANCEL || respuesta === ui.Button.CLOSE) return;
+      if (respuesta === ui.Button.YES) soloPendientes = true;
       
       startRow = 2; // Ignorar encabezado
       numRows = maxRows - 1;
@@ -611,19 +642,36 @@ function forzarActualizacionEstadoDocumentos() {
     if (numRows < 1) return;
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colStatusIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
     
-    SpreadsheetApp.getActiveSpreadsheet().toast("Escaneando " + numRows + " filas en Drive...", "Sistema QMS", 5);
+    var statusValues = [];
+    if (colStatusIdx && soloPendientes) {
+      statusValues = sheet.getRange(startRow, colStatusIdx, numRows, 1).getValues();
+    }
+    
+    SpreadsheetApp.getActiveSpreadsheet().toast("Escaneando filas en Drive...", "Sistema QMS", 5);
     
     var actualizadas = 0;
+    var saltadas = 0;
     for (var r = 0; r < numRows; r++) {
       var currentRow = startRow + r;
       if (currentRow > maxRows) break;
+      
+      if (soloPendientes && colStatusIdx) {
+        var st = statusValues[r][0] ? statusValues[r][0].toString().trim() : "";
+        if (st === "Impreso" || st === "Reimpreso") {
+          saltadas++;
+          continue;
+        }
+      }
       
       actualizarEstadoDocumentosEnHoja(sheet, currentRow, headers);
       actualizadas++;
     }
     
-    SpreadsheetApp.getActiveSpreadsheet().toast("✅ " + actualizadas + " filas validadas exitosamente.", "Sistema QMS", 5);
+    var msg = "✅ " + actualizadas + " filas validadas.";
+    if (saltadas > 0) msg += " (Saltadas " + saltadas + " ya impresas)";
+    SpreadsheetApp.getActiveSpreadsheet().toast(msg, "Sistema QMS", 8); 
   } catch (e) {
     Logger.log("Error en forzarActualizacionEstadoDocumentos: " + e.message);
     SpreadsheetApp.getUi().alert("Error", "Ocurrió un error al validar: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
