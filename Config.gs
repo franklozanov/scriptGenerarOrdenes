@@ -20,7 +20,8 @@ var VALORES_STATUS = {
   REIMPRESO: "Reimpreso",
   RECIBIDA_QA: "RecibidaQA",
   DEVUELTA_QA: "DevueltaQA",
-  CERRADA: "Cerrada"
+  CERRADA: "Cerrada",
+  ANULADA: "Anulada"
 };
 
 // Obtiene la contraseña desde las propiedades del script

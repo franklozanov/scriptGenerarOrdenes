@@ -336,7 +336,8 @@ function applyStatusDataValidation(silent) {
       VALORES_STATUS.REIMPRESO,
       VALORES_STATUS.RECIBIDA_QA,
       VALORES_STATUS.DEVUELTA_QA,
-      VALORES_STATUS.CERRADA
+      VALORES_STATUS.CERRADA,
+      VALORES_STATUS.ANULADA
     ];
     
     // Crear regla de validación
@@ -424,6 +425,11 @@ function applyStatusDataValidation(silent) {
           status: 'Cerrada',
           bgColor: '#d9ead3',    // Verde claro
           textColor: '#274e13'   // Verde oscuro
+        },
+        {
+          status: 'Anulada',
+          bgColor: '#ea9999',    // Rojo medio
+          textColor: '#660000'   // Rojo muy oscuro
         }
       ];
       
