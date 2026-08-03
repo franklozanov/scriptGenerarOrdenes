@@ -351,8 +351,28 @@ function onEditInstalled(e) {
       if (colSolicitadoPor) {
         var intersectsSolicitadoPor = (startCol <= colSolicitadoPor && endCol >= colSolicitadoPor);
         
-        // Procesamos la trazabilidad si no editaron SOLO esa columna manualmente
-        if (!(intersectsSolicitadoPor && numCols === 1)) {
+        // 1. Definimos explícitamente las columnas objetivo que deben disparar el registro
+        var targetHeaders = ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden'];
+        var targetColIndices = [];
+        
+        // 2. Buscamos dinámicamente el índice actual de cada una
+        for (var h = 0; h < targetHeaders.length; h++) {
+          var idx = getColumnIndexByNameCaseInsensitive(headers, targetHeaders[h], false);
+          if (idx) targetColIndices.push(idx);
+        }
+        
+        // 3. Validamos si la edición (desde startCol hasta endCol) tocó alguna de estas columnas
+        var tocaColumnasDatos = false;
+        for (var c = startCol; c <= endCol; c++) {
+          if (targetColIndices.indexOf(c) !== -1) {
+            tocaColumnasDatos = true;
+            break;
+          }
+        }
+        
+        // Procesamos la trazabilidad SOLO si la edición tocó las columnas de datos
+        // y no editaron SOLO esa columna de SolicitadoPor manualmente
+        if (tocaColumnasDatos && !(intersectsSolicitadoPor && numCols === 1)) {
           var iterStartRow = editedRange.getRow();
           var iterNumRows = numRows;
           
