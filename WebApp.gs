@@ -154,7 +154,7 @@ function handlePrivilegedOperation_(params) {
   }
 
   if (operation === 'registrarNovedad') {
-    if (!params.noOrden || !params.codigo || !params.tipoNovedad || !params.status || !params.realizadoPor) {
+    if (!params.noOrden || !params.codigo) {
       return { status: 'error', message: 'Faltan parámetros requeridos para registrar novedad.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
     }
     return procesarRegistroNovedad(params, callingUserId);

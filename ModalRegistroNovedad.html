@@ -336,25 +336,21 @@
 
       showLoading('Registrando...');
 
-      fetch(globalWebAppUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(params)
-      })
-      .then(r => r.json())
-      .then(function(result) {
-        hideLoading();
-        if (result.status === 'success') {
-          showAlert(result.message, 'success');
-          resetForm();
-        } else {
-          showError('Error: ' + (result.message || 'Desconocido'));
-        }
-      })
-      .catch(function(error) {
-        hideLoading();
-        showError('Error de red: ' + error.message);
-      });
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          if (result && result.status === 'success') {
+            showAlert(result.message, 'success');
+            resetForm();
+          } else {
+            showError('Error: ' + (result ? result.message : 'Desconocido'));
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error de servidor: ' + error.message);
+        })
+        .procesarRegistroNovedad(params, usuarioUserId);
     }
 
     function resetForm() {
