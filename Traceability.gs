@@ -113,8 +113,16 @@ function setupAuditTrailTrigger() {
 /**
  * Trigger instalable que registra todas las ediciones en la hoja Logs.
  * Incluye validación de permisos y lógica especial para columnas específicas.
+ *
+ * [FASE 1 REFACTOR] Cuando USE_NEW_ROUTER === true, delega al Event Router modular.
+ * Para revertir al comportamiento legacy: cambiar USE_NEW_ROUTER = false en EventRouter.gs
  */
 function onEditInstalled(e) {
+  // === KILL SWITCH: Delegar al nuevo Event Router si está activado ===
+  if (typeof USE_NEW_ROUTER !== 'undefined' && USE_NEW_ROUTER === true) {
+    return runNewEventRouter(e);
+  }
+
   try {
     if (!e || !e.range || !e.source) return;
     
@@ -666,8 +674,13 @@ function logChange(tipoCambio, descripcion, userIdentity) {
  * Función manual ejecutada desde el menú para forzar la actualización del estado
  * de los documentos en base a lo que realmente hay en Drive.
  * Se aplica a las filas seleccionadas o a todas si solo hay una celda seleccionada.
+ *
+ * [FASE 1 REFACTOR] Cuando USE_NEW_ROUTER === true, delega a ModDrive.forzarActualizacion().
  */
 function forzarActualizacionEstadoDocumentos() {
+  if (typeof USE_NEW_ROUTER !== 'undefined' && USE_NEW_ROUTER === true) {
+    return ModDrive.forzarActualizacion();
+  }
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getActiveSheet();
