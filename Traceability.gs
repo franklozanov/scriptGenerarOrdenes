@@ -355,7 +355,10 @@ function onEditInstalled(e) {
                  }
               }
             }
-            if (updateNeeded) targetRange.setValues(currentValues);
+            if (updateNeeded) {
+              targetRange.setValues(currentValues);
+              SpreadsheetApp.flush(); // Fuerza la visualización de la firma inmediatamente
+            }
           }
         }
       }
@@ -456,6 +459,16 @@ function onEditInstalled(e) {
               if (isClearedArray[isClearedIdx]) continue;
               
               var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              
+              // Si la fila es nueva y no tiene STATUS, asignarle Pendiente por defecto
+              if (currStatus === "") {
+                if (colStatusIdx) {
+                  statusValues[r][0] = "Pendiente";
+                  currStatus = "Pendiente";
+                  changedMassive = true;
+                }
+              }
+              
               if (currStatus !== "Impreso" && currStatus !== "Reimpreso" && currStatus !== "Anulada") {
                 if (colEstadoDocs) {
                   estadoDocsValues[r][0] = "⏳ Pendiente Validar";
@@ -468,8 +481,9 @@ function onEditInstalled(e) {
                 }
               }
             }
-            if (changedMassive && colEstadoDocs) {
-              sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).setValues(estadoDocsValues);
+            if (changedMassive) {
+              if (colEstadoDocs) sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).setValues(estadoDocsValues);
+              if (colStatusIdx) sheet.getRange(startRow, colStatusIdx, processNumRows, 1).setValues(statusValues);
             }
             SpreadsheetApp.getActiveSpreadsheet().toast("Se pegaron varias filas. Usa 'Refrescar Estado de Documentos' del menú superior para validarlas todas juntas.", "Validación Diferida", 8);
             logChange('CAMBIO_MASIVO', 'Pegado de ' + processNumRows + ' filas. Se marcó como Pendiente Validar para optimizar.', userIdentity);
@@ -482,6 +496,14 @@ function onEditInstalled(e) {
               
               var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
               var shouldValidate = isRefEdit || isStatusEdit; // Por defecto validar solo si se editó una ref o el STATUS
+              
+              // Si la fila es nueva y no tiene STATUS, asignarle Pendiente por defecto inmediatamente
+              if (currStatus === "") {
+                if (colStatusIdx) {
+                  sheet.getRange(startRow + r, colStatusIdx).setValue("Pendiente");
+                  currStatus = "Pendiente";
+                }
+              }
               
               if (currStatus === "Impreso" || currStatus === "Reimpreso" || currStatus === "Anulada") {
                 if (numRows === 1) { // Solo preguntar si es una sola edición
