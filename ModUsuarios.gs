@@ -28,20 +28,23 @@ var ModUsuarios = {
     var dispValues = evt.cols.CantDispAFecha ? evt.sheet.getRange(startRow, evt.cols.CantDispAFecha, processNumRows, 1).getValues() : [];
     var estValues = evt.cols.EstadoDocumentos ? evt.sheet.getRange(startRow, evt.cols.EstadoDocumentos, processNumRows, 1).getValues() : [];
     var solValues = evt.cols.SolicitadoPor ? evt.sheet.getRange(startRow, evt.cols.SolicitadoPor, processNumRows, 1).getValues() : [];
+    var statValues = evt.cols.STATUS ? evt.sheet.getRange(startRow, evt.cols.STATUS, processNumRows, 1).getValues() : [];
 
-    var changedDisp = false, changedEst = false, changedSol = false;
+    var changedDisp = false, changedEst = false, changedSol = false, changedStat = false;
 
     for (var r = 0; r < processNumRows; r++) {
       if (evt.isClearedArray[r]) {
         if (evt.cols.CantDispAFecha && dispValues[r][0] !== '') { dispValues[r][0] = ''; changedDisp = true; }
         if (evt.cols.EstadoDocumentos && estValues[r][0] !== '') { estValues[r][0] = ''; changedEst = true; }
         if (evt.cols.SolicitadoPor && solValues[r][0] !== '') { solValues[r][0] = ''; changedSol = true; }
+        if (evt.cols.STATUS && statValues[r][0] !== '') { statValues[r][0] = ''; changedStat = true; }
       }
     }
 
     if (changedDisp) evt.sheet.getRange(startRow, evt.cols.CantDispAFecha, processNumRows, 1).setValues(dispValues);
     if (changedEst) evt.sheet.getRange(startRow, evt.cols.EstadoDocumentos, processNumRows, 1).setValues(estValues);
     if (changedSol) evt.sheet.getRange(startRow, evt.cols.SolicitadoPor, processNumRows, 1).setValues(solValues);
+    if (changedStat) evt.sheet.getRange(startRow, evt.cols.STATUS, processNumRows, 1).setValues(statValues);
   },
 
   /**

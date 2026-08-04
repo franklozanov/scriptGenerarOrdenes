@@ -211,7 +211,13 @@ function onEditInstalled(e) {
       
       var startRow = editedRange.getRow();
       var processNumRows = numRows;
-      
+
+      // [FIX HOISTING] startCol/endCol deben calcularse ANTES del bloque de
+      // SolicitadoPor (que fue movido al inicio por rendimiento). Sin esto,
+      // por hoisting de ES5 valían undefined y SolicitadoPor nunca se firmaba.
+      var startCol = editedRange.getColumn();
+      var endCol = startCol + numCols - 1;
+
       // Obtener índices de las 8 columnas clave para trazabilidad
       var targetHeaders = ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden'];
       var targetColIndices = [];
@@ -254,23 +260,27 @@ function onEditInstalled(e) {
         }
         
         if (anyRowCleared) {
+          var colStatusFase0 = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
           var dispValues = cantDispAFechaCol ? sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1).getValues() : [];
           var estValues = colEstadoIdx ? sheet.getRange(startRow, colEstadoIdx, processNumRows, 1).getValues() : [];
           var solValues = colSolicitadoPor ? sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).getValues() : [];
-          
-          var changedDisp = false, changedEst = false, changedSol = false;
-          
+          var statValues = colStatusFase0 ? sheet.getRange(startRow, colStatusFase0, processNumRows, 1).getValues() : [];
+
+          var changedDisp = false, changedEst = false, changedSol = false, changedStat = false;
+
           for (var r = 0; r < processNumRows; r++) {
             if (isClearedArray[r]) {
               if (cantDispAFechaCol && dispValues[r][0] !== "") { dispValues[r][0] = ""; changedDisp = true; }
               if (colEstadoIdx && estValues[r][0] !== "") { estValues[r][0] = ""; changedEst = true; }
               if (colSolicitadoPor && solValues[r][0] !== "") { solValues[r][0] = ""; changedSol = true; }
+              if (colStatusFase0 && statValues[r][0] !== "") { statValues[r][0] = ""; changedStat = true; }
             }
           }
-          
+
           if (changedDisp) sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1).setValues(dispValues);
           if (changedEst) sheet.getRange(startRow, colEstadoIdx, processNumRows, 1).setValues(estValues);
           if (changedSol) sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).setValues(solValues);
+          if (changedStat) sheet.getRange(startRow, colStatusFase0, processNumRows, 1).setValues(statValues);
         }
 
       // 1. Auto-tracking de "SolicitadoPor" (quién pegó/editó la fila) - [MOVIDO AL INICIO POR RENDIMIENTO]
@@ -428,9 +438,10 @@ function onEditInstalled(e) {
       var colAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
       var colStatusTrackerIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
       
-      var startCol = editedRange.getColumn();
-      var endCol = startCol + numCols - 1;
-      
+      // startCol/endCol ya fueron calculados arriba (fix hoisting).
+      startCol = editedRange.getColumn();
+      endCol = startCol + numCols - 1;
+
       var isRequestEdit = false;
       if (colProceso && colOrdenCol && startCol <= colOrdenCol && endCol >= colProceso) isRequestEdit = true;
       
