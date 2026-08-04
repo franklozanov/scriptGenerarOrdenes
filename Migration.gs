@@ -374,3 +374,62 @@ function migrarHaciaColumnaUnificada() {
     if(ui) ui.alert('Error', 'Error durante la migración:\n' + e.message, ui.ButtonSet.OK);
   }
 }
+
+/**
+ * Migración de estado: reemplaza STATUS "Pendiente" -> "Creada" en los datos
+ * existentes y regenera el dropdown de STATUS (que ahora incluye "Creada" y
+ * ya no "Pendiente"). Correr UNA vez tras desplegar el rename.
+ *
+ * Orden: primero migra los datos, luego regenera la validación, para que
+ * ninguna fila quede marcada como valor inválido de forma persistente.
+ *
+ * @returns {number} Total de filas migradas.
+ */
+function migrarPendienteACreada() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var total = 0;
+  var hojas = ['Ordenes', 'RegistroNovedad'];
+
+  for (var h = 0; h < hojas.length; h++) {
+    var sheet = ss.getSheetByName(hojas[h]);
+    if (!sheet) continue;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) continue;
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+    if (!colStatus) continue;
+
+    var rng = sheet.getRange(2, colStatus, lastRow - 1, 1);
+    var vals = rng.getValues();
+    var cambios = 0;
+    for (var i = 0; i < vals.length; i++) {
+      if (vals[i][0] && vals[i][0].toString().trim() === 'Pendiente') {
+        vals[i][0] = VALORES_STATUS.CREADA;
+        cambios++;
+      }
+    }
+    if (cambios > 0) { rng.setValues(vals); total += cambios; }
+  }
+
+  // Regenerar el dropdown de STATUS (ahora "Creada", sin "Pendiente")
+  try {
+    applyStatusDataValidation(true);
+  } catch (e) {
+    Logger.log('migrarPendienteACreada: fallo al regenerar dropdown: ' + e.message);
+  }
+
+  try {
+    logChange('MIGRACION_ESTADO', 'Migradas ' + total + ' filas de STATUS "Pendiente" a "Creada" y regenerado el dropdown.', 'Sistema');
+  } catch (e) { /* logChange puede no estar disponible en algunos contextos */ }
+
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Migración completada',
+      total + ' fila(s) migradas de "Pendiente" a "Creada".\nDropdown de STATUS regenerado.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (e) { /* sin UI (ejecución no interactiva) */ }
+
+  return total;
+}
