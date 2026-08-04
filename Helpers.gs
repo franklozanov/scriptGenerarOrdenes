@@ -78,55 +78,24 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
 }
 
 /**
- * Verifica en Drive si existen los PDFs para NoOrden y NoAnalisis.
- * Usa caché en memoria (volátil) para no consultar Drive múltiples veces por el mismo archivo.
+ * Verifica si existen los PDFs de NoOrden (OA) y NoAnalisis (COA).
+ * [ÍNDICE] Consulta el índice materializado en memoria (O(1)) en lugar de
+ * escanear las carpetas de Drive por cada orden. El índice lo mantiene
+ * IndiceDocumentos.gs (rebuild horario + hook de subida + menú on-demand).
+ * La firma queda idéntica: ModDrive, el legacy y la impresión no cambian.
  */
-var docCache_ = {};
-
 function verificarDocumentosEnDrive(noOrden, noAnalisis) {
-  var tieneOA = false;
-  var tieneCOA = false;
-  
-  var noOrdenStr = noOrden ? String(noOrden).trim().toLowerCase() : "";
-  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim().toLowerCase() : "";
-  
+  var noOrdenStr = noOrden ? String(noOrden).trim() : "";
+  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim() : "";
+
   if (!noOrdenStr && !noAnalisisStr) {
     return { tieneOA: false, tieneCOA: false };
   }
-  
-  var config;
-  try { config = getPrintConfig_(); } catch(e) {}
-  
-  if (noOrdenStr && config) {
-    var key = "OA_" + noOrdenStr;
-    if (docCache_[key] !== undefined) {
-      tieneOA = docCache_[key];
-    } else {
-      try {
-        findOrderPdfInFolder(config.DOC_ORDENES, noOrdenStr);
-        tieneOA = true;
-      } catch(e) {
-        tieneOA = false;
-      }
-      docCache_[key] = tieneOA;
-    }
-  }
-  
-  if (noAnalisisStr && config) {
-    var key = "COA_" + noAnalisisStr;
-    if (docCache_[key] !== undefined) {
-      tieneCOA = docCache_[key];
-    } else {
-      try {
-        findAnalysisPdfInFolder(config.DOC_ANALISIS, noAnalisisStr);
-        tieneCOA = true;
-      } catch(e) {
-        tieneCOA = false;
-      }
-      docCache_[key] = tieneCOA;
-    }
-  }
-  
+
+  var idx = IndiceDocs.cargar();
+  var tieneOA = noOrdenStr ? (idx.OA[normalizarClaveDoc_(noOrdenStr)] !== undefined) : false;
+  var tieneCOA = noAnalisisStr ? (idx.COA[normalizarClaveDoc_(noAnalisisStr)] !== undefined) : false;
+
   return { tieneOA: tieneOA, tieneCOA: tieneCOA };
 }
 

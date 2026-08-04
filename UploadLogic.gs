@@ -233,6 +233,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     var archivoReemplazado = false;
     var skipUpload = false;
     var fileUrl = "";
+    var docFileId = "";
     
     // Verificar si el archivo ya existe
     if (existingFiles.hasNext()) {
@@ -243,6 +244,7 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
         Logger.log("Usuario canceló reemplazo. Actualizando estado sin modificar archivo.");
         var existingFile = existingFiles.next();
         fileUrl = existingFile.getUrl();
+        docFileId = existingFile.getId();
         skipUpload = true;
       } else if (!overwriteConfirmed) {
         // Retornar status 'exists' para que el frontend pida confirmación
@@ -266,6 +268,16 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
       var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
       var newFile = folder.createFile(blob);
       fileUrl = newFile.getUrl();
+      docFileId = newFile.getId();
+    }
+
+    // [ÍNDICE] Reflejar el doc en el índice ANTES de revalidar, para que
+    // actualizarEstadoDocumentosEnHoja lo vea de inmediato (cierra la ventana de staleness).
+    try {
+      var tipoIdx = (folderKey === 'DOC_ORDENES') ? 'OA' : 'COA';
+      if (docFileId) IndiceDocs.agregar(tipoIdx, docFileId, targetFileName);
+    } catch (idxErr) {
+      Logger.log('IndiceDocs.agregar falló (no crítico): ' + idxErr.message);
     }
 
     // Actualizar estado consolidado para TODAS las filas afectadas
