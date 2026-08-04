@@ -4,96 +4,147 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrar Entrega / Novedad</title>
+  <title>Registrar Novedad / Tiempo</title>
   
-  <!-- FASE 6: Design System Centralizado -->
   <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
   
   <style>
-    /* Estilos específicos de este modal */
     .button-group {
       display: flex;
       gap: 10px;
       margin-top: 20px;
+    }
+    
+    .segmented-control {
+      display: flex;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 10px;
+      gap: 4px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 20px;
+    }
+    .segmented-option { flex: 1; position: relative; }
+    .segmented-option input { position: absolute; opacity: 0; cursor: pointer; }
+    .segmented-option label {
+      display: block;
+      text-align: center;
+      padding: 10px 16px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+      cursor: pointer;
+      border-radius: 7px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+    .segmented-option input:checked + label {
+      background: white;
+      color: #1976d2;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      font-weight: 600;
+    }
+    .dynamic-section {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .dynamic-section.active { display: block; }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
   <div class="container" id="mainContainer" style="display: none;">
     <div class="info">
-      Seleccione una orden, el tipo de novedad y el nuevo estado. El sistema actualizará automáticamente el STATUS de la orden y dejará un registro en el historial.
+      Registre una novedad operativa/calidad o avance el estado de una orden. Se guardará un historial automático para auditoría y KPIs de tiempos.
     </div>
 
     <form id="novedadForm">
+      
+      <!-- Usuario Actual Info (Renderizado por JS) -->
+      <div class="form-row" id="userContainerWrapper">
+        <div class="form-group" id="userContainer" style="width: 100%;">
+          <!-- Carga dinámica -->
+        </div>
+      </div>
+
+      <!-- Buscador de Orden (Predictivo) -->
       <div class="form-row">
         <div class="form-group">
-          <label for="usuarioResponsable">Usuario Responsable</label>
-          <input type="text" id="usuarioResponsable" list="usuariosList" placeholder="Seleccione usuario" required>
-          <datalist id="usuariosList"></datalist>
-        </div>
-        <div class="form-group">
-          <label for="noOrden">Número de Orden</label>
-          <select id="noOrden" required>
-            <option value="">Cargando órdenes...</option>
-          </select>
+          <label for="noOrdenInput">Número de Orden</label>
+          <input type="text" id="noOrdenInput" list="ordenesList" placeholder="Escriba o seleccione orden..." autocomplete="off" required>
+          <datalist id="ordenesList"></datalist>
           <input type="hidden" id="ordenCodigo">
-          <input type="hidden" id="ordenTotalPags">
         </div>
       </div>
 
-      <div class="form-row">
+      <!-- Tabs / Segmented Control -->
+      <div class="segmented-control">
+        <div class="segmented-option">
+          <input type="radio" name="tipoRegistro" value="Novedad" id="tipoNovedad" checked>
+          <label for="tipoNovedad">Registrar Novedad</label>
+        </div>
+        <div class="segmented-option">
+          <input type="radio" name="tipoRegistro" value="Avance" id="tipoAvance">
+          <label for="tipoAvance">Avance de Proceso</label>
+        </div>
+      </div>
+
+      <!-- SECCION NOVEDAD -->
+      <div id="sectionNovedad" class="dynamic-section active">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="categoria">Categoría de Novedad</label>
+            <select id="categoria">
+              <option value="">Cargando categorías...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="subcategoria">Subcategoría</label>
+            <select id="subcategoria" disabled>
+              <option value="">Primero seleccione categoría</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCION AVANCE -->
+      <div id="sectionAvance" class="dynamic-section">
         <div class="form-group">
-          <label for="nuevoStatus">Nuevo Estado (STATUS)</label>
-          <select id="nuevoStatus" required>
-            <option value="">Seleccione estado</option>
-            <option value="RecibidaQA">RecibidaQA</option>
-            <option value="DevueltaQA">DevueltaQA</option>
-            <option value="Cerrada">Cerrada</option>
+          <label for="proceso">Avance a Etapa de Proceso</label>
+          <select id="proceso">
+            <option value="">Seleccione nueva etapa</option>
+            <option value="Entrega a Producción">Entrega a Producción</option>
+            <option value="Inspección QA">Inspección QA</option>
+            <option value="Revisión QA">Revisión QA</option>
+            <option value="Devolución por QA">Devolución por QA</option>
+            <option value="Liberación">Liberación</option>
           </select>
         </div>
-        <div class="form-group">
-          <label for="tipoNovedad">Tipo de Novedad</label>
-          <select id="tipoNovedad" required>
-            <option value="">Seleccione tipo</option>
-            <option value="Entrega de orden de acondicionamiento">Entrega de orden de acondicionamiento</option>
-            <option value="Devolución de orden de acondicionamiento">Devolución de orden de acondicionamiento</option>
-          </select>
-        </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="totalPagsMostrado">Páginas Entregadas</label>
-          <input type="number" id="totalPagsMostrado" readonly style="background-color: #f5f5f5;" placeholder="-">
-        </div>
-        <div class="form-group">
-          <label for="noPagDevueltas">Páginas Devueltas</label>
-          <input type="number" id="noPagDevueltas" min="0" placeholder="0">
-        </div>
-      </div>
-
-      <div id="paginasWarning" style="display: none; color: #e65100; font-size: 12px; margin-bottom: 16px; margin-top: -8px; background-color: #fff3e0; padding: 8px; border-radius: 4px; border-left: 3px solid #ffb74d;">
-        ⚠️ <strong>Atención:</strong> Las páginas devueltas no coinciden con las entregadas. Es <strong>obligatorio</strong> registrar el motivo en el comentario.
-      </div>
-
-      <div class="form-group">
-        <label for="comentario">Comentario <span id="reqAsterisk" style="color: red; display: none;">*</span></label>
-        <textarea id="comentario" placeholder="Ingrese comentarios adicionales (opcional)"></textarea>
+      <!-- COMENTARIOS (Común) -->
+      <div class="form-group" style="margin-top: 10px;">
+        <label for="comentario">Comentarios (Opcional) <span id="reqAsterisk" style="color: red; display: none;">*</span></label>
+        <textarea id="comentario" placeholder="Detalle adicional..."></textarea>
       </div>
 
       <div class="button-group">
-        <button type="submit" class="btn btn-primary" id="btnSubmit">Registrar Novedad</button>
-        <button type="button" class="btn btn-secondary" id="btnCancel">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSubmit">Guardar Registro</button>
+        <button type="button" class="btn btn-secondary" id="btnCancel">Cerrar</button>
       </div>
     </form>
   </div>
 
   <div class="loading-overlay hidden" id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text" id="loading-text">Procesando...</div>
+    <div class="loading-text" id="loading-text">Cargando...</div>
   </div>
 
-  <!-- FASE 6: JavaScript Compartido -->
   <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
 
   <script>
@@ -101,27 +152,30 @@
     var users = [];
     var ordenes = [];
 
+    var subcategoriasMap = {};
+
     function initialize() {
       google.script.run
+        .withSuccessHandler(function(map) {
+          subcategoriasMap = map || {};
+          populateCategorias();
+        })
+        .getNovedadesConfigMap();
+      google.script.run
         .withSuccessHandler(function(data) {
-          if (data && data.webAppUrl) {
-            globalWebAppUrl = data.webAppUrl;
-          }
+          if (data && data.webAppUrl) globalWebAppUrl = data.webAppUrl;
           if (data && data.users) {
             users = data.users;
             
             if (users.length === 0) {
               hideLoading();
-              showError('No hay usuarios configurados en la hoja Usuarios.');
+              showError('No hay usuarios configurados.');
               return;
             }
 
             function onUserValidated(userObj) {
-              window.currentUserIdentity = userObj.userId + " - " + userObj.nombreCompleto;
               window.currentUserIdentityObj = userObj;
-              
-              var inputUsuario = document.getElementById('usuarioResponsable');
-              var userContainer = inputUsuario.parentElement;
+              var userContainer = document.getElementById('userContainer');
               userContainer.innerHTML = '<label>Usuario Responsable</label>' +
                 '<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">' +
                 '<span style="font-size: 1.2em;">👤</span>' +
@@ -140,45 +194,12 @@
               if (data.savedProfileIdx !== undefined && data.savedProfileIdx !== null && matchedUsers[data.savedProfileIdx]) {
                 onUserValidated(matchedUsers[data.savedProfileIdx]);
               } else {
-                var optionsHtml = matchedUsers.map(function(u, idx) { return '<option value="' + idx + '">' + u.nombreCompleto + ' (' + u.rol + ')</option>'; }).join('');
-                var overlay = document.getElementById('loading-overlay');
-                overlay.classList.remove('hidden');
-                overlay.innerHTML = 
-                  '<div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:\'Inter\',sans-serif; color:#0f172a;">' +
-                    '<div style="font-size:2rem; margin-bottom:12px;">👥</div>' +
-                    '<h3 style="margin:0 0 8px 0; font-size:1rem;">Selecciona tu perfil</h3>' +
-                    '<p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>' +
-                    '<select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white; color:#0f172a;">' + optionsHtml + '</select>' +
-                    '<button id="profileConfirmBtn" style="width:100%; padding:10px; background:#1976d2; color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer;">Ingresar</button>' +
-                  '</div>';
-                
-                document.getElementById('profileConfirmBtn').addEventListener('click', function() {
-                  var idx = document.getElementById('profileSelect').value;
-                  overlay.innerHTML = '<div class="spinner"></div><div class="loading-text" id="loading-text">Cargando datos...</div>';
-                  google.script.run.withSuccessHandler(function() {
-                    onUserValidated(matchedUsers[idx]);
-                  }).saveUserProfileSelection(idx);
-                });
-                return;
+                 showError('Selección de múltiples perfiles no implementada en esta vista base. Hable con admin.');
               }
             } else {
-               document.body.innerHTML = 
-                 '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: \'Inter\', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">' +
-                   '<div style="font-size: 48px; margin-bottom: 16px;">🚫</div>' +
-                   '<h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>' +
-                   '<p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>' + (myEmail || 'Desconocido') + '</strong> no tiene un usuario asignado en el sistema.</p>' +
-                   '<div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.</div>' +
-                 '</div>';
-               return;
+               document.body.innerHTML = '<div style="padding: 20px; text-align: center;">🚫 Acceso Denegado</div>';
             }
-          } else {
-            loadOrdenes();
           }
-        })
-        .withFailureHandler(function(error) {
-          showError('Error al cargar datos iniciales: ' + error.message);
-          hideLoading();
-          document.getElementById('mainContainer').style.display = 'block';
         })
         .getInitialData();
 
@@ -186,154 +207,119 @@
         google.script.host.close();
       });
 
+      // Events
       document.getElementById('novedadForm').addEventListener('submit', handleSubmit);
-      document.getElementById('noOrden').addEventListener('change', handleOrdenChange);
-      document.getElementById('noPagDevueltas').addEventListener('input', validarPaginas);
-    }
-
-    function populateUsuariosList() {
-      var datalist = document.getElementById('usuariosList');
-      datalist.innerHTML = '';
-      users.forEach(function(user) {
-        var option = document.createElement('option');
-        option.value = user.nombreCompleto;
-        option.setAttribute('data-userid', user.userId);
-        datalist.appendChild(option);
-      });
+      document.getElementById('noOrdenInput').addEventListener('input', handleOrdenInput);
+      document.getElementById('categoria').addEventListener('change', handleCategoriaChange);
+      
+      const radios = document.querySelectorAll('input[name="tipoRegistro"]');
+      radios.forEach(r => r.addEventListener('change', toggleSections));
     }
 
     function loadOrdenes() {
       google.script.run
         .withSuccessHandler(function(data) {
           ordenes = data || [];
-          populateOrdenesSelect();
-          // Finaliza la carga completa
+          populateOrdenesDatalist();
           hideLoading();
           document.getElementById('mainContainer').style.display = 'block';
         })
         .withFailureHandler(function(error) {
           showError('Error al cargar órdenes: ' + error.message);
-          document.getElementById('noOrden').innerHTML = '<option value="">Error al cargar</option>';
           hideLoading();
-          document.getElementById('mainContainer').style.display = 'block';
         })
         .getOrdenesParaNovedad();
     }
 
-    function populateOrdenesSelect() {
-      var select = document.getElementById('noOrden');
-      select.innerHTML = '<option value="">Seleccione orden</option>';
+    function populateOrdenesDatalist() {
+      var datalist = document.getElementById('ordenesList');
+      datalist.innerHTML = '';
       
       ordenes.forEach(function(orden) {
         var option = document.createElement('option');
         option.value = orden.noOrden;
         option.textContent = orden.noOrden + ' - ' + orden.codigo;
-        option.setAttribute('data-codigo', orden.codigo);
-        option.setAttribute('data-totalpags', orden.totalPags);
-        select.appendChild(option);
+        datalist.appendChild(option);
       });
     }
 
-    function handleOrdenChange() {
-      var select = document.getElementById('noOrden');
-      var selectedOption = select.options[select.selectedIndex];
-      
-      if (selectedOption && selectedOption.value !== "") {
-        document.getElementById('ordenCodigo').value = selectedOption.getAttribute('data-codigo') || '';
-        var totalPags = selectedOption.getAttribute('data-totalpags') || '0';
-        document.getElementById('ordenTotalPags').value = totalPags;
-        document.getElementById('totalPagsMostrado').value = totalPags;
+    function handleOrdenInput() {
+      var val = document.getElementById('noOrdenInput').value;
+      var found = ordenes.find(o => o.noOrden === val);
+      if (found) {
+        document.getElementById('ordenCodigo').value = found.codigo;
       } else {
         document.getElementById('ordenCodigo').value = '';
-        document.getElementById('ordenTotalPags').value = '0';
-        document.getElementById('totalPagsMostrado').value = '';
       }
-      validarPaginas();
     }
 
-    function validarPaginas() {
-      var totalPags = document.getElementById('totalPagsMostrado').value;
-      var devueltas = document.getElementById('noPagDevueltas').value;
-      var warning = document.getElementById('paginasWarning');
-      var comentario = document.getElementById('comentario');
-      var reqAsterisk = document.getElementById('reqAsterisk');
-      var noOrden = document.getElementById('noOrden').value;
-      
-      if (!noOrden || totalPags === "") {
-        warning.style.display = 'none';
-        comentario.required = false;
-        reqAsterisk.style.display = 'none';
-        return;
+    function populateCategorias() {
+      var catSelect = document.getElementById('categoria');
+      catSelect.innerHTML = '<option value="">Seleccione categoría</option>';
+      for (var cat in subcategoriasMap) {
+        var option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        catSelect.appendChild(option);
       }
+    }
+
+    function handleCategoriaChange() {
+      var cat = document.getElementById('categoria').value;
+      var subSelect = document.getElementById('subcategoria');
       
-      var numTotal = Number(totalPags) || 0;
-      var numDevueltas = devueltas === "" ? -1 : Number(devueltas);
-      
-      if (numDevueltas >= 0 && numTotal !== numDevueltas) {
-        warning.style.display = 'block';
-        comentario.required = true;
-        reqAsterisk.style.display = 'inline';
-        comentario.placeholder = "Ingrese el motivo de la diferencia de páginas (Obligatorio)";
+      subSelect.innerHTML = '<option value="">Seleccione subcategoría</option>';
+      if (cat && subcategoriasMap[cat]) {
+        subSelect.disabled = false;
+        subcategoriasMap[cat].forEach(function(sub) {
+          var option = document.createElement('option');
+          option.value = sub;
+          option.textContent = sub;
+          subSelect.appendChild(option);
+        });
       } else {
-        warning.style.display = 'none';
-        comentario.required = false;
-        reqAsterisk.style.display = 'none';
-        comentario.placeholder = "Ingrese comentarios adicionales (opcional)";
+        subSelect.disabled = true;
+      }
+    }
+
+    function toggleSections() {
+      var isAvance = document.getElementById('tipoAvance').checked;
+      if (isAvance) {
+        document.getElementById('sectionAvance').classList.add('active');
+        document.getElementById('sectionNovedad').classList.remove('active');
+        // Reset inputs from other side
+        document.getElementById('categoria').value = '';
+        handleCategoriaChange();
+      } else {
+        document.getElementById('sectionAvance').classList.remove('active');
+        document.getElementById('sectionNovedad').classList.add('active');
+        document.getElementById('proceso').value = '';
       }
     }
 
     function handleSubmit(e) {
       e.preventDefault();
       
-      var usuarioUserId = "";
-      
-      if (window.currentUserIdentityObj) {
-        usuarioUserId = window.currentUserIdentityObj.userId;
-      } else {
-        var inputUsuario = document.getElementById('usuarioResponsable') ? document.getElementById('usuarioResponsable').value.trim() : "";
-        for (var i = 0; i < users.length; i++) {
-          if (users[i].nombreCompleto === inputUsuario) {
-            usuarioUserId = users[i].userId;
-            break;
-          }
-        }
-      }
-
-      var noOrden = document.getElementById('noOrden').value;
+      var usuarioUserId = window.currentUserIdentityObj ? window.currentUserIdentityObj.userId : "";
+      var noOrden = document.getElementById('noOrdenInput').value;
       var codigo = document.getElementById('ordenCodigo').value;
-      var totalPags = document.getElementById('ordenTotalPags').value;
-      var nuevoStatus = document.getElementById('nuevoStatus').value;
-      var tipoNovedad = document.getElementById('tipoNovedad').value;
-      var noPagDevueltas = document.getElementById('noPagDevueltas').value;
+      
+      var isAvance = document.getElementById('tipoAvance').checked;
+      var tipoRegistro = isAvance ? 'Avance' : 'Novedad';
+      
+      var categoria = document.getElementById('categoria').value;
+      var subcategoria = document.getElementById('subcategoria').value;
+      var proceso = document.getElementById('proceso').value;
       var comentario = document.getElementById('comentario').value;
 
-      if (!usuarioUserId) {
-        showError('Seleccione un usuario válido de la lista.');
-        return;
-      }
+      if (!usuarioUserId) return showError('Error de autenticación.');
+      if (!noOrden || !codigo) return showError('Escriba y seleccione una orden válida de la lista sugerida.');
 
-      if (!noOrden || !codigo) {
-        showError('Seleccione una orden válida.');
-        return;
-      }
-
-      if (!nuevoStatus) {
-        showError('Seleccione el nuevo estado.');
-        return;
-      }
-
-      if (!tipoNovedad) {
-        showError('Seleccione el tipo de novedad.');
-        return;
-      }
-
-      var numTotal = Number(totalPags) || 0;
-      var numDevueltas = noPagDevueltas === "" ? -1 : Number(noPagDevueltas);
-      
-      if (numDevueltas >= 0 && numTotal !== numDevueltas && !comentario.trim()) {
-        showAlert('Las páginas devueltas no coinciden con las entregadas. Debe registrar el motivo en los comentarios.', 'warning');
-        document.getElementById('comentario').focus();
-        return;
+      if (isAvance) {
+        if (!proceso) return showError('Seleccione una etapa de proceso.');
+      } else {
+        if (!categoria) return showError('Seleccione una categoría.');
+        if (!subcategoria) return showError('Seleccione una subcategoría.');
       }
 
       var params = {
@@ -341,71 +327,54 @@
         userId: usuarioUserId,
         noOrden: noOrden,
         codigo: codigo,
-        tipoNovedad: tipoNovedad,
-        status: nuevoStatus,
-        comentario: comentario,
-        totalPags: Number(totalPags) || 0,
-        noPagDevueltas: Number(noPagDevueltas) || 0,
-        realizadoPor: usuarioUserId
+        tipoRegistro: tipoRegistro,
+        categoria: categoria,
+        subcategoria: subcategoria,
+        proceso: proceso,
+        comentario: comentario
       };
 
-      showLoading('Registrando novedad...');
+      showLoading('Registrando...');
 
       fetch(globalWebAppUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain'
-        },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(params)
       })
-      .then(function(response) {
-        return response.json();
-      })
+      .then(r => r.json())
       .then(function(result) {
         hideLoading();
         if (result.status === 'success') {
-          showAlert('Novedad registrada exitosamente. Puede registrar otra novedad.', 'success');
-          resetearCamposNovedad();
+          showAlert(result.message, 'success');
+          resetForm();
         } else {
-          showError('Error al registrar novedad: ' + (result.message || 'Error desconocido'));
+          showError('Error: ' + (result.message || 'Desconocido'));
         }
       })
       .catch(function(error) {
         hideLoading();
-        showError('Error al registrar novedad: ' + error.message);
+        showError('Error de red: ' + error.message);
       });
     }
 
-    function resetearCamposNovedad() {
-      document.getElementById('noOrden').value = '';
-      document.getElementById('nuevoStatus').value = '';
-      document.getElementById('tipoNovedad').value = '';
-      document.getElementById('noPagDevueltas').value = '';
-      document.getElementById('comentario').value = '';
-      
+    function resetForm() {
+      document.getElementById('noOrdenInput').value = '';
       document.getElementById('ordenCodigo').value = '';
-      document.getElementById('ordenTotalPags').value = '0';
-      document.getElementById('totalPagsMostrado').value = '';
-      
-      validarPaginas();
-      loadOrdenes();
+      document.getElementById('categoria').value = '';
+      handleCategoriaChange();
+      document.getElementById('proceso').value = '';
+      document.getElementById('comentario').value = '';
+      loadOrdenes(); // Refresh list to avoid closed orders
     }
 
-    // Funciones showLoading y showMessage ahora vienen de GlobalScripts.html
-
-    // Inicializar al cargar
     window.addEventListener('load', function() {
       initialize();
-      
-      // Inicializar drag y resize (el drag handle azul está oculto en Theme.html)
       initializeModalDragResize({
-        title: 'Registrar Entrega / Novedad',  // No se mostrará - drag handle oculto
+        title: 'Registrar Novedad / Tiempo',
         enableDrag: true,
         enableResize: true,
         minWidth: 500,
-        minHeight: 600,
-        maxWidth: 900,
-        maxHeight: 900
+        minHeight: 600
       });
     });
   </script>

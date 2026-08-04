@@ -124,14 +124,11 @@ function procesarRegistroNovedad(params, userId) {
     // Obtener parámetros
     var noOrden = params.noOrden || "";
     var codigo = params.codigo || "";
-    var tipoNovedad = params.tipoNovedad || "";
-    var comentario = params.comentario || "";
-    var totalPags = params.totalPags || 0;
-    var noPagDevueltas = params.noPagDevueltas || 0;
-    var nuevoStatus = params.status || "";
-    var realizadoPor = params.realizadoPor || userId;
+    var tipoRegistro = params.tipoRegistro || "Novedad"; // "Novedad" o "Avance"
+    var fechaActual = new Date();
+    var timestampStr = Utilities.formatDate(fechaActual, ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
 
-    // Actualizar STATUS en la hoja Ordenes
+    // Actualizar STATUS y Novedades en la hoja Ordenes
     var sheetOrdenes = ss.getSheetByName('Ordenes');
     if (!sheetOrdenes) {
       return { status: 'error', message: 'La hoja Ordenes no existe.' };
@@ -140,20 +137,27 @@ function procesarRegistroNovedad(params, userId) {
     var headersOrdenes = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
     var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoOrden', false);
     var colStatusCol = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
+    var colNovedadesCol = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Novedades', false);
 
-    if (!colNoOrdenCol || !colStatusCol) {
-      return { status: 'error', message: 'No se encontraron las columnas NoOrden y/o STATUS en Ordenes.' };
+    if (!colNoOrdenCol) {
+      return { status: 'error', message: 'No se encontró la columna NoOrden en Ordenes.' };
     }
 
-    var dataRangeOrdenes = sheetOrdenes.getRange(2, 1, sheetOrdenes.getLastRow() - 1, sheetOrdenes.getLastColumn());
+    var dataRangeOrdenes = sheetOrdenes.getRange(2, 1, Math.max(1, sheetOrdenes.getLastRow() - 1), sheetOrdenes.getLastColumn());
     var valuesOrdenes = dataRangeOrdenes.getValues();
     var filaEncontrada = -1;
+    var statusActual = "";
+    var novedadesActuales = "";
 
     for (var i = 0; i < valuesOrdenes.length; i++) {
       var rowNoOrden = valuesOrdenes[i][colNoOrdenCol - 1];
       var rowNoOrdenStr = rowNoOrden ? rowNoOrden.toString().trim() : "";
       if (rowNoOrdenStr === noOrden) {
-        filaEncontrada = i + 2; // +2 por header y base-1
+        filaEncontrada = i + 2;
+        statusActual = colStatusCol ? (valuesOrdenes[i][colStatusCol - 1] || "") : "";
+        if (colNovedadesCol) {
+          novedadesActuales = valuesOrdenes[i][colNovedadesCol - 1] || "";
+        }
         break;
       }
     }
@@ -162,67 +166,166 @@ function procesarRegistroNovedad(params, userId) {
       return { status: 'error', message: 'No se encontró la orden ' + noOrden + ' en la hoja Ordenes.' };
     }
 
-    // Actualizar STATUS
-    sheetOrdenes.getRange(filaEncontrada, colStatusCol).setValue(nuevoStatus);
-
-    // Insertar registro en hoja RegistroNovedad
-    var sheetRegistro = ss.getSheetByName('RegistroNovedad');
-    if (!sheetRegistro) {
-      return { status: 'error', message: 'La hoja RegistroNovedad no existe.' };
-    }
-
-    var fechaNovedad = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
-
-    // --- INICIO MAPEO DINÁMICO DE COLUMNAS ---
-    // Obtener los encabezados actuales de la hoja
-    var lastColRegistro = Math.max(1, sheetRegistro.getLastColumn());
-    var headersRegistro = sheetRegistro.getRange(1, 1, 1, lastColRegistro).getValues()[0];
-    
-    // Crear array vacío del tamaño de las columnas
-    var rowData = new Array(headersRegistro.length).fill("");
-    
-    // Mapear los datos exactos a insertar
-    var dataMapping = {
-      'FechaNovedad': fechaNovedad,
-      'NoOrden': noOrden,
-      'Codigo': codigo,
-      'TipoNovedad': tipoNovedad,
-      'Comentario': comentario,
-      'TotalPags': totalPags,
-      'NoPagDevueltas': noPagDevueltas,
-      'RealizadoPor': nombreCorto,
-      'STATUS': nuevoStatus
-    };
-
-    // Inyectar por nombre de encabezado usando el helper
-    for (var colName in dataMapping) {
-      var colIdx = getColumnIndexByNameCaseInsensitive(headersRegistro, colName, false);
-      if (colIdx !== null && colIdx > 0) {
-        rowData[colIdx - 1] = dataMapping[colName];
+    if (tipoRegistro === 'Avance') {
+      var proceso = params.proceso || "";
+      // Actualizar STATUS en Ordenes si es un avance (Lógica base)
+      var statusMap = {
+        'Inspección QA': 'RecibidaQA',
+        'Revisión QA': 'RecibidaQA',
+        'Devolución por QA': 'DevueltaQA',
+        'Liberación': 'Cerrada',
+        'Entrega a Producción': 'Impreso'
+      };
+      
+      var nuevoStatus = statusMap[proceso] || params.status || statusActual;
+      if (nuevoStatus && colStatusCol) {
+        sheetOrdenes.getRange(filaEncontrada, colStatusCol).setValue(nuevoStatus);
       }
-    }
 
-    sheetRegistro.appendRow(rowData);
-    // --- FIN MAPEO DINÁMICO DE COLUMNAS ---
-
-    // Registrar en Logs
-    var userIdentity = getUserIdentityStringByUserId_(userId);
-    var logDescripcion = 'Novedad registrada: Orden ' + noOrden + ', Tipo: ' + tipoNovedad + ', Nuevo STATUS: ' + nuevoStatus;
-    logChange('REGISTRO_NOVEDAD', logDescripcion, userIdentity);
-
-    Logger.log("procesarRegistroNovedad: Novedad registrada exitosamente para orden " + noOrden);
-    return { 
-      status: 'success', 
-      message: 'Novedad registrada exitosamente para orden ' + noOrden,
-      data: {
-        noOrden: noOrden,
-        nuevoStatus: nuevoStatus,
-        realizadoPor: nombreCorto
+      // LogTiemposProceso
+      var sheetTiempos = ss.getSheetByName('LogTiemposProceso');
+      if (sheetTiempos) {
+        sheetTiempos.appendRow([timestampStr, noOrden, proceso, nombreCorto]);
+      } else {
+        Logger.log("Hoja LogTiemposProceso no existe.");
       }
-    };
+      
+      var logDescripcion = 'Avance registrado: Orden ' + noOrden + ' -> ' + proceso;
+      logChange('AVANCE_PROCESO', logDescripcion, getUserIdentityStringByUserId_(userId));
+
+      return { 
+        status: 'success', 
+        message: 'Avance registrado exitosamente.',
+        data: { noOrden: noOrden, nuevoStatus: nuevoStatus, realizadoPor: nombreCorto }
+      };
+
+    } else {
+      // Registro de Novedad Operativa / Calidad
+      var categoria = params.categoria || "";
+      var subcategoria = params.subcategoria || "";
+      var comentario = params.comentario || "";
+      var totalPags = params.totalPags || 0;
+      var noPagDevueltas = params.noPagDevueltas || 0;
+
+      // Anexar a columna Novedades en Ordenes
+      var textoNovedad = categoria + " (" + subcategoria + "): " + comentario + " - " + timestampStr + " - " + nombreCorto;
+      if (colNovedadesCol) {
+        var nuevaNovedadStr = novedadesActuales ? novedadesActuales + "\n" + textoNovedad : textoNovedad;
+        sheetOrdenes.getRange(filaEncontrada, colNovedadesCol).setValue(nuevaNovedadStr);
+      }
+
+      // Insertar en RegistroNovedad
+      var sheetRegistro = ss.getSheetByName('RegistroNovedad');
+      if (sheetRegistro) {
+        var lastColRegistro = Math.max(1, sheetRegistro.getLastColumn());
+        var headersRegistro = sheetRegistro.getRange(1, 1, 1, lastColRegistro).getValues()[0];
+        
+        var rowData = new Array(headersRegistro.length).fill("");
+        var dataMapping = {
+          'FechaNovedad': timestampStr,
+          'NoOrden': noOrden,
+          'Codigo': codigo,
+          'TipoNovedad': 'Novedad',
+          'Categoria': categoria,
+          'Subcategoria': subcategoria,
+          'Comentario': comentario,
+          'TotalPags': totalPags,
+          'NoPagDevueltas': noPagDevueltas,
+          'RealizadoPor': nombreCorto,
+          'STATUS': statusActual
+        };
+
+        for (var colName in dataMapping) {
+          var colIdx = getColumnIndexByNameCaseInsensitive(headersRegistro, colName, false);
+          if (colIdx !== null && colIdx > 0) {
+            rowData[colIdx - 1] = dataMapping[colName];
+          }
+        }
+        sheetRegistro.appendRow(rowData);
+      }
+
+      var logDescripcionN = 'Novedad registrada: Orden ' + noOrden + ', Categoria: ' + categoria;
+      logChange('REGISTRO_NOVEDAD', logDescripcionN, getUserIdentityStringByUserId_(userId));
+
+      return { 
+        status: 'success', 
+        message: 'Novedad registrada exitosamente para orden ' + noOrden,
+        data: { noOrden: noOrden, realizadoPor: nombreCorto }
+      };
+    }
   } catch (e) {
     Logger.log("ERROR en procesarRegistroNovedad: " + e.message);
     Logger.log("Stack trace: " + e.stack);
-    return { status: 'error', message: 'Error al procesar registro de novedad: ' + e.message };
+    return { status: 'error', message: 'Error al procesar registro: ' + e.message };
+  }
+}
+
+// --- CONFIGURACIÓN DE CATEGORÍAS ---
+
+/**
+ * Obtiene el mapa de categorías y subcategorías desde la hoja ParametrosNovedades.
+ * Si la hoja está vacía, inserta unos valores por defecto y los devuelve.
+ * @returns {Object} Mapa de categorías (key) a array de subcategorías (value)
+ */
+function getNovedadesConfigMap() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('ParametrosNovedades');
+    
+    // Si la hoja no existe (aún no se ha inicializado), usar por defecto
+    if (!sheet) {
+      return getParametrosNovedadesPorDefecto_();
+    }
+    
+    var lastRow = sheet.getLastRow();
+    
+    // Si la hoja existe pero está vacía (sólo encabezados), poblarla
+    if (lastRow < 2) {
+      poblarParametrosNovedadesPorDefecto_(sheet);
+      lastRow = Math.max(2, sheet.getLastRow()); // Actualizar lastRow después de poblar
+    }
+    
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    var map = {};
+    
+    for (var i = 0; i < values.length; i++) {
+      var cat = values[i][0] ? values[i][0].toString().trim() : "";
+      var sub = values[i][1] ? values[i][1].toString().trim() : "";
+      
+      if (cat && sub) {
+        if (!map[cat]) map[cat] = [];
+        map[cat].push(sub);
+      }
+    }
+    
+    return map;
+  } catch (e) {
+    Logger.log("Error en getNovedadesConfigMap: " + e.message);
+    return getParametrosNovedadesPorDefecto_(); // Fallback seguro
+  }
+}
+
+function getParametrosNovedadesPorDefecto_() {
+  return {
+    'Impresión': ['Falla de inyección de tinta', 'Manchas/Tinta corrida', 'Datos ilegibles o borrosos', 'Desprendimiento de tinta', 'Código de barras/QR no lee', 'Error en consecutivo/lote/fecha', 'Otro'],
+    'Desviación': ['Mezcla de material de empaque', 'Lote incorrecto', 'Falta de material', 'Falla en equipo/máquina', 'Daño físico a producto', 'Producto cruzado', 'Problema de temperatura/humedad', 'Otro'],
+    'BPD': ['Firma faltante', 'Fecha incorrecta/faltante', 'Corrección no válida (tachones)', 'Casilla vacía', 'Uso de lápiz/corrector', 'Formato incorrecto', 'Otro'],
+    'Observaciones': ['Faltantes en conteo (merma)', 'Sobrantes en conteo', 'Espera de insumos', 'Paro de línea programado', 'Otro']
+  };
+}
+
+function poblarParametrosNovedadesPorDefecto_(sheet) {
+  var defaultMap = getParametrosNovedadesPorDefecto_();
+  var data = [];
+  
+  for (var cat in defaultMap) {
+    var subs = defaultMap[cat];
+    for (var i = 0; i < subs.length; i++) {
+      data.push([cat, subs[i]]);
+    }
+  }
+  
+  if (data.length > 0) {
+    sheet.getRange(2, 1, data.length, 2).setValues(data);
   }
 }

@@ -34,8 +34,10 @@ var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 // Estructura requerida de hojas y columnas
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder', 'Estado', 'Copias'],
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'SolicitadoPor', 'EstadoDocumentos', 'ConsecutivoImp', 'ImpresoPor', 'ReimpresoPor', 'NoPags', 'Reimpresion', 'TotalPags', 'STATUS', 'HistorialImpresion'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'SolicitadoPor', 'EstadoDocumentos', 'ConsecutivoImp', 'ImpresoPor', 'ReimpresoPor', 'NoPags', 'Reimpresion', 'TotalPags', 'STATUS', 'HistorialImpresion', 'Novedades'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio'],
-  'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS']
+  'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Categoria', 'Subcategoria', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
+  'LogTiemposProceso': ['Timestamp', 'NoOrden', 'Proceso', 'RegistradoPor'],
+  'ParametrosNovedades': ['Categoria', 'Subcategoria']
 };

@@ -27,7 +27,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
     .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
-    .addItem('📝 Registrar Entrega / Novedad', 'abrirModalRegistroNovedad')
+    .addItem('🚨 Registrar novedad', 'abrirModalRegistroNovedad')
     .addItem('🔄 Refrescar Estado de Documentos', 'forzarActualizacionEstadoDocumentos')
     .addSeparator()
     .addSubMenu(configMenu)
