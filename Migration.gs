@@ -377,19 +377,34 @@ function migrarHaciaColumnaUnificada() {
 
 /**
  * Migración de estado: reemplaza STATUS "Pendiente" -> "Creada" en los datos
- * existentes y regenera el dropdown de STATUS (que ahora incluye "Creada" y
- * ya no "Pendiente"). Correr UNA vez tras desplegar el rename.
+ * existentes de Ordenes y RegistroNovedad. Correr UNA vez tras desplegar el rename.
  *
- * Orden: primero migra los datos, luego regenera la validación, para que
- * ninguna fila quede marcada como valor inválido de forma persistente.
+ * ORDEN CRÍTICO: primero se regenera el dropdown (para que incluya "Creada"),
+ * y SOLO DESPUÉS se escriben los datos. El data-validation de STATUS usa
+ * setAllowInvalid(false), por lo que un setValue("Creada") con el dropdown
+ * viejo LANZA excepción. Se tocan únicamente las celdas "Pendiente".
  *
  * @returns {number} Total de filas migradas.
  */
 function migrarPendienteACreada() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. PRIMERO: regenerar el dropdown de STATUS (ahora con "Creada", sin "Pendiente").
+  try {
+    applyStatusDataValidation(true);
+  } catch (e) {
+    Logger.log('migrarPendienteACreada: fallo al regenerar dropdown: ' + e.message);
+    try {
+      SpreadsheetApp.getUi().alert('Error',
+        'No se pudo regenerar el dropdown de STATUS:\n' + e.message + '\n\nLa migración se detuvo SIN cambios.',
+        SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (e2) { /* sin UI */ }
+    return 0;
+  }
+
+  // 2. DESPUÉS: migrar los datos "Pendiente" -> "Creada" (solo las celdas afectadas).
   var total = 0;
   var hojas = ['Ordenes', 'RegistroNovedad'];
-
   for (var h = 0; h < hojas.length; h++) {
     var sheet = ss.getSheetByName(hojas[h]);
     if (!sheet) continue;
@@ -400,23 +415,13 @@ function migrarPendienteACreada() {
     var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
     if (!colStatus) continue;
 
-    var rng = sheet.getRange(2, colStatus, lastRow - 1, 1);
-    var vals = rng.getValues();
-    var cambios = 0;
+    var vals = sheet.getRange(2, colStatus, lastRow - 1, 1).getValues();
     for (var i = 0; i < vals.length; i++) {
       if (vals[i][0] && vals[i][0].toString().trim() === 'Pendiente') {
-        vals[i][0] = VALORES_STATUS.CREADA;
-        cambios++;
+        sheet.getRange(2 + i, colStatus).setValue(VALORES_STATUS.CREADA);
+        total++;
       }
     }
-    if (cambios > 0) { rng.setValues(vals); total += cambios; }
-  }
-
-  // Regenerar el dropdown de STATUS (ahora "Creada", sin "Pendiente")
-  try {
-    applyStatusDataValidation(true);
-  } catch (e) {
-    Logger.log('migrarPendienteACreada: fallo al regenerar dropdown: ' + e.message);
   }
 
   try {

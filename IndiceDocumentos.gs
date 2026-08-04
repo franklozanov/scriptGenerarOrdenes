@@ -14,26 +14,38 @@
 /**
  * Convierte un nombre de archivo o un valor de celda en una clave canónica
  * comparable. Se usa TANTO al construir el índice (desde nombres de archivo)
- * COMO al consultarlo (desde el valor de la celda) — garantiza que ambos
- * lados hablen el mismo idioma y elimina el match difuso (contains).
+ * COMO al consultarlo (desde el valor de la celda) — ambos lados producen la
+ * misma clave y se elimina el match difuso (contains).
  *
- *   "0042.pdf"      -> "42"           (OA numérico, sin ceros a la izquierda)
- *   "OA0042.pdf"    -> "42"           (OA subido a mano por el admin)
- *   42 (número)     -> "42"
- *   "2026-0015.pdf" -> "2026-0015"    (COA alfanumérico: stem tal cual)
- *   "COA2026-0015"  -> "2026-0015"
+ * COA — el archivo trae varios tokens: "COA 2026-0220 k1548 a26ns036.pdf".
+ *       La clave es el patrón de análisis AÑO-SECUENCIA (2026-0220), que es
+ *       exactamente lo que guarda la columna NoAnalisis.
+ *   "COA 2026-0220 k1548 a26ns036.pdf" -> "2026-0220"
+ *   "2026-0220" (celda NoAnalisis)     -> "2026-0220"
+ *
+ * OA — número de orden de 4 cifras, opcionalmente con prefijo "OA":
+ *   "0042.pdf"   -> "42"
+ *   "OA0042.pdf" -> "42"
+ *   42 (número)  -> "42"
  *
  * @param {*} raw - Nombre de archivo o valor de celda (NoOrden / NoAnalisis)
  * @returns {string} Clave canónica ("" si no hay contenido)
  */
 function normalizarClaveDoc_(raw) {
   var s = String(raw == null ? '' : raw).trim().toLowerCase();
-  s = s.replace(/\.pdf$/, '');     // quitar extensión (si viene de un filename)
-  s = s.replace(/^(oa|coa)/, '');  // quitar prefijo opcional del admin
+  s = s.replace(/\.pdf$/, ''); // quitar extensión (si viene de un filename)
+
+  // COA: extraer el patrón AÑO-SECUENCIA (ej. 2026-0220) de donde sea que esté
+  // dentro del nombre. Cubre tanto el filename multi-token como el valor de celda.
+  var mAnalisis = s.match(/\d{4}-\d{4}/);
+  if (mAnalisis) return mAnalisis[0];
+
+  // OA: número de orden, con prefijo "oa" opcional y sin espacios.
+  s = s.replace(/^(oa|coa)/, '').replace(/\s+/g, '');
   if (s !== '' && /^\d+$/.test(s)) {
-    return String(parseInt(s, 10)); // puramente numérico -> canónico entero (mata ceros a la izquierda)
+    return String(parseInt(s, 10)); // canónico entero (mata ceros a la izquierda)
   }
-  return s;                         // alfanumérico (ej. COA 2026-0015) -> stem normalizado
+  return s; // fallback defensivo
 }
 
 var IndiceDocs = {
