@@ -44,15 +44,16 @@ var Auditoria = {
    */
   revertirEdicionSistema: function(e, editedRange) {
     var sheet = editedRange.getSheet();
-    var numRows = editedRange.getNumRows();
-    var numCols = editedRange.getNumColumns();
+    var esCeldaSuelta = (editedRange.getNumRows() === 1 && editedRange.getNumColumns() === 1);
+    var addr = editedRange.getA1Notation();
 
-    if (numRows === 1 && numCols === 1) {
+    // Segunda capa (tras la advertencia previa): CELDA SUELTA → revertir al valor
+    // anterior; MULTI-CELDA → SOLO auditar (el usuario puede Ctrl+Z o el admin
+    // restaura de versiones). Así no destruimos datos sin valor anterior disponible.
+    if (esCeldaSuelta) {
       editedRange.setValue(e.oldValue !== undefined ? e.oldValue : '');
-    } else {
-      editedRange.clearContent();
+      SpreadsheetApp.flush();
     }
-    SpreadsheetApp.flush();
 
     var email = (e.user && e.user.getEmail()) ? e.user.getEmail() : Session.getActiveUser().getEmail();
     var userIdentity = email || 'Usuario no identificado (edición directa)';
@@ -63,12 +64,18 @@ var Auditoria = {
       }
     }
 
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'La hoja "' + sheet.getName() + '" es de sistema y no se edita manualmente. Cambio revertido.',
-      '⚠️ Edición no permitida', 6);
-    logChange('VIOLACION_PERMISO',
-      'Intento de edición manual en hoja de sistema ' + sheet.getName() + ' ' + editedRange.getA1Notation() + '. Revertido.',
-      userIdentity);
+    if (esCeldaSuelta) {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'La hoja "' + sheet.getName() + '" es de sistema. Cambio revertido.', '⚠️ Edición no permitida', 6);
+      logChange('VIOLACION_PERMISO',
+        'Edición manual en hoja de sistema ' + sheet.getName() + ' ' + addr + '. Revertido (celda).', userIdentity);
+    } else {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Editaste la hoja de sistema "' + sheet.getName() + '" en varias celdas. Registrado — usa Ctrl+Z para deshacer.',
+        '⚠️ Edición registrada', 8);
+      logChange('VIOLACION_PERMISO',
+        'Edición manual MULTI-CELDA en hoja de sistema ' + sheet.getName() + ' ' + addr + '. NO revertido (auditado; deshacer con Ctrl+Z o restaurar versión).', userIdentity);
+    }
   },
 
   /**
@@ -85,38 +92,37 @@ var Auditoria = {
     var colsSys = evt.columnasSistemaTocadas;
     if (!colsSys || colsSys.length === 0) return false;
 
-    var esCeldaSuelta = (evt.numRows === 1 && evt.numCols === 1);
-    var revertidoAlgo = false;
     var nombres = [];
-
     for (var ci = 0; ci < colsSys.length; ci++) {
       var col = colsSys[ci];
-      var nombreCol = (evt.headers[col - 1] != null) ? evt.headers[col - 1].toString().trim() : ('col' + col);
-      for (var r = 0; r < evt.numRows; r++) {
-        var fila = evt.startRow + r;
-        if (fila === 1) continue;              // no tocar encabezados
-        if (evt.isClearedArray[r]) continue;    // borrado legítimo de fila: no revertir
+      nombres.push((evt.headers[col - 1] != null) ? evt.headers[col - 1].toString().trim() : ('col' + col));
+    }
+    var addr = evt.editedRange.getA1Notation();
 
-        if (esCeldaSuelta) {
-          evt.sheet.getRange(fila, col).setValue(e.oldValue !== undefined ? e.oldValue : '');
-        } else {
-          evt.sheet.getRange(fila, col).clearContent();
-        }
-        revertidoAlgo = true;
-        if (nombres.indexOf(nombreCol) === -1) nombres.push(nombreCol);
-      }
+    // Segunda capa (tras la advertencia previa):
+    // - CELDA SUELTA con valor editable → revertir al valor anterior exacto.
+    // - MULTI-CELDA → SOLO auditar (no revertir; el usuario puede Ctrl+Z o el admin
+    //   restaura de versiones). Así no destruimos datos sin valor anterior disponible.
+    if (evt.numRows === 1 && evt.numCols === 1) {
+      // No pelear con borrado legítimo de fila ni tocar encabezado.
+      if (evt.startRow === 1 || evt.isClearedArray[0]) return false;
+
+      evt.sheet.getRange(evt.startRow, colsSys[0]).setValue(e.oldValue !== undefined ? e.oldValue : '');
+      SpreadsheetApp.flush();
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Columna de sistema (' + nombres[0] + ') no editable. Cambio revertido.', '⚠️ Edición no permitida', 6);
+      logChange('VIOLACION_PERMISO',
+        'Edición manual a columna de sistema [' + nombres[0] + '] en Ordenes ' + addr + '. Revertido (celda).', evt.userIdentity);
+      return true;
     }
 
-    if (!revertidoAlgo) return false;
-    SpreadsheetApp.flush();
-
+    // Multi-celda: SOLO auditar.
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Columna(s) de sistema (' + nombres.join(', ') + ') no se editan manualmente. Cambio revertido.',
-      '⚠️ Edición no permitida', 6);
+      'Editaste columna(s) de sistema (' + nombres.join(', ') + ') en varias celdas. Registrado — usa Ctrl+Z para deshacer.',
+      '⚠️ Edición registrada', 8);
     logChange('VIOLACION_PERMISO',
-      'Intento de edición manual a columna(s) de sistema [' + nombres.join(', ') + '] en Ordenes ' + evt.editedRange.getA1Notation() + '. Revertido.',
-      evt.userIdentity);
-    return true;
+      'Edición manual MULTI-CELDA a columna(s) de sistema [' + nombres.join(', ') + '] en Ordenes ' + addr + '. NO revertido (auditado; deshacer con Ctrl+Z o restaurar versión).', evt.userIdentity);
+    return false;
   },
 
   /**

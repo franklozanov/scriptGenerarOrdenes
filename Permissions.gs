@@ -207,7 +207,51 @@ function applyNewProtectionScheme() {
   try { applyStatusDataValidation(); }
   catch (e) { Logger.log('⚠️ applyStatusDataValidation: ' + e.message); }
 
-  Logger.log("✓ Esquema aplicado (visibilidad + validación; integridad por trigger-enforcement)");
+  // Protección "solo advertencia" en columnas/hojas de sistema: avisa ANTES de una
+  // edición manual y deja CANCELAR. Los setValue del script la ignoran → no rompe la app.
+  try { aplicarAdvertenciasSistema_(); }
+  catch (e) { Logger.log('⚠️ aplicarAdvertenciasSistema_: ' + e.message); }
+
+  Logger.log("✓ Esquema aplicado (visibilidad + validación + advertencias; integridad por trigger-enforcement)");
+}
+
+/**
+ * Aplica protección "solo advertencia" (setWarningOnly) a las hojas y columnas de
+ * sistema. Muestra un aviso "¿seguro que quieres editar esto?" ANTES de una edición
+ * MANUAL, con opción a Cancelar → frena el pegado accidental sin perder datos.
+ * NO restringe editores ni afecta los setValue del script (no rompe la app).
+ */
+function aplicarAdvertenciasSistema_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Hojas de sistema: advertencia sobre toda la hoja.
+  for (var i = 0; i < HOJAS_SOLO_SISTEMA.length; i++) {
+    var sh = ss.getSheetByName(HOJAS_SOLO_SISTEMA[i]);
+    if (!sh) continue;
+    try {
+      sh.protect().setWarningOnly(true).setDescription('Advertencia_' + HOJAS_SOLO_SISTEMA[i]);
+    } catch (e) {
+      Logger.log('Advertencia hoja ' + HOJAS_SOLO_SISTEMA[i] + ': ' + e.message);
+    }
+  }
+
+  // Columnas de sistema en Ordenes: advertencia por columna (fila 2 al final).
+  var sheetOrdenes = ss.getSheetByName('Ordenes');
+  if (!sheetOrdenes) return;
+  var headers = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
+  var maxRows = sheetOrdenes.getMaxRows();
+  if (maxRows <= 1) return;
+
+  for (var c = 0; c < headers.length; c++) {
+    var nombre = headers[c] ? headers[c].toString().trim() : '';
+    if (COLUMNAS_SISTEMA_ORDENES.indexOf(nombre) === -1) continue;
+    try {
+      sheetOrdenes.getRange(2, c + 1, maxRows - 1, 1)
+        .protect().setWarningOnly(true).setDescription('Advertencia_' + nombre);
+    } catch (e) {
+      Logger.log('Advertencia col ' + nombre + ': ' + e.message);
+    }
+  }
 }
 
 // --- PROTECCIÓN DE HOJAS INDIVIDUALES ---
