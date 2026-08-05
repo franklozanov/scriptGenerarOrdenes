@@ -68,16 +68,6 @@ var IndiceDocs = {
       sh.getRange(1, 1, 1, 5).setValues([['Tipo', 'Clave', 'FileId', 'NombreArchivo', 'FechaIndex']]);
       sh.getRange('B:B').setNumberFormat('@'); // Clave como texto plano
       sh.hideSheet();
-      // Bloqueo owner-only: solo el sistema (propietario) escribe el índice.
-      // Se protege al crear porque en el primer Inicializar la hoja aún no
-      // existe cuando corre applyNewProtectionScheme.
-      try {
-        if (typeof protectSheetFully === 'function') {
-          protectSheetFully(sh, 'Proteccion_IndiceDocumentos');
-        }
-      } catch (e) {
-        Logger.log('IndiceDocs: no se pudo proteger la hoja al crearla: ' + e.message);
-      }
     }
     return sh;
   },

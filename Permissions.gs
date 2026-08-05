@@ -181,52 +181,33 @@ function ensureFolderPermissions() {
  * Elimina protecciones legacy, oculta hojas, protege hojas sensibles y configura validaciones.
  */
 function applyNewProtectionScheme() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  // NOTA IMPORTANTE — Modelo de integridad:
+  // NO aplicamos protecciones de hoja/rango owner-only. Las escrituras de la app
+  // (imprimir, novedades, subir) corren como USUARIO ACTIVO (modales +
+  // google.script.run), no como propietario, así que una protección owner-only
+  // las ROMPERÍA (por eso el esquema anterior nunca se pudo aplicar en prod).
+  // La integridad de columnas/hojas de sistema se hace por TRIGGER-ENFORCEMENT:
+  // el trigger onEditInstalled (corre como propietario) revierte y audita las
+  // ediciones MANUALES a esas columnas/hojas. Los setValue del script no disparan
+  // el trigger, así que las escrituras legítimas de la app pasan intactas.
 
-  // Primero eliminar protecciones legacy
+  // Limpiar cualquier protección owner-only previa (deja el libro sin locks que
+  // rompan a los usuarios no-propietarios).
   removeLegacyProtections();
 
-  // Ocultar todas las hojas excepto Ordenes, Logs y RegistroNovedad
+  // Ocultar hojas internas (defensa en profundidad; no impide edición si se desoculta,
+  // de eso se encarga el trigger-enforcement).
   hideAllSheetsExcept(['Ordenes', 'Logs', 'RegistroNovedad']);
 
-  // Protección completa (owner-only) para hojas de sistema/config. Se protege
-  // solo si la hoja existe. IndiceDocumentos puede no existir aún en el primer
-  // Inicializar (se crea después); ahí la protege su propio módulo al crearla.
-  var hojasBloqueoTotal = [
-    ['templates', 'Proteccion_Templates'],
-    ['Usuarios', 'Proteccion_Usuarios'],
-    ['RegistroNovedad', 'Proteccion_RegistroNovedad'],
-    ['LogTiemposProceso', 'Proteccion_LogTiemposProceso'],
-    ['ParametrosNovedades', 'Proteccion_ParametrosNovedades'],
-    ['IndiceDocumentos', 'Proteccion_IndiceDocumentos']
-  ];
-
-  // Cada paso es independiente: una falla (p.ej. permisos de Drive) NO debe
-  // dejar el resto de las hojas sin proteger.
+  // Permisos de carpetas Drive (necesario para visor/impresión).
   try { ensureFolderPermissions(); }
-  catch (e) { Logger.log('⚠️ ensureFolderPermissions falló: ' + e.message); }
+  catch (e) { Logger.log('⚠️ ensureFolderPermissions: ' + e.message); }
 
-  for (var i = 0; i < hojasBloqueoTotal.length; i++) {
-    try {
-      var s = ss.getSheetByName(hojasBloqueoTotal[i][0]);
-      if (s) protectSheetFully(s, hojasBloqueoTotal[i][1]);
-    } catch (e) {
-      Logger.log('⚠️ Protección falló en ' + hojasBloqueoTotal[i][0] + ': ' + e.message);
-    }
-  }
-
-  // Ordenes: protección mixta (solo columnas admin). Logs: protección total.
-  try { configureOrdenesProtection(); }
-  catch (e) { Logger.log('⚠️ configureOrdenesProtection falló: ' + e.message); }
-
-  try { configureLogsProtection(); }
-  catch (e) { Logger.log('⚠️ configureLogsProtection falló: ' + e.message); }
-
-  // Validación de datos de STATUS
+  // Validación de datos + colores de STATUS (dropdown). NO bloquea la edición.
   try { applyStatusDataValidation(); }
-  catch (e) { Logger.log('⚠️ applyStatusDataValidation falló: ' + e.message); }
+  catch (e) { Logger.log('⚠️ applyStatusDataValidation: ' + e.message); }
 
-  Logger.log("✓ Nuevo esquema de protección aplicado");
+  Logger.log("✓ Esquema aplicado (visibilidad + validación; integridad por trigger-enforcement)");
 }
 
 // --- PROTECCIÓN DE HOJAS INDIVIDUALES ---
