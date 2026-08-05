@@ -182,43 +182,50 @@ function ensureFolderPermissions() {
  */
 function applyNewProtectionScheme() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+
   // Primero eliminar protecciones legacy
   removeLegacyProtections();
-  
+
   // Ocultar todas las hojas excepto Ordenes, Logs y RegistroNovedad
   hideAllSheetsExcept(['Ordenes', 'Logs', 'RegistroNovedad']);
-  
-  // Verificar y asegurar permisos de carpetas de Drive
-  ensureFolderPermissions();
-  
-  // Proteger hoja templates
-  var sheetTemplates = ss.getSheetByName('templates');
-  if (sheetTemplates) {
-    protectSheetFully(sheetTemplates, 'Proteccion_Templates');
+
+  // Protección completa (owner-only) para hojas de sistema/config. Se protege
+  // solo si la hoja existe. IndiceDocumentos puede no existir aún en el primer
+  // Inicializar (se crea después); ahí la protege su propio módulo al crearla.
+  var hojasBloqueoTotal = [
+    ['templates', 'Proteccion_Templates'],
+    ['Usuarios', 'Proteccion_Usuarios'],
+    ['RegistroNovedad', 'Proteccion_RegistroNovedad'],
+    ['LogTiemposProceso', 'Proteccion_LogTiemposProceso'],
+    ['ParametrosNovedades', 'Proteccion_ParametrosNovedades'],
+    ['IndiceDocumentos', 'Proteccion_IndiceDocumentos']
+  ];
+
+  // Cada paso es independiente: una falla (p.ej. permisos de Drive) NO debe
+  // dejar el resto de las hojas sin proteger.
+  try { ensureFolderPermissions(); }
+  catch (e) { Logger.log('⚠️ ensureFolderPermissions falló: ' + e.message); }
+
+  for (var i = 0; i < hojasBloqueoTotal.length; i++) {
+    try {
+      var s = ss.getSheetByName(hojasBloqueoTotal[i][0]);
+      if (s) protectSheetFully(s, hojasBloqueoTotal[i][1]);
+    } catch (e) {
+      Logger.log('⚠️ Protección falló en ' + hojasBloqueoTotal[i][0] + ': ' + e.message);
+    }
   }
-  
-  // Proteger hoja Usuarios
-  var sheetUsuarios = ss.getSheetByName('Usuarios');
-  if (sheetUsuarios) {
-    protectSheetFully(sheetUsuarios, 'Proteccion_Usuarios');
-  }
-  
-  // Proteger hoja RegistroNovedad
-  var sheetRegistroNovedad = ss.getSheetByName('RegistroNovedad');
-  if (sheetRegistroNovedad) {
-    protectSheetFully(sheetRegistroNovedad, 'Proteccion_RegistroNovedad');
-  }
-  
-  // Configurar protección mixta para Ordenes
-  configureOrdenesProtection();
-  
-  // Configurar protección para Logs
-  configureLogsProtection();
-  
-  // Aplicar Validación de Datos a las columnas STATUS
-  applyStatusDataValidation();
-  
+
+  // Ordenes: protección mixta (solo columnas admin). Logs: protección total.
+  try { configureOrdenesProtection(); }
+  catch (e) { Logger.log('⚠️ configureOrdenesProtection falló: ' + e.message); }
+
+  try { configureLogsProtection(); }
+  catch (e) { Logger.log('⚠️ configureLogsProtection falló: ' + e.message); }
+
+  // Validación de datos de STATUS
+  try { applyStatusDataValidation(); }
+  catch (e) { Logger.log('⚠️ applyStatusDataValidation falló: ' + e.message); }
+
   Logger.log("✓ Nuevo esquema de protección aplicado");
 }
 
@@ -230,6 +237,12 @@ function applyNewProtectionScheme() {
  * @param {string} description - Descripción de la protección
  */
 function protectSheetFully(sheet, description) {
+  // Idempotente: quitar protecciones de hoja previas para no acumular duplicados.
+  var previas = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var k = 0; k < previas.length; k++) {
+    try { previas[k].remove(); } catch (e) {}
+  }
+
   var protection = sheet.protect().setDescription(description);
   protection.removeEditors(protection.getEditors());
   if (protection.canDomainEdit()) protection.setDomainEdit(false);
