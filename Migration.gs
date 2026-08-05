@@ -376,33 +376,12 @@ function migrarHaciaColumnaUnificada() {
 }
 
 /**
- * Migración de estado: reemplaza STATUS "Pendiente" -> "Creada" en los datos
- * existentes de Ordenes y RegistroNovedad. Correr UNA vez tras desplegar el rename.
- *
- * ORDEN CRÍTICO: primero se regenera el dropdown (para que incluya "Creada"),
- * y SOLO DESPUÉS se escriben los datos. El data-validation de STATUS usa
- * setAllowInvalid(false), por lo que un setValue("Creada") con el dropdown
- * viejo LANZA excepción. Se tocan únicamente las celdas "Pendiente".
- *
- * @returns {number} Total de filas migradas.
+ * Cuenta las filas con STATUS "Pendiente" en Ordenes y RegistroNovedad.
+ * Sirve para detectar si hace falta la migración a "Creada".
+ * @returns {number} Cantidad de filas con STATUS "Pendiente".
  */
-function migrarPendienteACreada() {
+function contarStatusPendiente_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // 1. PRIMERO: regenerar el dropdown de STATUS (ahora con "Creada", sin "Pendiente").
-  try {
-    applyStatusDataValidation(true);
-  } catch (e) {
-    Logger.log('migrarPendienteACreada: fallo al regenerar dropdown: ' + e.message);
-    try {
-      SpreadsheetApp.getUi().alert('Error',
-        'No se pudo regenerar el dropdown de STATUS:\n' + e.message + '\n\nLa migración se detuvo SIN cambios.',
-        SpreadsheetApp.getUi().ButtonSet.OK);
-    } catch (e2) { /* sin UI */ }
-    return 0;
-  }
-
-  // 2. DESPUÉS: migrar los datos "Pendiente" -> "Creada" (solo las celdas afectadas).
   var total = 0;
   var hojas = ['Ordenes', 'RegistroNovedad'];
   for (var h = 0; h < hojas.length; h++) {
@@ -410,11 +389,42 @@ function migrarPendienteACreada() {
     if (!sheet) continue;
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) continue;
-
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
     if (!colStatus) continue;
+    var vals = sheet.getRange(2, colStatus, lastRow - 1, 1).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (vals[i][0] && vals[i][0].toString().trim() === 'Pendiente') total++;
+    }
+  }
+  return total;
+}
 
+/**
+ * Núcleo de la migración STATUS "Pendiente" -> "Creada". NO muestra UI, para
+ * poder reutilizarse desde Inicializar Sistema. Devuelve las filas migradas.
+ *
+ * ORDEN CRÍTICO: primero regenera el dropdown (para que "Creada" sea válido) y
+ * SOLO DESPUÉS escribe los datos. El data-validation de STATUS usa
+ * setAllowInvalid(false), así que setValue("Creada") con el dropdown viejo
+ * lanzaría excepción. Se tocan únicamente las celdas "Pendiente".
+ *
+ * @returns {number} Total de filas migradas.
+ */
+function aplicarMigracionStatusCreada_() {
+  applyStatusDataValidation(true); // 1) dropdown -> "Creada" (sin "Pendiente")
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var total = 0;
+  var hojas = ['Ordenes', 'RegistroNovedad'];
+  for (var h = 0; h < hojas.length; h++) {
+    var sheet = ss.getSheetByName(hojas[h]);
+    if (!sheet) continue;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) continue;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colStatus = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+    if (!colStatus) continue;
     var vals = sheet.getRange(2, colStatus, lastRow - 1, 1).getValues();
     for (var i = 0; i < vals.length; i++) {
       if (vals[i][0] && vals[i][0].toString().trim() === 'Pendiente') {
@@ -428,6 +438,29 @@ function migrarPendienteACreada() {
     logChange('MIGRACION_ESTADO', 'Migradas ' + total + ' filas de STATUS "Pendiente" a "Creada" y regenerado el dropdown.', 'Sistema');
   } catch (e) { /* logChange puede no estar disponible en algunos contextos */ }
 
+  return total;
+}
+
+/**
+ * Migración manual STATUS "Pendiente" -> "Creada" (para correr desde el editor).
+ * Inicializar Sistema hace lo mismo con confirmación integrada; esta versión
+ * standalone muestra su propio alert de resultado.
+ *
+ * @returns {number} Total de filas migradas.
+ */
+function migrarPendienteACreada() {
+  var total;
+  try {
+    total = aplicarMigracionStatusCreada_();
+  } catch (e) {
+    Logger.log('migrarPendienteACreada: ' + e.message);
+    try {
+      SpreadsheetApp.getUi().alert('Error',
+        'No se pudo migrar STATUS:\n' + e.message + '\n\nLa migración se detuvo.',
+        SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (e2) { /* sin UI */ }
+    return 0;
+  }
   try {
     SpreadsheetApp.getUi().alert(
       'Migración completada',
@@ -435,6 +468,5 @@ function migrarPendienteACreada() {
       SpreadsheetApp.getUi().ButtonSet.OK
     );
   } catch (e) { /* sin UI (ejecución no interactiva) */ }
-
   return total;
 }

@@ -120,11 +120,30 @@ function initializeCompleteSystem(ui) {
     summary.push("⚠️ Validaciones de estado: " + e.message);
   }
 
+  // STATUS: aplicar dropdown/colores y, si hay filas "Pendiente" (legacy),
+  // confirmar y migrarlas a "Creada" dentro del mismo proceso de inicialización.
   try {
-    applyStatusDataValidation(true); // silent=true para evitar error de UI en inicialización
-    summary.push("✓ Validaciones y colores de STATUS aplicados");
+    var pendientes = contarStatusPendiente_();
+    if (pendientes > 0) {
+      var respMig = ui.alert(
+        'Migración de STATUS necesaria',
+        'Se detectaron ' + pendientes + ' fila(s) con STATUS "Pendiente".\n\n' +
+        'Con el router modular el estado inicial es "Creada". Se regenerará el ' +
+        'dropdown y se migrarán esas filas de "Pendiente" a "Creada".\n\n¿Continuar?',
+        ui.ButtonSet.YES_NO
+      );
+      if (respMig === ui.Button.YES) {
+        var migradas = aplicarMigracionStatusCreada_();
+        summary.push("✓ STATUS: dropdown regenerado y " + migradas + " fila(s) migradas Pendiente→Creada");
+      } else {
+        summary.push("⚠️ Migración de STATUS OMITIDA por el usuario. Con el router activo, editar filas fallará hasta migrar (Run migrarPendienteACreada).");
+      }
+    } else {
+      applyStatusDataValidation(true); // sin Pendientes: solo refrescar dropdown/colores
+      summary.push("✓ Validaciones y colores de STATUS aplicados (0 filas a migrar)");
+    }
   } catch (e) {
-    summary.push("⚠️ Validaciones de STATUS: " + e.message);
+    summary.push("⚠️ Validaciones/migración de STATUS: " + e.message);
   }
 
 
