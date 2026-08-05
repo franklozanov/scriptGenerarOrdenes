@@ -31,8 +31,9 @@ function buildEnrichedEvent(e) {
   var sheet = editedRange.getSheet();
   var sheetName = sheet.getName();
 
-  // No procesar ediciones en hojas internas del sistema (Logs, índice, etc.)
-  if (HOJAS_NO_AUDITADAS.indexOf(sheetName) !== -1) return null;
+  // Las hojas solo-sistema las maneja el router por enforcement (revertir);
+  // aquí cortamos por defensa (no deberían llegar a construir un evento).
+  if (HOJAS_SOLO_SISTEMA.indexOf(sheetName) !== -1) return null;
 
   var startRow = editedRange.getRow();
   var numRows = editedRange.getNumRows();
@@ -133,6 +134,19 @@ function buildEnrichedEvent(e) {
   }
   var isRequestOrStatusEdit = isRequestEdit || touchesStatus;
 
+  // === COLUMNAS DE SISTEMA TOCADAS (enforcement) ===
+  // Índices (base-1) de columnas solo-sistema dentro del rango editado en Ordenes.
+  // El router revierte una edición manual a estas; las escrituras del script no
+  // disparan el trigger, así que no se ven afectadas.
+  var columnasSistemaTocadas = [];
+  if (sheetName === 'Ordenes') {
+    for (var csc = startCol; csc <= endCol; csc++) {
+      var nomCol = (csc <= headers.length && headers[csc - 1] != null) ? headers[csc - 1].toString().trim() : '';
+      if (COLUMNAS_SISTEMA_ORDENES.indexOf(nomCol) !== -1) columnasSistemaTocadas.push(csc);
+    }
+  }
+  var soloColumnasSistema = (columnasSistemaTocadas.length > 0 && columnasSistemaTocadas.length === numCols);
+
   // === DETECCIÓN DE FILAS VACÍAS (FASE 0 legacy) ===
   var isClearedArray = [];
   var anyRowCleared = false;
@@ -199,6 +213,10 @@ function buildEnrichedEvent(e) {
     touchesRefColumns: touchesRefColumns,
     isRequestEdit: isRequestEdit,
     isRequestOrStatusEdit: isRequestOrStatusEdit,
+
+    // Enforcement de columnas de sistema
+    columnasSistemaTocadas: columnasSistemaTocadas,
+    soloColumnasSistema: soloColumnasSistema,
 
     // Detección de filas vacías
     isClearedArray: isClearedArray,

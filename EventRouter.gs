@@ -18,13 +18,6 @@
 var USE_NEW_ROUTER = true;
 
 /**
- * Columnas "derivadas" que son escritas por el sistema, no por el usuario.
- * Si una edición SOLO toca una de estas columnas, el Router no debe procesarla
- * para evitar cascadas infinitas (un setValue dispara otro onEdit).
- */
-var COLUMNAS_DERIVADAS = ['SolicitadoPor', 'SolicitadaPor', 'EstadoDocumentos', 'CantDispAFecha'];
-
-/**
  * Punto de entrada del nuevo sistema modular.
  * Es invocado por onEditInstalled cuando USE_NEW_ROUTER === true.
  * 
@@ -32,36 +25,36 @@ var COLUMNAS_DERIVADAS = ['SolicitadoPor', 'SolicitadaPor', 'EstadoDocumentos', 
  */
 function runNewEventRouter(e) {
   try {
-    // === GUARD CLAUSE ANTI-CASCADA ===
-    // Si la edición fue SOLO en una columna derivada (escrita por el sistema),
-    // no procesar para evitar bucles infinitos.
     var editedRange = e.range;
     var sheet = editedRange.getSheet();
     var sheetName = sheet.getName();
-    
-    if (HOJAS_NO_AUDITADAS.indexOf(sheetName) !== -1) return;
-    
-    if (sheetName === 'Ordenes') {
-      var numCols = editedRange.getNumColumns();
-      if (numCols === 1) {
-        var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        var editedColIdx = editedRange.getColumn();
-        var editedColName = (editedColIdx <= headers.length) ? headers[editedColIdx - 1].toString().trim() : '';
-        if (COLUMNAS_DERIVADAS.indexOf(editedColName) !== -1) {
-          return; // Edición en columna derivada — cortocircuitar
-        }
-      }
+
+    // === ENFORCEMENT 1: hoja solo-sistema ===
+    // Toda edición MANUAL a estas hojas se revierte y audita. Los setValue del
+    // script no disparan el trigger, así que aquí solo llegan ediciones humanas.
+    if (HOJAS_SOLO_SISTEMA.indexOf(sheetName) !== -1) {
+      Auditoria.revertirEdicionSistema(e, editedRange);
+      return;
     }
 
     // === CONSTRUIR EVENTO ENRIQUECIDO ===
     var evt = buildEnrichedEvent(e);
     if (!evt) return;
 
+    // === ENFORCEMENT 2: columnas solo-sistema en Ordenes ===
+    // Revierte la edición manual a esas columnas (salvo en filas que se están
+    // vaciando: eso es un borrado legítimo). Si SOLO se tocaron columnas de
+    // sistema, no hay datos que procesar y se corta.
+    if (evt.sheetName === 'Ordenes' && evt.columnasSistemaTocadas.length > 0) {
+      Auditoria.revertirColumnasSistema(e, evt);
+      if (evt.soloColumnasSistema) return;
+    }
+
     // === DELEGACIÓN SECUENCIAL ESTRICTA ===
     // El orden importa: SolicitadoPor debe escribirse y flushearse
     // ANTES de que ModDrive lance la validación lenta de Drive.
-    
-    // 1. Permisos y protecciones
+
+    // 1. Permisos y protecciones (protecciones nativas; queda por compatibilidad)
     if (!evt.hasPermission) {
       Auditoria.revertirEdicionNoPermitida(evt, e);
       return;

@@ -24,10 +24,22 @@ var VALORES_STATUS = {
   ANULADA: "Anulada"
 };
 
-// Hojas internas del sistema que NO se auditan (sus ediciones no se registran
-// en Logs). Son logs/índices escritos por el script, no datos de negocio.
-// Denylist: todo lo demás SÍ se audita por defecto (seguro para un QMS).
-var HOJAS_NO_AUDITADAS = ['Logs', 'IndiceDocumentos', 'LogTiemposProceso'];
+// === INTEGRIDAD POR TRIGGER-ENFORCEMENT ===
+// El trigger onEditInstalled corre como propietario y SOLO se dispara con
+// ediciones HUMANAS (los setValue del script NO lo disparan). Por eso una edición
+// MANUAL a estas hojas/columnas —que solo el script debe escribir— se REVIERTE y
+// se audita como violación, mientras las escrituras legítimas de la app
+// (imprimir/novedades/subir, vía google.script.run) pasan intactas.
+
+// Hojas que solo el sistema escribe: cualquier edición manual se revierte.
+var HOJAS_SOLO_SISTEMA = ['Logs', 'IndiceDocumentos', 'LogTiemposProceso'];
+
+// Columnas de Ordenes que solo el sistema escribe: edición manual → revertir.
+var COLUMNAS_SISTEMA_ORDENES = [
+  'STATUS', 'SolicitadoPor', 'EstadoDocumentos', 'CantDispAFecha',
+  'ConsecutivoImp', 'ImpresoPor', 'ReimpresoPor', 'NoPags', 'Reimpresion',
+  'TotalPags', 'HistorialImpresion'
+];
 
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
