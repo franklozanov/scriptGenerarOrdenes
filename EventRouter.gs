@@ -39,7 +39,7 @@ function runNewEventRouter(e) {
     var sheet = editedRange.getSheet();
     var sheetName = sheet.getName();
     
-    if (sheetName === 'Logs') return;
+    if (HOJAS_NO_AUDITADAS.indexOf(sheetName) !== -1) return;
     
     if (sheetName === 'Ordenes') {
       var numCols = editedRange.getNumColumns();

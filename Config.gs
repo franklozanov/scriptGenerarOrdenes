@@ -24,6 +24,11 @@ var VALORES_STATUS = {
   ANULADA: "Anulada"
 };
 
+// Hojas internas del sistema que NO se auditan (sus ediciones no se registran
+// en Logs). Son logs/índices escritos por el script, no datos de negocio.
+// Denylist: todo lo demás SÍ se audita por defecto (seguro para un QMS).
+var HOJAS_NO_AUDITADAS = ['Logs', 'IndiceDocumentos', 'LogTiemposProceso'];
+
 // Obtiene la contraseña desde las propiedades del script
 var ADMIN_PASS = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
 

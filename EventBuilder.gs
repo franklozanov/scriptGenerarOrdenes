@@ -31,8 +31,8 @@ function buildEnrichedEvent(e) {
   var sheet = editedRange.getSheet();
   var sheetName = sheet.getName();
 
-  // No procesar ediciones en la hoja de Logs
-  if (sheetName === 'Logs') return null;
+  // No procesar ediciones en hojas internas del sistema (Logs, índice, etc.)
+  if (HOJAS_NO_AUDITADAS.indexOf(sheetName) !== -1) return null;
 
   var startRow = editedRange.getRow();
   var numRows = editedRange.getNumRows();
