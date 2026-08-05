@@ -20,6 +20,7 @@ function onOpen() {
   var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
     .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
     .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp')
+    .addItem('🗂️ Reconstruir índice de documentos', 'reconstruirIndiceDocumentos')
     .addSeparator()
     .addSubMenu(adminMenu);
 

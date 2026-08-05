@@ -105,6 +105,15 @@ function initializeCompleteSystem(ui) {
   }
 
   try {
+    setupIndiceDocsTrigger();
+    reconstruirIndiceDocumentos();
+    summary.push("✓ Índice de documentos creado y programado (rebuild horario)");
+  } catch (e) {
+    // No abortamos el init por el índice: se puede reconstruir desde el menú.
+    summary.push("✗ Error creando índice de documentos (no crítico): " + e.message);
+  }
+
+  try {
     aplicarValidacionesEstadoCarga(true); // silent=true para evitar error de UI en inicialización
     summary.push("✓ Validaciones de estado de carga aplicadas");
   } catch (e) {

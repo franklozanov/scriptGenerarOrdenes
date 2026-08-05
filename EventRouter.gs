@@ -15,7 +15,7 @@
  * INSTRUCCIONES DE ROLLBACK: Si algo falla en producción, cambiar a false
  * y hacer clasp push. El sistema volverá al comportamiento anterior inmediatamente.
  */
-var USE_NEW_ROUTER = false;
+var USE_NEW_ROUTER = true;
 
 /**
  * Columnas "derivadas" que son escritas por el sistema, no por el usuario.

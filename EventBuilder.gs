@@ -133,8 +133,6 @@ function buildEnrichedEvent(e) {
   }
   var isRequestOrStatusEdit = isRequestEdit || touchesStatus;
 
-  var isMassivePaste = (numRows > 3);
-
   // === DETECCIÓN DE FILAS VACÍAS (FASE 0 legacy) ===
   var isClearedArray = [];
   var anyRowCleared = false;
@@ -184,7 +182,6 @@ function buildEnrichedEvent(e) {
     startCol: startCol,
     numCols: numCols,
     endCol: endCol,
-    isMassivePaste: isMassivePaste,
 
     // Datos pre-cargados
     headers: headers,

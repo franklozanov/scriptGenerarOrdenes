@@ -2,9 +2,9 @@
 // MODULE: ModDrive
 // Descripción: Gestiona STATUS, EstadoDocumentos y la validación
 //              de documentos en Google Drive.
-//              - Asignación automática de STATUS = "Pendiente"
-//              - Pegado masivo → "⏳ Pendiente Validar"
-//              - Edición individual → Verificación inmediata en Drive
+//              - Asignación automática de STATUS = "Creada"
+//              - Validación inline vía índice de documentos (O(1)),
+//                misma lógica sin importar cuántas filas se peguen
 //              - Prompt de reversión para filas ya impresas/anuladas
 //              - Función de menú forzarActualizacion()
 // Prioridad de Carga: 5° (depende de EventBuilder y Helpers)
@@ -14,12 +14,15 @@ var ModDrive = {
 
   /**
    * Procesa STATUS y EstadoDocumentos tras una edición.
-   * - Filas nuevas sin STATUS → asigna "Pendiente"
-   * - Pegado masivo (>3 filas) → marca "⏳ Pendiente Validar" sin consultar Drive
-   * - Edición individual → valida documentos en Drive en tiempo real
-   * - Filas impresas/anuladas → prompt de reversión
+   * - Filas nuevas sin STATUS → asigna "Creada".
+   * - Valida EstadoDocumentos inline vía el índice de documentos (O(1)):
+   *   la misma lógica sin importar cuántas filas se peguen. Ya NO existe la
+   *   rama de "pegado masivo diferido" ni el pseudo-estado "⏳ Pendiente Validar"
+   *   (era un valor fuera del data-validation de la columna).
+   * - Filas Impreso/Reimpreso/Anulada se saltan (no se re-validan) salvo en
+   *   edición individual, donde se ofrece el prompt de reversión a "Creada".
    * Corresponde a la FASE 3 del monolito (Traceability.gs L417-546).
-   * 
+   *
    * @param {Object} evt - EnrichedEvent del EventBuilder
    */
   procesarStatusYDocumentos: function(evt) {
@@ -31,107 +34,67 @@ var ModDrive = {
     if (processNumRows <= 0) return;
 
     var colStatusIdx = evt.cols.STATUS;
-    var colEstadoDocs = evt.cols.EstadoDocumentos;
-
     var statusValues = colStatusIdx ? evt.sheet.getRange(startRow, colStatusIdx, processNumRows, 1).getValues() : [];
-    var estadoDocsValues = colEstadoDocs ? evt.sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).getValues() : [];
 
-    // === PEGADO MASIVO: No bloquear con validaciones lentas de Drive ===
-    if (evt.isMassivePaste) {
-      var changedMassive = false;
-      for (var r = 0; r < processNumRows; r++) {
-        var isClearedIdx = (startRow === 2 && evt.editedRange.getRow() === 1) ? r + 1 : r;
-        if (evt.isClearedArray[isClearedIdx]) continue;
+    var multiFila = processNumRows > 1;
+    if (multiFila) SpreadsheetApp.getActiveSpreadsheet().toast('Validando documentos...', 'Sistema QMS', 3);
 
-        var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : '';
+    for (var r = 0; r < processNumRows; r++) {
+      var isClearedIdx = (startRow === 2 && evt.editedRange.getRow() === 1) ? r + 1 : r;
+      if (evt.isClearedArray[isClearedIdx]) continue;
 
-        // Filas nuevas sin STATUS → asignar Pendiente
-        if (currStatus === '') {
-          if (colStatusIdx) {
-            statusValues[r][0] = 'Pendiente';
-            currStatus = 'Pendiente';
-            changedMassive = true;
-          }
-        }
+      var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : '';
+      var shouldValidate = evt.touchesRefColumns || evt.touchesStatus;
 
-        if (currStatus !== 'Impreso' && currStatus !== 'Reimpreso' && currStatus !== 'Anulada') {
-          if (colEstadoDocs) {
-            estadoDocsValues[r][0] = '⏳ Pendiente Validar';
-            changedMassive = true;
-          }
-        } else if (currStatus === 'Anulada') {
-          if (colEstadoDocs && estadoDocsValues[r][0] !== '🚫 Orden Anulada') {
-            estadoDocsValues[r][0] = '🚫 Orden Anulada';
-            changedMassive = true;
-          }
+      // Fila nueva sin STATUS → "Creada" (inmediato, para que actualizarEstado lo vea)
+      if (currStatus === '') {
+        if (colStatusIdx) {
+          evt.sheet.getRange(startRow + r, colStatusIdx).setValue(VALORES_STATUS.CREADA);
+          currStatus = VALORES_STATUS.CREADA;
         }
       }
-      if (changedMassive) {
-        if (colEstadoDocs) evt.sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).setValues(estadoDocsValues);
-        if (colStatusIdx) evt.sheet.getRange(startRow, colStatusIdx, processNumRows, 1).setValues(statusValues);
-      }
-      SpreadsheetApp.getActiveSpreadsheet().toast('Se pegaron varias filas. Usa \'Refrescar Estado de Documentos\' del menú superior para validarlas todas juntas.', 'Validación Diferida', 8);
-      logChange('CAMBIO_MASIVO', 'Pegado de ' + processNumRows + ' filas. Se marcó como Pendiente Validar para optimizar.', evt.userIdentity);
-    }
-    // === EDICIÓN INDIVIDUAL O PEQUEÑA ===
-    else {
-      for (var r = 0; r < processNumRows; r++) {
-        var isClearedIdx = (startRow === 2 && evt.editedRange.getRow() === 1) ? r + 1 : r;
-        if (evt.isClearedArray[isClearedIdx]) continue;
 
-        var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : '';
-        var shouldValidate = evt.touchesRefColumns || evt.touchesStatus;
-
-        // Filas nuevas sin STATUS → asignar Pendiente inmediatamente
-        if (currStatus === '') {
-          if (colStatusIdx) {
-            evt.sheet.getRange(startRow + r, colStatusIdx).setValue('Pendiente');
-            currStatus = 'Pendiente';
-          }
-        }
-
-        if (currStatus === 'Impreso' || currStatus === 'Reimpreso' || currStatus === 'Anulada') {
-          if (evt.numRows === 1) {
-            var editedOnlyStatus = (evt.numCols === 1 && evt.startCol === colStatusIdx);
-
-            if (editedOnlyStatus) {
-              shouldValidate = true;
-            } else {
-              var ui = SpreadsheetApp.getUi();
-              var statusStr = (currStatus === 'Anulada') ? 'anulada' : 'impresa';
-              var response = ui.alert(
-                '⚠️ Orden ya procesada',
-                'Estás modificando datos de una orden que ya fue ' + statusStr + ' (Fila ' + (startRow + r) + ').\n\n¿Deseas devolver el STATUS a "Pendiente" para reactivar su validación en Drive?',
-                ui.ButtonSet.YES_NO
-              );
-
-              if (response === ui.Button.YES) {
-                if (colStatusIdx) evt.sheet.getRange(startRow + r, colStatusIdx).setValue('Pendiente');
-                shouldValidate = true;
-                logChange('ESTADO_REVERTIDO', 'Usuario modificó fila ' + statusStr + ' y aceptó regresar el STATUS a Pendiente', evt.userIdentity);
-              } else {
-                shouldValidate = (currStatus === 'Anulada');
-              }
-            }
+      if (currStatus === VALORES_STATUS.IMPRESO || currStatus === VALORES_STATUS.REIMPRESO || currStatus === VALORES_STATUS.ANULADA) {
+        if (evt.numRows === 1) {
+          var editedOnlyStatus = (evt.numCols === 1 && evt.startCol === colStatusIdx);
+          if (editedOnlyStatus) {
+            // El usuario cambió STATUS a mano: respetamos su elección sin preguntar.
+            shouldValidate = true;
           } else {
-            shouldValidate = (currStatus === 'Anulada');
+            var ui = SpreadsheetApp.getUi();
+            var statusStr = (currStatus === VALORES_STATUS.ANULADA) ? 'anulada' : 'impresa';
+            var response = ui.alert(
+              '⚠️ Orden ya procesada',
+              'Estás modificando datos de una orden que ya fue ' + statusStr + ' (Fila ' + (startRow + r) + ').\n\n¿Deseas devolver el STATUS a "' + VALORES_STATUS.CREADA + '" para reactivar su validación en Drive?',
+              ui.ButtonSet.YES_NO
+            );
+            if (response === ui.Button.YES) {
+              if (colStatusIdx) evt.sheet.getRange(startRow + r, colStatusIdx).setValue(VALORES_STATUS.CREADA);
+              shouldValidate = true;
+              logChange('ESTADO_REVERTIDO', 'Usuario modificó fila ' + statusStr + ' y aceptó regresar el STATUS a ' + VALORES_STATUS.CREADA, evt.userIdentity);
+            } else {
+              shouldValidate = (currStatus === VALORES_STATUS.ANULADA);
+            }
           }
-        }
-
-        if (shouldValidate) {
-          if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast('Validando documentos en Drive...', 'Sistema QMS', 3);
-          actualizarEstadoDocumentosEnHoja(evt.sheet, startRow + r, evt.headers);
-          if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast('Validación en Drive completada.', 'Sistema QMS', 3);
+        } else {
+          // Pegado múltiple sobre filas impresas/anuladas: solo asegurar el sello de anuladas.
+          shouldValidate = (currStatus === VALORES_STATUS.ANULADA);
         }
       }
+
+      if (shouldValidate) {
+        actualizarEstadoDocumentosEnHoja(evt.sheet, startRow + r, evt.headers);
+      }
     }
+
+    if (multiFila) SpreadsheetApp.getActiveSpreadsheet().toast('Validación completada.', 'Sistema QMS', 3);
   },
 
   /**
    * Función de menú: Fuerza la actualización del estado de documentos
    * escaneando Drive para las filas seleccionadas o toda la hoja.
    * Corresponde a forzarActualizacionEstadoDocumentos() del monolito (L670-740).
-   * 
+   *
    * Se invoca desde el wrapper público forzarActualizacionEstadoDocumentos().
    */
   forzarActualizacion: function() {
