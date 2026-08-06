@@ -33,6 +33,7 @@ El corazón del sistema es el **módulo de impresión** (`Index.html` + `PrintLo
 | `Main.gs` | Punto de entrada: `onOpen()` (menús + warmup de caché), apertura de modales |
 | `Auth.gs` | Identidad por email→hoja Usuarios, `isUserAuthorized`, `withAdminAuth`, sesión |
 | `Permissions.gs` | RBAC, protecciones de hojas, permisos de carpetas Drive |
+| `AdminBypass.gs` | Ventana temporal (5 min, rol ADMIN + contraseña) que suspende el enforcement de integridad solo para quien la activa |
 | `AppInit.gs` | `initializeCompleteSystem` — setup idempotente de estructura, protecciones y triggers |
 | `Cache.gs` | `getInitialData`, caché chunked de plantillas estáticas |
 | `PrintLogic.gs` | Lógica de impresión: buscar PDFs, consecutivo, guardar, wrappers `*ForUser` |
@@ -213,6 +214,15 @@ La operación de guardado es **atómica**: `processAndSavePdfBackgroundForUser` 
 - **Multi-perfil:** un email con varios `UserID` muestra un selector; la elección se cachea (`saveUserProfileSelection`, 6h).
 - **Autorización de escritura:** los wrappers `*ForUser` (backend) validan `isUserAuthorized(userId)` antes de cualquier operación privilegiada y lanzan `ACCESS_DENIED` si falla. ⚠️ `isUserAuthorized` concede acceso si el rol está **vacío** (comportamiento permisivo).
 - **Contraseña admin:** `withAdminAuth` re-pide **siempre** la contraseña (`LOCK_PASSWORD` en Script Properties) para operaciones administrativas. No hay caché para ella.
+
+### Bypass temporal de integridad (`AdminBypass.gs`)
+
+El trigger-enforcement revierte por igual a todos, incluido el propietario. Para correcciones manuales legítimas existe una ventana temporal:
+
+- **Activación:** menú **🔒 Opciones Admin → 🔓 Activar bypass de integridad**. Exige **rol `ADMIN`** en la hoja `Usuarios` **y** la contraseña (`withAdminAuth`). Dura `BYPASS_DURACION_MIN` (5 min) y caduca sola.
+- **Alcance:** es **nominal** — solo exime al email que lo activó; el resto de usuarios sigue con enforcement. Se guarda en `ScriptProperties` (`BYPASS_ADMIN_EMAIL`, `BYPASS_ADMIN_HASTA`) porque el trigger corre como propietario y no ve `UserProperties`.
+- **Trazabilidad:** el bypass no elimina el registro, cambia *revertir* por *auditar*. Cada edición se loguea como `EDICION_ADMIN_BYPASS`, más `BYPASS_ADMIN_ACTIVADO` / `BYPASS_ADMIN_CERRADO`.
+- **Limitación:** solo aplica con `USE_NEW_ROUTER = true`. Con el monolito legacy no hay bypass (degrada hacia *más* protección, nunca menos).
 
 ---
 

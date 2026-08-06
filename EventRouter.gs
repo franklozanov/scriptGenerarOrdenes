@@ -29,10 +29,21 @@ function runNewEventRouter(e) {
     var sheet = editedRange.getSheet();
     var sheetName = sheet.getName();
 
+    // === BYPASS ADMIN ===
+    // Ventana temporal (menú Opciones Admin, exige rol ADMIN + contraseña) durante
+    // la cual las ediciones manuales de ESE admin no se revierten, solo se auditan.
+    var emailEditor = resolverEmailEditor_(e);
+    var bypass = bypassAdminActivoPara_(emailEditor);
+
     // === ENFORCEMENT 1: hoja solo-sistema ===
     // Toda edición MANUAL a estas hojas se revierte y audita. Los setValue del
     // script no disparan el trigger, así que aquí solo llegan ediciones humanas.
     if (HOJAS_SOLO_SISTEMA.indexOf(sheetName) !== -1) {
+      if (bypass) {
+        Auditoria.registrarEdicionBypass(e, editedRange, 'Hoja de sistema ' + sheetName,
+          resolverIdentidadEditor_(emailEditor));
+        return;
+      }
       Auditoria.revertirEdicionSistema(e, editedRange);
       return;
     }
@@ -45,9 +56,15 @@ function runNewEventRouter(e) {
     // Revierte la edición manual a esas columnas (salvo en filas que se están
     // vaciando: eso es un borrado legítimo). Si SOLO se tocaron columnas de
     // sistema, no hay datos que procesar y se corta.
+    // Con bypass vigente no se revierte: se audita y se deja seguir el flujo normal
+    // para que la app reaccione al cambio del admin (p. ej. corregir STATUS).
     if (evt.sheetName === 'Ordenes' && evt.columnasSistemaTocadas.length > 0) {
-      Auditoria.revertirColumnasSistema(e, evt);
-      if (evt.soloColumnasSistema) return;
+      if (bypass) {
+        Auditoria.registrarEdicionBypass(e, evt.editedRange, 'Columnas de sistema en Ordenes', evt.userIdentity);
+      } else {
+        Auditoria.revertirColumnasSistema(e, evt);
+        if (evt.soloColumnasSistema) return;
+      }
     }
 
     // === DELEGACIÓN SECUENCIAL ESTRICTA ===
@@ -55,7 +72,7 @@ function runNewEventRouter(e) {
     // ANTES de que ModDrive lance la validación lenta de Drive.
 
     // 1. Permisos y protecciones (protecciones nativas; queda por compatibilidad)
-    if (!evt.hasPermission) {
+    if (!evt.hasPermission && !bypass) {
       Auditoria.revertirEdicionNoPermitida(evt, e);
       return;
     }

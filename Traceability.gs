@@ -661,7 +661,10 @@ function logChange(tipoCambio, descripcion, userIdentity) {
     'ASIGNACION_PENDIENTE_COA': 'Asignación a Pendiente (COA)',
     'INICIALIZACION': 'Inicialización del Sistema',
     'EDICION_MANUAL_NOVEDAD': 'Edición de Novedad',
-    'EDICION_MASIVA_NOVEDAD': 'Edición Masiva de Novedades'
+    'EDICION_MASIVA_NOVEDAD': 'Edición Masiva de Novedades',
+    'BYPASS_ADMIN_ACTIVADO': 'Bypass de Integridad Activado',
+    'BYPASS_ADMIN_CERRADO': 'Bypass de Integridad Cerrado',
+    'EDICION_ADMIN_BYPASS': 'Edición Admin (bajo bypass)'
   };
   var tipoNatural = dictTipos[tipoCambio] ? dictTipos[tipoCambio] : tipoCambio;
 

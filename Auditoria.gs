@@ -126,6 +126,38 @@ var Auditoria = {
   },
 
   /**
+   * Registra una edición que el enforcement habría revertido pero se permitió
+   * por haber una ventana de bypass ADMIN vigente. El bypass NO elimina la
+   * trazabilidad: cambia "revertir" por "dejar constancia".
+   *
+   * @param {Object} e - Evento crudo de Google Apps Script
+   * @param {Range} editedRange - Rango editado
+   * @param {string} contexto - Qué se tocó (hoja de sistema o columnas de sistema)
+   * @param {string} userIdentity - Identidad del admin para el log
+   */
+  registrarEdicionBypass: function(e, editedRange, contexto, userIdentity) {
+    var addr = editedRange.getA1Notation();
+    var detalle;
+
+    if (editedRange.getNumRows() === 1 && editedRange.getNumColumns() === 1) {
+      detalle = '🔴 Antes: ' + (e.oldValue !== undefined ? e.oldValue : '(vacío)') + '\n' +
+                '🟢 Ahora: ' + (e.value !== undefined ? e.value : '(vacío)');
+    } else {
+      detalle = '📦 Edición múltiple: ' + (editedRange.getNumRows() * editedRange.getNumColumns()) + ' celdas.';
+    }
+
+    logChange('EDICION_ADMIN_BYPASS',
+      '🔓 Bypass ADMIN vigente — cambio PERMITIDO (no revertido).\n' +
+      '📍 ' + contexto + ' ' + addr + '\n' + detalle,
+      userIdentity);
+
+    var restante = tiempoRestanteBypass_();
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Cambio permitido y registrado en Logs.' + (restante ? ' Bypass vence en ' + restante + ' min.' : ''),
+      '🔓 Modo mantenimiento', 5);
+  },
+
+  /**
    * Registra la edición en la hoja Logs (registro forense).
    * Corresponde al bloque de logging genérico del monolito (L552-611).
    * 

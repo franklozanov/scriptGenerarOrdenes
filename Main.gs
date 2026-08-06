@@ -14,7 +14,11 @@
 function onOpen() {
   // 1. Menú de Administrador (Opciones de seguridad y proxy)
   var adminMenu = SpreadsheetApp.getUi().createMenu('🔒 Opciones Admin')
-    .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp');
+    .addItem('🚀 Inicializar Sistema Completo', 'promptInitializeApp')
+    .addSeparator()
+    .addItem('🔓 Activar bypass de integridad (' + BYPASS_DURACION_MIN + ' min)', 'activarBypassAdmin')
+    .addItem('🔒 Desactivar bypass', 'desactivarBypassAdmin')
+    .addItem('⏱️ Estado del bypass', 'estadoBypassAdmin');
 
   // 2. Menú de Configuración General
   var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
