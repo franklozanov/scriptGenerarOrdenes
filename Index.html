@@ -242,13 +242,58 @@
         transform: translateY(0);
         box-shadow: 0 2px 4px rgba(25, 118, 210, 0.2);
       }
-      button#goBtn:disabled { 
-        background: #e2e8f0; 
+      button#goBtn:disabled {
+        background: #e2e8f0;
         color: #94a3b8;
         cursor: not-allowed;
         box-shadow: none;
       }
-      
+
+      /* Botón "Ver PDF Generado" (es un <a>, no hereda los estilos de button#goBtn) */
+      a#pdfDownloadLink {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 14px 24px;
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 0.3px;
+        text-align: center;
+        text-decoration: none;
+        margin-top: 12px;
+        box-shadow: 0 4px 6px rgba(22, 163, 74, 0.25), 0 1px 3px rgba(0,0,0,0.08);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: pdfReadyPulse 1.6s ease-in-out 2;
+      }
+      a#pdfDownloadLink:hover {
+        background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+        box-shadow: 0 6px 12px rgba(22, 163, 74, 0.35), 0 2px 4px rgba(0,0,0,0.1);
+        transform: translateY(-1px);
+        color: #ffffff;
+        text-decoration: none;
+      }
+      a#pdfDownloadLink:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(22, 163, 74, 0.25);
+      }
+      a#pdfDownloadLink svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+      @keyframes pdfReadyPulse {
+        0%, 100% { box-shadow: 0 4px 6px rgba(22, 163, 74, 0.25), 0 1px 3px rgba(0,0,0,0.08); }
+        50% { box-shadow: 0 4px 6px rgba(22, 163, 74, 0.25), 0 0 0 6px rgba(22, 163, 74, 0.15); }
+      }
+
       #status { 
         margin-top: 16px; 
         font-size: 13px; 
@@ -1273,24 +1318,28 @@
           status.innerText = "✅ PDF listo en memoria. Haga clic en 'Ver PDF Generado' para abrirlo y guardarlo.";
           status.className = "success-text";
           
-          // Ocultar botón original y crear enlace con la misma apariencia
+          // Ocultar botón original y mostrar el botón-enlace "Ver PDF Generado"
           btn.style.display = 'none';
           
           let downloadLink = document.getElementById('pdfDownloadLink');
           if (!downloadLink) {
             downloadLink = document.createElement('a');
             downloadLink.id = 'pdfDownloadLink';
-            downloadLink.className = btn.className;
-            downloadLink.style.textDecoration = 'none';
-            downloadLink.style.textAlign = 'center';
-            downloadLink.style.display = 'inline-block';
+            downloadLink.setAttribute('role', 'button');
             btn.parentNode.insertBefore(downloadLink, btn.nextSibling);
           }
           downloadLink.href = blobURL;
           downloadLink.target = '_blank';
-          downloadLink.innerText = "👉 Ver PDF Generado";
-          downloadLink.style.display = 'inline-block';
-          
+          downloadLink.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>' +
+            '<polyline points="14 2 14 8 20 8"></polyline>' +
+            '<line x1="12" y1="18" x2="12" y2="12"></line>' +
+            '<polyline points="9 15 12 18 15 15"></polyline>' +
+            '</svg><span>Ver PDF Generado</span>';
+          downloadLink.style.display = 'flex';
+
           downloadLink.onclick = function() {
             // 1) Disparar SIEMPRE el guardado en Drive + actualización de trazabilidad.
             google.script.run
