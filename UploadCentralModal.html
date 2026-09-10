@@ -506,12 +506,13 @@
       progressContainer.classList.remove('active');
       validateForm();
       
-      // Verificamos si hay data para mostrar
-      checkNoDataMessage();
+      // Mostrar loader y refrescar listas
+      var overlay = document.getElementById('loading-overlay');
+      if (overlay) overlay.classList.remove('hidden');
+      var loadingText = document.getElementById('loading-text');
+      if (loadingText) loadingText.textContent = 'Actualizando listas...';
       
-      if (mainContent.style.display !== 'none') {
-        addRow();
-      }
+      loadPendingOrders();
     }
 
     function checkNoDataMessage() {
@@ -1429,7 +1430,13 @@
       rowCounter = 0;
       fileCache = {}; // Limpiar cache de archivos
       summary.classList.remove('active');
-      addRow();
+      
+      var overlay = document.getElementById('loading-overlay');
+      if (overlay) overlay.classList.remove('hidden');
+      var loadingText = document.getElementById('loading-text');
+      if (loadingText) loadingText.textContent = 'Actualizando listas...';
+      
+      loadPendingOrders();
       
       btnAdd.disabled = false;
       btnUpload.disabled = true;
