@@ -202,6 +202,37 @@ var IndiceDocs = {
   },
 
   /**
+   * Elimina una entrada del índice de manera incremental. Para el hook de borrado:
+   * refleja al instante que un doc fue enviado a la papelera.
+   *
+   * @param {string} tipo - 'OA' o 'COA'
+   * @param {string} claveDoc - Clave (NoOrden o NoAnalisis)
+   */
+  eliminar: function(tipo, claveDoc) {
+    var clave = normalizarClaveDoc_(claveDoc);
+    if (clave === '' || (tipo !== 'OA' && tipo !== 'COA')) return;
+
+    var idx = this.cargar();
+    if (idx[tipo][clave] === undefined) {
+      return; // No existe
+    }
+
+    // Borrar de la hoja oculta
+    var sh = this._obtenerHoja();
+    var data = sh.getDataRange().getValues();
+    // Búsqueda lineal, asumiendo max un par de miles de registros (rápido en V8)
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === tipo && String(data[i][1]) === clave) {
+        sh.deleteRow(i + 1); // +1 porque data es 0-indexed y hojas son 1-indexed
+        break;
+      }
+    }
+    
+    // Borrar del memo
+    delete idx[tipo][clave];
+  },
+
+  /**
    * Devuelve el fileId de un documento por tipo+clave, o null si no está indexado.
    * Bonus: permite a la impresión hacer getFileById directo (sin buscar en la carpeta).
    */

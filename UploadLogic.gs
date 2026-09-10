@@ -25,7 +25,7 @@ function abrirModalSubidaGeneral() {
     var html = template.evaluate()
       .setWidth(700)
       .setHeight(600);
-    SpreadsheetApp.getUi().showModelessDialog(html, 'Subida Masiva de Documentos');
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Gestión de Archivos Adjuntos');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
   }
@@ -99,6 +99,43 @@ function getPendingOrdersList() {
   } catch (e) {
     Logger.log("Error en getPendingOrdersList: " + e.message);
     throw new Error("Error al obtener listas pendientes: " + e.message);
+  }
+}
+
+/**
+ * Obtiene las listas de órdenes y análisis ya cargados basándose en el IndiceDocs.
+ * Retorna arrays con los NoOrden y NoAnalisis que existen en Drive.
+ * 
+ * @returns {Object} Objeto con arrays de documentos cargados
+ */
+function getLoadedOrdersList() {
+  try {
+    var loadedOA = [];
+    var loadedCOA = [];
+    
+    // Usamos IndiceDocs que ya tiene la foto en memoria de Drive
+    var idx = IndiceDocs.cargar();
+    
+    if (idx.OA) {
+      for (var key in idx.OA) {
+        loadedOA.push(key);
+      }
+    }
+    
+    if (idx.COA) {
+      for (var key in idx.COA) {
+        loadedCOA.push(key);
+      }
+    }
+    
+    // Opcional: ordenar para que se vean más organizados
+    loadedOA.sort();
+    loadedCOA.sort();
+    
+    return { ordenesCargadasOA: loadedOA, ordenesCargadasCOA: loadedCOA };
+  } catch (e) {
+    Logger.log("Error en getLoadedOrdersList: " + e.message);
+    throw new Error("Error al obtener listas cargadas: " + e.message);
   }
 }
 
@@ -306,3 +343,69 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
     return { status: 'error', message: "Error interno del servidor: " + e.message };
   }
 }
+
+/**
+ * Elimina un documento (OA o COA) moviéndolo a la papelera.
+ * 
+ * @param {string} docType - "Orden de Acondicionamiento" o "Certificado de Analisis"
+ * @param {string} referenceNo - Número de Orden o Análisis
+ * @param {string} actingUserId - UserID de quien borra
+ * @returns {Object} Resultado con status y message
+ */
+function eliminarDocumentoCentral(docType, referenceNo, actingUserId) {
+  try {
+    var tipoIdx = (docType === "Orden de Acondicionamiento") ? 'OA' : 
+                  (docType === "Certificado de Analisis") ? 'COA' : null;
+                  
+    if (!tipoIdx) {
+      return { status: 'error', message: 'Tipo de documento no válido.' };
+    }
+
+    var fileId = IndiceDocs.obtenerFileId(tipoIdx, referenceNo);
+    if (!fileId) {
+      return { status: 'error', message: 'No se encontró el documento en el índice para ' + referenceNo };
+    }
+
+    // Mover a papelera
+    try {
+      DriveApp.getFileById(fileId).setTrashed(true);
+    } catch (e) {
+      Logger.log("Error al borrar archivo en Drive: " + e.message);
+      return { status: 'error', message: 'No se pudo mover el archivo a la papelera: ' + e.message };
+    }
+
+    // Quitar del índice
+    IndiceDocs.eliminar(tipoIdx, referenceNo);
+
+    // Actualizar hojas (encontrar filas que tengan este referenceNo y actualizar su semáforo)
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (sheetOrdenes) {
+      var data = sheetOrdenes.getDataRange().getValues();
+      var headers = data[0];
+      var targetColName = (tipoIdx === 'OA') ? "NoOrden" : "NoAnalisis";
+      var targetColIdx = getColumnIndexByName(headers, targetColName, true) - 1;
+
+      var referenceNoStr = String(referenceNo).trim().toLowerCase();
+      
+      for (var i = 1; i < data.length; i++) {
+        var cellValue = data[i][targetColIdx];
+        var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
+        if (cellValueStr === referenceNoStr) {
+          actualizarEstadoDocumentosEnHoja(sheetOrdenes, i + 1, headers);
+        }
+      }
+    }
+
+    // Auditoría
+    var userIdentity = getUserIdentityStringByUserId_(actingUserId);
+    logChange('ELIMINAR_DOCUMENTO', "Se ELIMINÓ el documento tipo '" + docType + "' para la referencia " + referenceNo, userIdentity);
+
+    return { status: 'success', message: 'Documento enviado a la papelera correctamente.' };
+
+  } catch (e) {
+    Logger.log("Error en eliminarDocumentoCentral: " + e.message);
+    return { status: 'error', message: 'Error interno: ' + e.message };
+  }
+}
+

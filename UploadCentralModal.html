@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subida Masiva de Documentos</title>
+  <title>Gestión de Archivos Adjuntos</title>
   
   <!-- FASE 6: Design System Centralizado -->
   <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
@@ -366,18 +366,46 @@
     .summary .stat.error .stat-value {
       color: #c62828;
     }
+    .tabs-container {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+      margin-bottom: 16px;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #666;
+      border-bottom: 3px solid transparent;
+    }
+    .tab:hover {
+      color: #1976d2;
+    }
+    .tab.active {
+      color: #1976d2;
+      border-bottom-color: #1976d2;
+    }
   </style>
 </head>
 <body>
   <!-- Spinner de carga inicial -->
   <div class="loading-overlay hidden" id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text" id="loading-text">Cargando órdenes pendientes...</div>
+    <div class="loading-text" id="loading-text">Cargando datos...</div>
   </div>
 
   <div class="container" id="mainContent" style="display: none;">
-    <div class="info">
+    <div class="tabs-container">
+      <div class="tab active" id="tabUpload" onclick="switchMode('upload')">Subir / Reemplazar</div>
+      <div class="tab" id="tabDelete" onclick="switchMode('delete')">Eliminar Adjunto</div>
+    </div>
+
+    <div class="info" id="infoUpload">
       <strong>Instrucciones:</strong> Agrega las filas necesarias, selecciona el número de orden y el archivo PDF correspondiente. Los archivos se subirán secuencialmente uno por uno.
+    </div>
+    
+    <div class="info" id="infoDelete" style="display: none; background-color: #ffebee; border-left: 4px solid #f44336;">
+      <strong>Instrucciones (Eliminar):</strong> Selecciona el documento que deseas eliminar de Drive. Se enviará a la papelera y el estado en el Excel cambiará instantáneamente.
     </div>
 
     <div class="user-selector">
@@ -431,6 +459,8 @@
   <script>
     var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     var globalPendingOrders = [];
+    var globalLoadedOrders = { ordenesCargadasOA: [], ordenesCargadasCOA: [] };
+    var currentMode = 'upload';
     var globalUsers = [];
     var rowCounter = 0;
     var globalWebAppUrl = '';
@@ -453,6 +483,63 @@
     var uploadUserName = document.getElementById('uploadUserName');
     var uploadUsersList = document.getElementById('uploadUsersList');
 
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('tabUpload').classList.toggle('active', mode === 'upload');
+      document.getElementById('tabDelete').classList.toggle('active', mode === 'delete');
+      document.getElementById('infoUpload').style.display = (mode === 'upload') ? 'block' : 'none';
+      document.getElementById('infoDelete').style.display = (mode === 'delete') ? 'block' : 'none';
+      
+      if (mode === 'upload') {
+        btnUpload.textContent = '📤 Subir Todo';
+        btnAdd.style.display = 'inline-block';
+      } else {
+        btnUpload.textContent = '🗑️ Eliminar Todo';
+        btnAdd.style.display = 'inline-block';
+      }
+      
+      // Reset form
+      rowsContainer.innerHTML = '';
+      fileCache = {};
+      rowCounter = 0;
+      summary.classList.remove('active');
+      progressContainer.classList.remove('active');
+      validateForm();
+      
+      // Verificamos si hay data para mostrar
+      checkNoDataMessage();
+      
+      if (mainContent.style.display !== 'none') {
+        addRow();
+      }
+    }
+
+    function checkNoDataMessage() {
+      if (currentMode === 'upload') {
+        var hasOA = globalPendingOrders.ordenesPendientesOA && globalPendingOrders.ordenesPendientesOA.length > 0;
+        var hasCOA = globalPendingOrders.ordenesPendientesCOA && globalPendingOrders.ordenesPendientesCOA.length > 0;
+        if (!hasOA && !hasCOA) {
+          mainContent.style.display = 'none';
+          noOrdersMessage.style.display = 'block';
+          noOrdersMessage.querySelector('.no-orders-text').innerText = 'No hay documentos pendientes de subida en este momento.';
+        } else {
+          noOrdersMessage.style.display = 'none';
+          mainContent.style.display = 'block';
+        }
+      } else {
+        var hasOA = globalLoadedOrders.ordenesCargadasOA && globalLoadedOrders.ordenesCargadasOA.length > 0;
+        var hasCOA = globalLoadedOrders.ordenesCargadasCOA && globalLoadedOrders.ordenesCargadasCOA.length > 0;
+        if (!hasOA && !hasCOA) {
+          mainContent.style.display = 'none';
+          noOrdersMessage.style.display = 'block';
+          noOrdersMessage.querySelector('.no-orders-text').innerText = 'No hay documentos cargados en Drive que se puedan eliminar.';
+        } else {
+          noOrdersMessage.style.display = 'none';
+          mainContent.style.display = 'block';
+        }
+      }
+    }
+
     function getSelectedUploadUser() {
       if (window.currentUserIdentity) return window.currentUserIdentityObj;
       var selectedName = uploadUserName.value.trim();
@@ -468,17 +555,23 @@
       google.script.run
         .withSuccessHandler(function(data) {
           globalPendingOrders = data;
-          hideLoading();
           
-          var hasOA = data.ordenesPendientesOA && data.ordenesPendientesOA.length > 0;
-          var hasCOA = data.ordenesPendientesCOA && data.ordenesPendientesCOA.length > 0;
-          
-          if (!hasOA && !hasCOA) {
-            noOrdersMessage.style.display = 'block';
-          } else {
-            mainContent.style.display = 'block';
-            addRow(); // Agregar primera fila por defecto
-          }
+          // Ahora cargamos las cargadas
+          google.script.run
+            .withSuccessHandler(function(dataLoaded) {
+              globalLoadedOrders = dataLoaded;
+              hideLoading();
+              checkNoDataMessage();
+              if (mainContent.style.display !== 'none') {
+                addRow();
+              }
+            })
+            .withFailureHandler(function(err) {
+              hideLoading();
+              showError('Error al cargar órdenes de Drive: ' + err.message);
+            })
+            .getLoadedOrdersList();
+            
         })
         .withFailureHandler(function(error) {
           hideLoading();
@@ -491,7 +584,7 @@
     window.onload = function() {
       // Inicializar drag y resize (el drag handle azul está oculto en Theme.html)
       initializeModalDragResize({
-        title: 'Subida Masiva de Documentos',  // No se mostrará - drag handle oculto
+        title: 'Gestión de Archivos Adjuntos',
         enableDrag: true,
         enableResize: true,
         minWidth: 600,
@@ -578,6 +671,23 @@
       rowCounter++;
       var rowId = 'row-' + rowCounter;
 
+      var fileInputHtml = currentMode === 'upload' ? `
+          <div class="file-input-wrapper">
+            <input type="file" accept="application/pdf" onchange="handleFileSelect(this, '${rowId}')">
+            <div class="file-info">
+              <div>📄 Arrastra o selecciona PDF</div>
+              <div class="file-name"></div>
+              <div class="file-size"></div>
+            </div>
+          </div>
+      ` : `
+          <div class="file-input-wrapper has-file" style="cursor:default; border-color:#f44336; background-color:#ffebee;">
+            <div class="file-info" style="display: flex; flex-direction: column; justify-content: center; height: 100%;">
+              <div style="font-weight:bold; color:#c62828;">🗑️ Seleccionado para eliminar</div>
+            </div>
+          </div>
+      `;
+
       var rowHtml = `
         <div class="upload-row" id="${rowId}">
           <select class="doc-type-select doc-type-select-input" onchange="handleDocTypeChange(this, '${rowId}')">
@@ -587,16 +697,9 @@
           <select class="order-select reference-select" onchange="validateForm()">
             <option value="">Seleccione referencia...</option>
           </select>
-          <div class="file-input-wrapper">
-            <input type="file" accept="application/pdf" onchange="handleFileSelect(this, '${rowId}')">
-            <div class="file-info">
-              <div>📄 Arrastra o selecciona PDF</div>
-              <div class="file-name"></div>
-              <div class="file-size"></div>
-            </div>
-          </div>
+          ${fileInputHtml}
           <div class="status-indicator" id="${rowId}-status"></div>
-          <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>🗑️</button>
+          <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>❌</button>
           <div class="error-message" id="${rowId}-error"></div>
         </div>
       `;
@@ -618,12 +721,22 @@
       var list = [];
       var emptyMessage = '';
       
-      if (docType === 'Orden de Acondicionamiento') {
-        list = globalPendingOrders.ordenesPendientesOA || [];
-        emptyMessage = 'No hay órdenes con OA pendiente';
-      } else if (docType === 'Certificado de Analisis') {
-        list = globalPendingOrders.ordenesPendientesCOA || [];
-        emptyMessage = 'No hay órdenes con COA pendiente';
+      if (currentMode === 'upload') {
+        if (docType === 'Orden de Acondicionamiento') {
+          list = globalPendingOrders.ordenesPendientesOA || [];
+          emptyMessage = 'No hay órdenes con OA pendiente';
+        } else if (docType === 'Certificado de Analisis') {
+          list = globalPendingOrders.ordenesPendientesCOA || [];
+          emptyMessage = 'No hay órdenes con COA pendiente';
+        }
+      } else {
+        if (docType === 'Orden de Acondicionamiento') {
+          list = globalLoadedOrders.ordenesCargadasOA || [];
+          emptyMessage = 'No hay OA cargados para eliminar';
+        } else if (docType === 'Certificado de Analisis') {
+          list = globalLoadedOrders.ordenesCargadasCOA || [];
+          emptyMessage = 'No hay COA cargados para eliminar';
+        }
       }
       
       if (list.length === 0) {
@@ -773,21 +886,32 @@
 
       rows.forEach(function(row) {
         var referenceSelect = row.querySelector('.reference-select');
-        var fileInput = row.querySelector('input[type="file"]');
         var rowId = row.id;
         var hasReference = referenceSelect.value !== '';
-        var hasFile = fileInput.files.length > 0;
-        var hasCache = fileCache[rowId] !== undefined;
-
-        if (!hasReference || !hasFile || !hasCache) {
-          allValid = false;
+        
+        if (currentMode === 'upload') {
+          var fileInput = row.querySelector('input[type="file"]');
+          var hasFile = fileInput.files.length > 0;
+          var hasCache = fileCache[rowId] !== undefined;
+          if (!hasReference || !hasFile || !hasCache) {
+            allValid = false;
+          }
+        } else {
+          if (!hasReference) {
+            allValid = false;
+          }
         }
       });
 
-      btnUpload.disabled = !allValid;
+      btnUpload.disabled = !allValid || rows.length === 0;
     }
 
     async function uploadAll() {
+      if (currentMode === 'delete') {
+        var confirmDelete = confirm('¿Estás seguro de que deseas eliminar permanentemente ' + rowsContainer.querySelectorAll('.upload-row').length + ' documento(s) de Drive? Esta acción actualizará los estados inmediatamente.');
+        if (!confirmDelete) return;
+      }
+      
       var rows = Array.from(rowsContainer.querySelectorAll('.upload-row'));
       var totalRows = rows.length;
       var successCounter = 0;
@@ -810,24 +934,39 @@
       summary.classList.remove('active');
 
       // CARGA PARALELA: Procesar archivos en lotes
-      console.log('🚀 Iniciando carga paralela de', totalRows, 'archivos (límite:', PARALLEL_UPLOAD_LIMIT, 'simultáneos)');
+      console.log('🚀 Iniciando proceso de', totalRows, 'archivos (límite:', PARALLEL_UPLOAD_LIMIT, 'simultáneos)');
       
       for (var i = 0; i < rows.length; i += PARALLEL_UPLOAD_LIMIT) {
         var batch = rows.slice(i, i + PARALLEL_UPLOAD_LIMIT);
         var batchPromises = batch.map(function(row, batchIndex) {
-          return uploadSingleRow(row, i + batchIndex, totalRows, function(success) {
-            completedCounter++;
-            if (success) {
-              successCounter++;
-            } else {
-              errorCounter++;
-            }
-            
-            // Actualizar progreso global
-            var progress = (completedCounter / totalRows) * 100;
-            progressFill.style.width = progress + '%';
-            progressText.textContent = 'Procesados ' + completedCounter + ' de ' + totalRows + ' archivos...';
-          });
+          if (currentMode === 'upload') {
+            return uploadSingleRow(row, i + batchIndex, totalRows, function(success) {
+              completedCounter++;
+              if (success) {
+                successCounter++;
+              } else {
+                errorCounter++;
+              }
+              
+              // Actualizar progreso global
+              var progress = (completedCounter / totalRows) * 100;
+              progressFill.style.width = progress + '%';
+              progressText.textContent = 'Procesados ' + completedCounter + ' de ' + totalRows + ' archivos...';
+            });
+          } else {
+            return deleteSingleRow(row, i + batchIndex, totalRows, function(success) {
+              completedCounter++;
+              if (success) {
+                successCounter++;
+              } else {
+                errorCounter++;
+              }
+              
+              var progress = (completedCounter / totalRows) * 100;
+              progressFill.style.width = progress + '%';
+              progressText.textContent = 'Procesados ' + completedCounter + ' de ' + totalRows + ' archivos...';
+            });
+          }
         });
         
         // Esperar a que termine el lote actual antes de continuar con el siguiente
@@ -843,11 +982,11 @@
       errorCount.textContent = errorCounter;
       
       if (errorCounter === 0) {
-        summaryMessage.textContent = 'Todos los archivos han sido subidos exitosamente.';
+        summaryMessage.textContent = currentMode === 'upload' ? 'Todos los archivos han sido subidos exitosamente.' : 'Todos los archivos han sido eliminados exitosamente.';
       } else if (successCounter === 0) {
-        summaryMessage.textContent = 'Ningún archivo pudo ser subido. Revise los errores indicados.';
+        summaryMessage.textContent = currentMode === 'upload' ? 'Ningún archivo pudo ser subido. Revise los errores indicados.' : 'Ningún archivo pudo ser eliminado. Revise los errores indicados.';
       } else {
-        summaryMessage.textContent = successCounter + ' archivo(s) subido(s) exitosamente, ' + errorCounter + ' con error(es).';
+        summaryMessage.textContent = successCounter + (currentMode === 'upload' ? ' archivo(s) subido(s) exitosamente, ' : ' archivo(s) eliminado(s) exitosamente, ') + errorCounter + ' con error(es).';
       }
       
       summary.classList.add('active');
@@ -956,6 +1095,73 @@
           }
         } else if (result.status === 'success') {
           statusIndicator.textContent = '✅ Completado';
+          statusIndicator.className = 'status-indicator success';
+          callback(true);
+        } else {
+          statusIndicator.textContent = '❌ Error';
+          statusIndicator.className = 'status-indicator error';
+          if (errorContainer) {
+            errorContainer.textContent = result.message || 'Error desconocido';
+            errorContainer.classList.add('active');
+          }
+          callback(false);
+        }
+      } catch (error) {
+        console.error('Error en fila', index + 1, ':', error);
+        statusIndicator.textContent = '❌ Error';
+        statusIndicator.className = 'status-indicator error';
+        if (errorContainer) {
+          errorContainer.textContent = error.message || 'Error desconocido';
+          errorContainer.classList.add('active');
+        }
+        callback(false);
+      }
+    }
+
+    /**
+     * Elimina un documento llamando al backend.
+     */
+    async function deleteSingleRow(row, index, total, callback) {
+      var rowId = row.id;
+      var docTypeSelect = row.querySelector('.doc-type-select-input');
+      var referenceSelect = row.querySelector('.reference-select');
+      var statusIndicator = document.getElementById(rowId + '-status');
+      var errorContainer = document.getElementById(rowId + '-error');
+      
+      var docType = docTypeSelect.value;
+      var referenceNo = referenceSelect.value;
+      var selectedUser = getSelectedUploadUser();
+      
+      if (!selectedUser) {
+        statusIndicator.textContent = '❌ Usuario';
+        statusIndicator.className = 'status-indicator error';
+        if (errorContainer) {
+          errorContainer.textContent = 'Seleccione un usuario válido desde el listado.';
+          errorContainer.classList.add('active');
+        }
+        callback(false);
+        return;
+      }
+      
+      if (errorContainer) {
+        errorContainer.textContent = '';
+        errorContainer.classList.remove('active');
+      }
+      
+      statusIndicator.textContent = '⏳ Eliminando...';
+      statusIndicator.className = 'status-indicator loading';
+      statusIndicator.style.display = 'block';
+      
+      try {
+        var result = await new Promise(function(resolve, reject) {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .eliminarDocumentoCentral(docType, referenceNo, selectedUser.userId);
+        });
+        
+        if (result && result.status === 'success') {
+          statusIndicator.textContent = '✅ Eliminado';
           statusIndicator.className = 'status-indicator success';
           callback(true);
         } else {

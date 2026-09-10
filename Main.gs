@@ -30,7 +30,7 @@ function onOpen() {
 
   // 3. Menú Principal (Gestionar OA)
   SpreadsheetApp.getUi().createMenu('Gestionar OA')
-    .addItem('📤 Subir documentos', 'abrirModalSubidaGeneral')
+    .addItem('📁 Gestionar archivos adjuntos', 'abrirModalSubidaGeneral')
     .addItem('🖨️ Imprimir Orden', 'openPrintDialog')
     .addItem('🚨 Registrar novedad', 'abrirModalRegistroNovedad')
     .addItem('🔄 Refrescar Estado de Documentos', 'forzarActualizacionEstadoDocumentos')
