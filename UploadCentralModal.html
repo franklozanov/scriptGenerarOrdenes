@@ -665,7 +665,7 @@
           hideLoading();
           showError('Error al obtener configuración inicial: ' + error.message);
         })
-        .getInitialData();
+        .getInitialData('<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>');
     };
 
     function addRow() {

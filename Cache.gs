@@ -78,7 +78,7 @@ function getStaticTemplateBase64_(key, fileId) {
  * Obtiene datos iniciales (usuarios y plantillas) para los modales.
  * Usa caché de 10 minutos para optimizar performance.
  */
-function getInitialData() {
+function getInitialData(spreadsheetId) {
   try {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v4');
@@ -92,7 +92,13 @@ function getInitialData() {
       }
     } catch(e) {}
     
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss;
+    if (spreadsheetId) {
+      ss = SpreadsheetApp.openById(spreadsheetId);
+    } else {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    }
+    
     var currentSignature = "";
     try {
       var tplSheet = ss.getSheetByName('templates');

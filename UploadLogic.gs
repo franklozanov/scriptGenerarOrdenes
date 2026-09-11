@@ -22,6 +22,7 @@ function abrirModalSubidaGeneral() {
   // (vía getInitialData() → activeEmail → match con hoja Usuarios)
   try {
     var template = HtmlService.createTemplateFromFile('UploadCentralModal');
+    template.spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
     var html = template.evaluate()
       .setWidth(700)
       .setHeight(600);

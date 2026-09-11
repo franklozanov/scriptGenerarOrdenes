@@ -22,6 +22,7 @@ function abrirModalRegistroNovedad() {
   // (vía getInitialData() → activeEmail → match con hoja Usuarios)
   try {
     var template = HtmlService.createTemplateFromFile('ModalRegistroNovedad');
+    template.spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
     var html = template.evaluate()
       .setWidth(600)
       .setHeight(650);
