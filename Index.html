@@ -1078,7 +1078,7 @@
           }
         }).withFailureHandler(e => {
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
-        }).getInitialData();
+        }).getInitialData('<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>');
       };
 
       // PDF generation processing function (extracted for reuse)

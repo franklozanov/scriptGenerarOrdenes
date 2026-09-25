@@ -201,7 +201,7 @@
             }
           }
         })
-        .getInitialData();
+        .getInitialData('<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>');
 
       document.getElementById('btnCancel').addEventListener('click', function() {
         google.script.host.close();

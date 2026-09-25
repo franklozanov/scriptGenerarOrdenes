@@ -21,9 +21,8 @@
  * Muestra el panel Index.html con las opciones de impresión.
  */
 function openPrintDialog() {
-  // La validación de identidad se realiza inline dentro de Index.html al cargar
-  // (vía getInitialData() → activeEmail → match con hoja Usuarios)
   var template = HtmlService.createTemplateFromFile('Index');
+  template.spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
   var html = template.evaluate()
     .setWidth(550).setHeight(700);
   SpreadsheetApp.getUi().showModelessDialog(html, ' ');

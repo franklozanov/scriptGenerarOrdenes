@@ -7,16 +7,16 @@
 /**
  * Genera el prefijo de caché para una plantilla estática.
  */
-function getStaticTemplateCachePrefix_(key) {
-  return 'staticPdf_' + key + '_';
+function getStaticTemplateCachePrefix_(key, fileId) {
+  return 'staticPdf_' + key + '_' + (fileId || 'noId') + '_';
 }
 
 /**
  * Obtiene una plantilla estática desde el caché (chunked).
  */
-function getCachedStaticTemplateBase64_(key) {
+function getCachedStaticTemplateBase64_(key, fileId) {
   var cache = CacheService.getScriptCache();
-  var prefix = getStaticTemplateCachePrefix_(key);
+  var prefix = getStaticTemplateCachePrefix_(key, fileId);
   var meta = cache.get(prefix + 'meta');
   if (!meta) return null;
 
@@ -38,10 +38,10 @@ function getCachedStaticTemplateBase64_(key) {
 /**
  * Cachea una plantilla estática en chunks.
  */
-function cacheStaticTemplateBase64_(key, base64) {
+function cacheStaticTemplateBase64_(key, fileId, base64) {
   if (!base64) return;
   var cache = CacheService.getScriptCache();
-  var prefix = getStaticTemplateCachePrefix_(key);
+  var prefix = getStaticTemplateCachePrefix_(key, fileId);
   var chunkCount = Math.ceil(base64.length / STATIC_TEMPLATE_CHUNK_SIZE_);
 
   try {
@@ -65,12 +65,12 @@ function getStaticTemplateBase64(key, fileId) {
  * Obtiene el base64 de una plantilla estática (desde caché o Drive).
  */
 function getStaticTemplateBase64_(key, fileId) {
-  var cached = getCachedStaticTemplateBase64_(key);
+  var cached = getCachedStaticTemplateBase64_(key, fileId);
   if (cached) return cached;
 
   var file = DriveApp.getFileById(fileId);
   var base64 = Utilities.base64Encode(file.getBlob().getBytes());
-  cacheStaticTemplateBase64_(key, base64);
+  cacheStaticTemplateBase64_(key, fileId, base64);
   return base64;
 }
 
@@ -78,7 +78,7 @@ function getStaticTemplateBase64_(key, fileId) {
  * Obtiene datos iniciales (usuarios y plantillas) para los modales.
  * Usa caché de 10 minutos para optimizar performance.
  */
-function getInitialData() {
+function getInitialData(spreadsheetId) {
   try {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('initialData_v4');
@@ -92,27 +92,47 @@ function getInitialData() {
       }
     } catch(e) {}
     
+    var ss;
+    if (spreadsheetId) {
+      ss = SpreadsheetApp.openById(spreadsheetId);
+    } else {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    }
+    
+    var currentSignature = "";
+    try {
+      var tplSheet = ss.getSheetByName('templates');
+      if (tplSheet) {
+        var tplDataRaw = tplSheet.getDataRange().getValues();
+        currentSignature = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(tplDataRaw)));
+      }
+    } catch(e) {
+      Logger.log("Error leyendo templates para firma: " + e.message);
+    }
+
     if (cached) {
       try { 
         var parsedData = JSON.parse(cached); 
-        for (var i = 0; i < parsedData.templates.length; i++) {
-          var t = parsedData.templates[i];
-          // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí para no bloquear la UI.
-          // Se descargarán asíncronamente o en Lazy Load durante la impresión.
-          t.base64 = null;
+        if (parsedData.templateSignature === currentSignature && currentSignature !== "") {
+          for (var i = 0; i < parsedData.templates.length; i++) {
+            var t = parsedData.templates[i];
+            // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí para no bloquear la UI.
+            // Se descargarán asíncronamente o en Lazy Load durante la impresión.
+            t.base64 = null;
+          }
+          if (!parsedData.webAppUrl) {
+            try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
+          }
+          parsedData.activeEmail = activeEmail;
+          parsedData.savedProfileIdx = savedProfileIdx;
+          return parsedData; 
+        } else {
+          Logger.log("Firma de caché diferente o ausente. Se reconstruirá el caché de plantillas.");
         }
-        if (!parsedData.webAppUrl) {
-          try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
-        }
-        parsedData.activeEmail = activeEmail;
-        parsedData.savedProfileIdx = savedProfileIdx;
-        return parsedData; 
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
       }
     }
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
   
     var users = [];
     var userSheet = ss.getSheetByName('Usuarios');
@@ -303,7 +323,7 @@ function getInitialData() {
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
     var result = { users: users, templates: templates, webAppUrl: webAppUrl, activeEmail: activeEmail, savedProfileIdx: savedProfileIdx };
     
-    var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl };
+    var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl, templateSignature: currentSignature };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];
       dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, type: t.type, formOrder: t.formOrder, estado: t.estado, copias: t.copias, hasAccess: t.hasAccess });
