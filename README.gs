@@ -5,6 +5,17 @@
  * las reglas de desarrollo del Sistema de Gestión de Calidad (QMS App).
  *
  * ==========================================
+ * IMPORTANTE: CONTROL DE VERSIONES Y SINCRONIZACIÓN
+ * ==========================================
+ * NO USAMOS CLASP en este proyecto.
+ * La sincronización entre GitHub y Google Apps Script se realiza 
+ * exclusivamente utilizando la extensión GAS GitHub Assistant.
+ * Por lo tanto, TODO archivo subido a GitHub intentará sincronizarse con GAS.
+ * REGLA: NUNCA subas archivos con extensiones no nativas (como .md, .json, .yml)
+ * al repositorio, ya que generarán errores de sincronización en GAS GH Assist.
+ * Toda la documentación y recursos deben vivir en archivos .gs o .html nativos.
+ *
+ * ==========================================
  * 1. Arquitectura del Sistema
  * ==========================================
  * El sistema está construido como una Single Page Application (SPA) dentro 
