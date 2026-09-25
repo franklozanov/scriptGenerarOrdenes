@@ -1079,9 +1079,7 @@
         });
       }
       
-      // ===========================================
-=============
-    // Configuración y Botones Simples
+      // ==============================    // Configuración y Botones Simples
     async function toggleMaintenanceModeAction() {
       var toggle = document.getElementById("toggle-maintenance");
       var label = document.getElementById("maintenance-status-label");
@@ -1142,8 +1140,7 @@
         .abrirModalValidacionSistema();
     }
 
-    /* ========================================================
-       MODULO: AUTOAPROBACIÓN TEMPORAL (Config tab)
+    /* ===========================================       MODULO: AUTOAPROBACIÓN TEMPORAL (Config tab)
        ======================================================== */
     function autoAprob_toggle() {
       document.getElementById('aa_fields').style.display = document.getElementById('aa_enabled').checked ? 'block' : 'none';
@@ -1899,8 +1896,7 @@
     }
 
 
-    /* ========================================================
-       MODULO: CARGA DE ÓRDENES (MIGRADO A SIDEBAR SPA)
+    /* ===========================================       MODULO: CARGA DE ÓRDENES (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     // co_cardCount ya está declarada arriba
 
@@ -2443,8 +2439,7 @@
       });
     }
 
-    /* ========================================================
-       MODULO: SUBIDA DE DOCUMENTOS (MIGRADO A SIDEBAR SPA)
+    /* ===========================================       MODULO: SUBIDA DE DOCUMENTOS (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     let up_pendingOrders = null;
     let up_fileCache = {}; // { cardId_docType: { base64, name, type } }
@@ -2693,8 +2688,7 @@
       });
     }
 
-    /* ========================================================
-       MODULO: REGISTRAR NOVEDAD (MIGRADO A SIDEBAR SPA)
+    /* ===========================================       MODULO: REGISTRAR NOVEDAD (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     let nov_ordenes = [];
 
@@ -2843,8 +2837,7 @@
       nov_validarPaginas();
     }
 
-    /* ========================================================
-       MODULO: AUTORIZAR QA (MIGRADO A SIDEBAR SPA)
+    /* ===========================================       MODULO: AUTORIZAR QA (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     let qa_ordenes = [];
 
@@ -3072,8 +3065,7 @@
     // ---------------------------------------------------------------------
 
 
-    /* ========================================================
-       MODULO: APROBAR IMPRESIÓN QA (MIGRADO A SIDEBAR SPA)
+    /* ===========================================       MODULO: APROBAR IMPRESIÓN QA (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     let qai_solicitudes = [];
 
@@ -3180,8 +3172,7 @@
       }
     }
     
-    /* ========================================================
-       MODULO: IMPRESIÓN ORDEN (MIGRADO A SIDEBAR SPA)
+    /* ===========================================       MODULO: IMPRESIÓN ORDEN (MIGRADO A SIDEBAR SPA)
        ======================================================== */
     let imp_globalTemplates = [];
     let imp_preloadedStaticPdfs = {}; 
