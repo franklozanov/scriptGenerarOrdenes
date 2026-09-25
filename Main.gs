@@ -111,8 +111,18 @@ function onOpenMain(email) {
   // Menú Principal (Gestionar OA)
   // Fase 3: Migración a Sidebar SPA — Configuración y Opciones Admin migradas al Panel
   // Principal QMS (pestaña ⚙️ Configuración), que aplica sus propios permisos por rol.
-  var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
-  mainMenu.addItem('🎛️ Iniciar Sesión y Abrir Panel QMS', 'abrirPanelQMS');
+    var mainMenu = SpreadsheetApp.getUi().createMenu('Gestionar OA');
+  mainMenu.addItem('🚀 Iniciar Sesión y Abrir Panel QMS', 'abrirPanelQMS');
+  
+  // Agregar submenú de configuración solo para administradores
+  var rolUpper = (validUser.rol || '').toUpperCase();
+  if (rolUpper === 'ADMIN' || rolUpper === 'ADMINISTRADOR' || rolUpper === 'ADMINISTRADOR DE SISTEMA') {
+    mainMenu.addSeparator();
+    var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración');
+    configMenu.addItem('Inicializar App', 'abrirModalValidacionSistema');
+    mainMenu.addSubMenu(configMenu);
+  }
+  
   mainMenu.addToUi();
   Logger.log("Menús de UI creados exitosamente.");
   

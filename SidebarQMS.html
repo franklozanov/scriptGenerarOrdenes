@@ -160,9 +160,14 @@
           <div class="user-name skeleton" style="width:100px; height:12px; margin-bottom:4px;" id="user-name-el"></div>
           <div class="user-role-badge skeleton" style="width:60px; height:10px;" id="user-role-el"></div>
         </div>
-        <button class="btn-switch-user" onclick="sp_cerrarSesion()" title="Cambiar usuario">
-          <i data-lucide="log-out"></i>
-        </button>
+        <div style="display:flex; gap:8px;">
+          <button id="header-admin-btn" class="btn-switch-user" style="display:none; color: #64748b;" onclick="startAdminInitFlow()" title="Administración Global">
+            <i data-lucide="settings"></i>
+          </button>
+          <button class="btn-switch-user" onclick="sp_cerrarSesion()" title="Cambiar usuario">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
       </div>
       <div class="session-pill hidden" id="session-pill-el">
         <div class="session-dot"></div>
