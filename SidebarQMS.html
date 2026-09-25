@@ -893,8 +893,7 @@
       applyPermissions(data.userPermissions);
       document.getElementById("loading-overlay").classList.add("hidden");
 
-      var userInfo = document.getElementById("sidebar-user-info");
-      if (userInfo && data.currentUser) {
+      if (data.currentUser) {
         // -- User Header (Stripe-style) ----------------------
       const avatarEl = document.getElementById('user-avatar-el');
       const nameEl = document.getElementById('user-name-el');
@@ -1637,7 +1636,7 @@
       showLoading('Cerrando sesi�n segura...');
       
       // Mostrar skeleton loader de transici�n
-      document.getElementById('sidebar-content').innerHTML = 
+      document.querySelector('.view-container').innerHTML = 
         '<div style="padding: 20px; text-align: center;"><i data-lucide="loader" class="spin"></i><p style="margin-top: 10px; color: #64748b;">Preparando cambio de usuario...</p></div>';
       lucide.createIcons();
 
@@ -1645,7 +1644,7 @@
         .withSuccessHandler(function () {
            // No cerramos el host, el panel queda en estado de carga mientras se abre el modal.
            // Cuando el usuario haga login en el modal, se recargar� autom�ticamente este sidebar.
-           document.getElementById('sidebar-content').innerHTML = 
+           document.querySelector('.view-container').innerHTML = 
              '<div style="padding: 40px 20px; text-align: center;"><i data-lucide="shield-check" style="width:48px; height:48px; color:#10b981; margin-bottom:16px;"></i><h3 style="font-size:16px; font-weight:600; color:#0f172a;">Sesi�n Protegida</h3><p style="margin-top: 8px; font-size:13px; color: #64748b;">Por favor, ingresa tu PIN en la ventana emergente para continuar.</p></div>';
            lucide.createIcons();
            hideLoading();
