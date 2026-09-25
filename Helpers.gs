@@ -144,118 +144,59 @@ function isReimpresionType_(printType) {
  * @param {Array} headers - Encabezados de la hoja
  * @param {string} texto - Texto del evento a registrar
  */
-function appendHistorialImpresion_(sheet, rowIndex, headers, texto) {
-  try {
-    var colHist = getColumnIndexByNameCaseInsensitive(headers, 'HistorialImpresion', false);
-    if (!colHist) {
-      Logger.log("ADVERTENCIA: Columna 'HistorialImpresion' no existe. Ejecute la inicializaciÃ³n de columnas.");
-      return;
-    }
-    var timestamp = Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm");
-    var linea = "[" + timestamp + "] " + texto;
-    var actual = sheet.getRange(rowIndex, colHist).getValue();
-    actual = actual ? actual.toString() : "";
-    sheet.getRange(rowIndex, colHist).setValue(actual ? actual + "\n" + linea : linea);
-  } catch (e) {
-    Logger.log("Error en appendHistorialImpresion_: " + e.message);
-  }
-}
-
-/**
- * Agrega una lÃ­nea de historial a una orden identificada por su NoOrden.
- * Wrapper de conveniencia cuando no se tiene el rowIndex/headers a mano.
- * @param {string} orderNo - NÃºmero de orden
- * @param {string} texto - Texto del evento a registrar
- */
-function appendHistorialByOrderNo_(orderNo, texto) {
-  try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Ordenes');
-    if (!sheet) return;
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
-    if (!colNoOrden) return;
-    var data = sheet.getRange(1, colNoOrden, sheet.getLastRow(), 1).getValues();
-    var target = orderNo != null ? orderNo.toString().trim().toLowerCase() : "";
-    for (var i = 1; i < data.length; i++) {
-      var v = data[i][0] != null ? data[i][0].toString().trim().toLowerCase() : "";
-      if (v === target) {
-        appendHistorialImpresion_(sheet, i + 1, headers, texto);
-        return;
-      }
-    }
-  } catch (e) {
-    Logger.log("Error en appendHistorialByOrderNo_: " + e.message);
-  }
-}
-
-
-function verificarDocumentosEnDrive(noOrden, noAnalisis) {
-  var noOrdenStr = noOrden ? String(noOrden).trim() : "";
-  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim() : "";
-
-  if (!noOrdenStr && !noAnalisisStr) {
-    return { tieneOA: false, tieneCOA: false };
-  }
-
-  var idx = IndiceDocs.cargar();
-  var tieneOA = noOrdenStr ? (idx.OA[normalizarClaveDoc_(noOrdenStr)] !== undefined) : false;
-  var tieneCOA = noAnalisisStr ? (idx.COA[normalizarClaveDoc_(noAnalisisStr)] !== undefined) : false;
-
-  return { tieneOA: tieneOA, tieneCOA: tieneCOA };
-}
-
-function normalizarClaveDoc_(clave) {
-  return String(clave).trim().toLowerCase();
-}
-
-
-function verificarDocumentosEnDrive(noOrden, noAnalisis) {
-  var noOrdenStr = noOrden ? String(noOrden).trim() : "";
-  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim() : "";
-
-  if (!noOrdenStr && !noAnalisisStr) {
-    return { tieneOA: false, tieneCOA: false };
-  }
-
-  var idx = IndiceDocs.cargar();
-  var tieneOA = noOrdenStr ? (idx.OA[normalizarClaveDoc_(noOrdenStr)] !== undefined) : false;
-  var tieneCOA = noAnalisisStr ? (idx.COA[normalizarClaveDoc_(noAnalisisStr)] !== undefined) : false;
-
-  return { tieneOA: tieneOA, tieneCOA: tieneCOA };
-}
-
-function normalizarClaveDoc_(clave) {
-  return String(clave).trim().toLowerCase();
-}
-
-function calcularEstadoDocumentos(tieneOA, tieneCOA) {
-  if (tieneOA && tieneCOA) {
-    return VALORES_ESTADO_DOCUMENTOS.LISTOS;
-  } else if (tieneOA && !tieneCOA) {
-    return VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
-  } else if (!tieneOA && tieneCOA) {
-    return VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
-  } else {
-    return VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
-  }
-}
-
 function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
   var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
   var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
-  
-  // Columnas Legacy / Simples
   var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
   
-  // Columnas Nuevas FASE 1
-  var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
-  var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
-  var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-  
-  if (!colNoOrdenIdx) {
-    Logger.log("ADVERTENCIA: No se encontro columna NoOrden");
+  if (!colNoOrdenIdx || !colEstadoIdx) {
+    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoDocumentos");
     return;
   }
+  
+  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
+  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
+  
+  // Si la fila esta vacia, borrar estado
+  if ((!noOrden || String(noOrden).trim() === "") && 
+      (!noAnalisis || String(noAnalisis).trim() === "")) {
+    sheet.getRange(rowIndex, colEstadoIdx).setValue("");
+    return;
+  }
+  
+  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
+  var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
+  
+  sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
+}
+
+/**
+ * Agrega una línea de historial a la orden (columna HistorialImpresion).
+function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
+  var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+  var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+  
+  if (!colNoOrdenIdx || !colEstadoIdx) {
+    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoDocumentos");
+    return;
+  }
+  
+  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
+  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
+  
+  // Si la fila esta vacia, borrar estado
+  if ((!noOrden || String(noOrden).trim() === "") && 
+      (!noAnalisis || String(noAnalisis).trim() === "")) {
+    sheet.getRange(rowIndex, colEstadoIdx).setValue("");
+    return;
+  }
+  
+  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
+  var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
+  
+  sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
+}
   
   var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
   var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;

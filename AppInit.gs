@@ -494,103 +494,74 @@ function aplicarValidacionesEstadoDocumentos(silent) {
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // Obtener Ã­ndices de columnas
-    var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-    var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
-    var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    // Obtener índices de la nueva columna unificada
+    var colEstadoDocumentosIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
     
-    if (!colAdjuntoCOAIdx || !colAdjuntoOAIdx || !colEstadoCargaIdx) {
-      throw new Error("No se encontraron las columnas AdjuntoCOA, AdjuntoOA o EstadoCarga. AsegÃºrese de que existan.");
+    if (!colEstadoDocumentosIdx) {
+      throw new Error("No se encontró la columna EstadoDocumentos. Asegúrese de que exista.");
     }
     
-    var lastRow = sheet.getMaxRows();
+    var lastRow = Math.max(sheet.getMaxRows(), 2);
     
-    // Valores permitidos para AdjuntoCOA y AdjuntoOA (usar constantes de Config.gs)
-    var valoresDocumento = [VALORES_DOCUMENTO.PENDIENTE, VALORES_DOCUMENTO.CARGADO];
-    var ruleDocumento = SpreadsheetApp.newDataValidation()
-      .requireValueInList(valoresDocumento, true)
-      .setAllowInvalid(false)
-      .setHelpText("Seleccione: " + valoresDocumento.join(" o "))
-      .build();
-    
-    // Valores permitidos para EstadoCarga (usar constantes de Config.gs)
-    var valoresEstadoCarga = [
-      VALORES_ESTADO_CARGA.PENDIENTE_AMBOS,
-      VALORES_ESTADO_CARGA.PENDIENTE_OA,
-      VALORES_ESTADO_CARGA.PENDIENTE_COA,
-      VALORES_ESTADO_CARGA.CARGADOS
+    // Valores permitidos para EstadoDocumentos (usar constantes de Config.gs)
+    var valoresEstadoDocumentos = [
+      VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS,
+      VALORES_ESTADO_DOCUMENTOS.FALTA_OA,
+      VALORES_ESTADO_DOCUMENTOS.FALTA_COA,
+      VALORES_ESTADO_DOCUMENTOS.LISTOS
     ];
-    var ruleEstadoCarga = SpreadsheetApp.newDataValidation()
-      .requireValueInList(valoresEstadoCarga, true)
+    
+    var ruleEstadoDocumentos = SpreadsheetApp.newDataValidation()
+      .requireValueInList(valoresEstadoDocumentos, true)
       .setAllowInvalid(false)
-      .setHelpText("Estado calculado automÃ¡ticamente. Valores: " + valoresEstadoCarga.join(", "))
+      .setHelpText("Estado calculado automáticamente. Valores: " + valoresEstadoDocumentos.join(", "))
       .build();
     
-    // Aplicar validaciÃ³n a AdjuntoCOA (desde fila 2 hasta el final)
-    var rangeCOA = sheet.getRange(2, colAdjuntoCOAIdx, lastRow - 1, 1);
-    rangeCOA.setDataValidation(ruleDocumento);
-    Logger.log("âœ“ ValidaciÃ³n aplicada a columna AdjuntoCOA");
+    // Aplicar validación a EstadoDocumentos (desde fila 2 hasta el final)
+    var rangeEstado = sheet.getRange(2, colEstadoDocumentosIdx, lastRow - 1, 1);
+    rangeEstado.setDataValidation(ruleEstadoDocumentos);
     
-    // Aplicar validaciÃ³n a AdjuntoOA
-    var rangeOA = sheet.getRange(2, colAdjuntoOAIdx, lastRow - 1, 1);
-    rangeOA.setDataValidation(ruleDocumento);
-    Logger.log("âœ“ ValidaciÃ³n aplicada a columna AdjuntoOA");
+    // Aplicar Warning-Only Protection (sin romper Google Script Run)
+    try {
+      rangeEstado.protect().setWarningOnly(true).setDescription('Advertencia_EstadoDocumentos');
+      Logger.log("✓ Columna EstadoDocumentos protegida de edición manual con Advertencia");
+    } catch(e) {
+      Logger.log("No se pudo aplicar warningOnly: " + e.message);
+    }
     
-    // Aplicar validaciÃ³n a EstadoCarga
-    var rangeEstado = sheet.getRange(2, colEstadoCargaIdx, lastRow - 1, 1);
-    rangeEstado.setDataValidation(ruleEstadoCarga);
-    Logger.log("âœ“ ValidaciÃ³n aplicada a columna EstadoCarga");
-    
-    // Mostrar mensaje al usuario solo si no es modo silencioso
     if (!silent) {
       try {
         var ui = SpreadsheetApp.getUi();
         ui.alert(
-          'âœ… Validaciones Aplicadas',
-          'Se aplicaron validaciones de datos tipo dropdown a las columnas:\n\n' +
-          'â€¢ AdjuntoCOA: Pendiente, âœ… Cargado\n' +
-          'â€¢ AdjuntoOA: Pendiente, âœ… Cargado\n' +
-          'â€¢ EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, âœ… Cargados\n\n' +
-          'Ahora solo se podrÃ¡n ingresar valores vÃ¡lidos en estas columnas.',
+          '✅ Validaciones Aplicadas',
+          'Se aplicaron validaciones de datos a la columna unificada:
+
+' +
+          '• EstadoDocumentos: Protegida con 4 estados automáticos.
+',
           ui.ButtonSet.OK
         );
-      } catch (uiError) {
-        Logger.log("No se pudo mostrar mensaje UI (contexto sin UI): " + uiError.message);
-      }
+      } catch (uiError) {}
     }
-    
-    return {
-      status: 'success',
-      message: 'Validaciones aplicadas correctamente'
-    };
     
   } catch (e) {
-    Logger.log("ERROR al aplicar validaciones: " + e.message);
-    
+    Logger.log("ERROR en aplicarValidacionesEstadoDocumentos: " + e.message);
     if (!silent) {
       try {
-        var ui = SpreadsheetApp.getUi();
-        ui.alert(
-          'Error',
-          'No se pudieron aplicar las validaciones:\n' + e.message,
-          ui.ButtonSet.OK
-        );
-      } catch (uiError) {
-        Logger.log("No se pudo mostrar error UI: " + uiError.message);
-      }
+        SpreadsheetApp.getUi().alert('Error', 'Fallo al aplicar validaciones: ' + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+      } catch (uiError) {}
     }
-    
-    throw e;
   }
 }
 
 /**
- * Prompt para aplicar validaciones con autenticaciÃ³n admin.
+ * Prompt para que un administrador aplique la validación desde el menú.
  */
-function promptAplicarValidacionesEstadoCarga() {
+function promptAplicarValidacionesEstadoDocumentos() {
   withAdminAuth('Aplicar Validaciones de Estado de Carga', function(ui) {
-    aplicarValidacionesEstadoDocumentos();
+    aplicarValidacionesEstadoDocumentos(false);
   });
+});
 }
 
 // --- LOGGING ---
