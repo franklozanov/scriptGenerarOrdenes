@@ -41,7 +41,7 @@ function abrirModalSubidaGeneral() {
  * @property {Array<string>} ordenesPendientesOA - Números de orden con OA pendiente
  * @property {Array<string>} ordenesPendientesCOA - Números de orden con COA pendiente
  */
-function getPendingOrdersList() {
+function getOrdersData() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
@@ -57,7 +57,7 @@ function getPendingOrdersList() {
     
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return { ordenesPendientesOA: [], ordenesPendientesCOA: [] };
+      return { ordenesPendientesOA: [], ordenesPendientesCOA: [], cargadasOA: [], cargadasCOA: [] };
     }
     
     var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
@@ -65,6 +65,8 @@ function getPendingOrdersList() {
     
     var ordenesPendientesOA = [];
     var ordenesPendientesCOA = [];
+    var cargadasOA = [];
+    var cargadasCOA = [];
     
     for (var i = 0; i < data.length; i++) {
       var noOrden = data[i][colNoOrdenCol - 1];
@@ -77,28 +79,43 @@ function getPendingOrdersList() {
       
       if (!noOrdenStr) continue;
       
-      // Agregar a lista de OA pendientes si el estado incluye Faltan Ambos o Falta OA
+      // Lógica para OA
       if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta OA") !== -1) {
         if (ordenesPendientesOA.indexOf(noOrdenStr) === -1) {
           ordenesPendientesOA.push(noOrdenStr);
         }
+      } else if (estadoDocStr.indexOf("Falta COA") !== -1 || estadoDocStr.indexOf("Listos para Imprimir") !== -1) {
+        if (cargadasOA.indexOf(noOrdenStr) === -1) {
+          cargadasOA.push(noOrdenStr);
+        }
       }
       
-      // Agregar a lista de COA pendientes si el estado incluye Faltan Ambos o Falta COA Y tiene NoAnalisis
-      if (noAnalisisStr && (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta COA") !== -1)) {
-        if (ordenesPendientesCOA.indexOf(noAnalisisStr) === -1) {
-          ordenesPendientesCOA.push(noAnalisisStr);
+      // Lógica para COA
+      if (noAnalisisStr) {
+        if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta COA") !== -1) {
+          if (ordenesPendientesCOA.indexOf(noAnalisisStr) === -1) {
+            ordenesPendientesCOA.push(noAnalisisStr);
+          }
+        } else if (estadoDocStr.indexOf("Falta OA") !== -1 || estadoDocStr.indexOf("Listos para Imprimir") !== -1) {
+          if (cargadasCOA.indexOf(noAnalisisStr) === -1) {
+            cargadasCOA.push(noAnalisisStr);
+          }
         }
       }
     }
     
-    Logger.log("✓ Órdenes con OA pendiente: " + ordenesPendientesOA.length);
-    Logger.log("✓ Órdenes con COA pendiente: " + ordenesPendientesCOA.length);
-    return { ordenesPendientesOA: ordenesPendientesOA, ordenesPendientesCOA: ordenesPendientesCOA };
+    Logger.log("✓ Órdenes con OA pendiente: " + ordenesPendientesOA.length + " | Cargadas: " + cargadasOA.length);
+    Logger.log("✓ Órdenes con COA pendiente: " + ordenesPendientesCOA.length + " | Cargadas: " + cargadasCOA.length);
+    return { 
+      ordenesPendientesOA: ordenesPendientesOA, 
+      ordenesPendientesCOA: ordenesPendientesCOA,
+      cargadasOA: cargadasOA,
+      cargadasCOA: cargadasCOA
+    };
     
   } catch (e) {
-    Logger.log("Error en getPendingOrdersList: " + e.message);
-    throw new Error("Error al obtener listas pendientes: " + e.message);
+    Logger.log("Error en getOrdersData: " + e.message);
+    throw new Error("Error al obtener datos de órdenes: " + e.message);
   }
 }
 
@@ -304,5 +321,105 @@ function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenc
   } catch (e) {
     Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);
     return { status: 'error', message: "Error interno del servidor: " + e.message };
+  }
+}
+
+/**
+ * Elimina un documento (Orden o Análisis) del sistema.
+ * 
+ * @param {string} referenceNo - Número de referencia
+ * @param {string} docType - Tipo de documento
+ * @param {string} actingUserId - UserID
+ * @returns {Object} Resultado
+ */
+function eliminarDocumentoCentral(referenceNo, docType, actingUserId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (!sheetOrdenes) throw new Error("La hoja 'Ordenes' no existe.");
+
+    var data = sheetOrdenes.getDataRange().getValues();
+    var headers = data[0];
+    
+    var targetColName = "";
+    var folderKey = "";
+    if (docType === "Orden de Acondicionamiento") {
+      targetColName = "NoOrden";
+      folderKey = "DOC_ORDENES";
+    } else if (docType === "Certificado de Analisis") {
+      targetColName = "NoAnalisis";
+      folderKey = "DOC_ANALISIS";
+    }
+    
+    if (folderKey === "") {
+      return { status: 'error', message: "Tipo de documento no reconocido." };
+    }
+    
+    var targetColIdx = getColumnIndexByName(headers, targetColName, true) - 1;
+    var targetRowIndices = [];
+    var referenceNoStr = String(referenceNo).trim().toLowerCase();
+    
+    for (var i = 1; i < data.length; i++) {
+      var cellValue = data[i][targetColIdx];
+      var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
+      if (cellValueStr === referenceNoStr) {
+        targetRowIndices.push(i + 1);
+      }
+    }
+
+    if (targetRowIndices.length === 0) {
+      return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja.' };
+    }
+
+    var tplSheet = ss.getSheetByName('templates');
+    var tplData = tplSheet.getDataRange().getValues();
+    var tplHeaders = tplData[0];
+    var folderId = "";
+    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false) || 1;
+    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false) || 2;
+    colClaveIdx--; colValorIdx--;
+
+    for (var i = 1; i < tplData.length; i++) {
+      var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+      if (key === folderKey) {
+        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+        break;
+      }
+    }
+
+    var folder = DriveApp.getFolderById(folderId);
+    var targetFileName = referenceNo + ".pdf";
+    var existingFiles = folder.getFilesByName(targetFileName);
+    var eliminado = false;
+    
+    while (existingFiles.hasNext()) {
+      var file = existingFiles.next();
+      file.setTrashed(true);
+      eliminado = true;
+    }
+
+    if (eliminado) {
+      var tipoIdx = (folderKey === 'DOC_ORDENES') ? 'OA' : 'COA';
+      try {
+        if (typeof IndiceDocs !== 'undefined' && typeof IndiceDocs.eliminar === 'function') {
+          IndiceDocs.eliminar(tipoIdx, targetFileName);
+        }
+      } catch (idxErr) {
+        Logger.log('IndiceDocs.eliminar falló: ' + idxErr.message);
+      }
+
+      for (var j = 0; j < targetRowIndices.length; j++) {
+        actualizarEstadoDocumentosEnHoja(sheetOrdenes, targetRowIndices[j], headers);
+      }
+
+      var userIdentity = getUserIdentityStringByUserId_(actingUserId);
+      logChange('ELIMINA_DOCUMENTO', "Se eliminó el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado", userIdentity);
+      
+      return { status: 'success', message: 'Documento eliminado exitosamente.' };
+    } else {
+      return { status: 'error', message: 'El documento no se encontró en Drive.' };
+    }
+  } catch (e) {
+    return { status: 'error', message: e.message };
   }
 }

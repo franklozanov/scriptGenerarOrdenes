@@ -160,11 +160,18 @@ function handlePrivilegedOperation_(params) {
     return procesarRegistroNovedad(params, callingUserId);
   }
 
+  if (operation === 'eliminarDocumento') {
+    if (!params.referenceNo || !params.docType) {
+      return { status: 'error', message: 'Faltan parámetros requeridos para eliminar documento.', diagnostic: 'MISSING_REQUIRED_PARAMS' };
+    }
+    return eliminarDocumentoCentral(params.referenceNo, params.docType, callingUserId);
+  }
+
   return {
     status: 'error',
     message: 'Operación no reconocida: ' + operation,
     diagnostic: 'UNKNOWN_OPERATION',
-    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad']
+    supportedOperations: ['uploadDocument', 'saveFinalPDF', 'updateTraceability', 'finalizeFinalPdf', 'registrarNovedad', 'eliminarDocumento']
   };
 }
 

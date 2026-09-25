@@ -202,6 +202,34 @@ var IndiceDocs = {
   },
 
   /**
+   * Elimina una entrada del índice de forma incremental.
+   *
+   * @param {string} tipo - 'OA' o 'COA'
+   * @param {string} nombre - Nombre del archivo (para derivar la clave)
+   */
+  eliminar: function(tipo, nombre) {
+    var clave = normalizarClaveDoc_(nombre);
+    if (clave === '' || (tipo !== 'OA' && tipo !== 'COA')) return;
+
+    var idx = this.cargar();
+    if (idx[tipo] && idx[tipo][clave] !== undefined) {
+      delete idx[tipo][clave];
+    }
+
+    var sh = this._obtenerHoja();
+    var last = sh.getLastRow();
+    if (last < 2) return;
+    
+    var data = sh.getRange(2, 1, last - 1, 2).getValues(); // Tipo, Clave
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === tipo && String(data[i][1]) === clave) {
+        sh.deleteRow(i + 2);
+        break;
+      }
+    }
+  },
+
+  /**
    * Devuelve el fileId de un documento por tipo+clave, o null si no está indexado.
    * Bonus: permite a la impresión hacer getFileById directo (sin buscar en la carpeta).
    */

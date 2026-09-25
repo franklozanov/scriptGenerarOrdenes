@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subida Masiva de Documentos</title>
+  <title>Gestión Masiva de Documentos</title>
   
   <!-- FASE 6: Design System Centralizado -->
   <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
@@ -79,10 +79,12 @@
     }
 
     .upload-row select.doc-type-select,
-    .upload-row .doc-type-select-input {
-      flex: 0 0 180px;
-      min-width: 180px;
-      max-width: 180px;
+    .upload-row .doc-type-select-input,
+    .upload-row select.action-select,
+    .upload-row .action-select-input {
+      flex: 0 0 160px;
+      min-width: 160px;
+      max-width: 160px;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
@@ -421,7 +423,7 @@
   <!-- Mensaje cuando no hay órdenes pendientes -->
   <div class="container no-orders" id="noOrdersMessage" style="display: none;">
     <div class="no-orders-icon">📋</div>
-    <div class="no-orders-text">No hay documentos pendientes de subida en este momento (ni órdenes ni análisis).</div>
+    <div class="no-orders-text">No hay documentos en el sistema para gestionar (ni órdenes ni análisis).</div>
     <button class="btn-cancel" onclick="cancel()">Cerrar</button>
   </div>
 
@@ -464,7 +466,7 @@
       return null;
     }
 
-    function loadPendingOrders() {
+    function loadOrdersData() {
       google.script.run
         .withSuccessHandler(function(data) {
           globalPendingOrders = data;
@@ -472,8 +474,10 @@
           
           var hasOA = data.ordenesPendientesOA && data.ordenesPendientesOA.length > 0;
           var hasCOA = data.ordenesPendientesCOA && data.ordenesPendientesCOA.length > 0;
+          var hasCargadasOA = data.cargadasOA && data.cargadasOA.length > 0;
+          var hasCargadasCOA = data.cargadasCOA && data.cargadasCOA.length > 0;
           
-          if (!hasOA && !hasCOA) {
+          if (!hasOA && !hasCOA && !hasCargadasOA && !hasCargadasCOA) {
             noOrdersMessage.style.display = 'block';
           } else {
             mainContent.style.display = 'block';
@@ -482,16 +486,16 @@
         })
         .withFailureHandler(function(error) {
           hideLoading();
-          showError('Error al cargar listas pendientes: ' + error.message);
+          showError('Error al cargar datos de órdenes: ' + error.message);
         })
-        .getPendingOrdersList();
+        .getOrdersData();
     }
 
     // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
       // Inicializar drag y resize (el drag handle azul está oculto en Theme.html)
       initializeModalDragResize({
-        title: 'Subida Masiva de Documentos',  // No se mostrará - drag handle oculto
+        title: 'Gestión Masiva de Documentos',  // No se mostrará - drag handle oculto
         enableDrag: true,
         enableResize: true,
         minWidth: 600,
@@ -523,7 +527,7 @@
             '</div>';
             
             validateForm();
-            loadPendingOrders();
+            loadOrdersData();
           }
 
           var myEmail = data.activeEmail ? data.activeEmail.toLowerCase().trim() : "";
@@ -584,6 +588,11 @@
             <option value="Orden de Acondicionamiento">Orden Acond.</option>
             <option value="Certificado de Analisis">Certificado Análisis</option>
           </select>
+          <select class="action-select action-select-input" onchange="handleActionChange(this, '${rowId}')">
+            <option value="cargar">Cargar</option>
+            <option value="reemplazar">Reemplazar</option>
+            <option value="eliminar">Eliminar</option>
+          </select>
           <select class="order-select reference-select" onchange="validateForm()">
             <option value="">Seleccione referencia...</option>
           </select>
@@ -604,26 +613,38 @@
       rowsContainer.insertAdjacentHTML('beforeend', rowHtml);
       var newRow = document.getElementById(rowId);
       var docTypeSelect = newRow.querySelector('.doc-type-select-input');
+      var actionSelect = newRow.querySelector('.action-select-input');
       var referenceSelect = newRow.querySelector('.reference-select');
       
       // Inicializar con lista de órdenes por defecto
-      populateReferenceSelect(referenceSelect, 'Orden de Acondicionamiento');
+      populateReferenceSelect(referenceSelect, 'Orden de Acondicionamiento', 'cargar');
       
       validateForm();
     }
 
-    function populateReferenceSelect(select, docType) {
+    function populateReferenceSelect(select, docType, action) {
       select.innerHTML = '<option value="">Seleccione referencia...</option>';
       
       var list = [];
       var emptyMessage = '';
       
-      if (docType === 'Orden de Acondicionamiento') {
-        list = globalPendingOrders.ordenesPendientesOA || [];
-        emptyMessage = 'No hay órdenes con OA pendiente';
-      } else if (docType === 'Certificado de Analisis') {
-        list = globalPendingOrders.ordenesPendientesCOA || [];
-        emptyMessage = 'No hay órdenes con COA pendiente';
+      if (action === 'cargar') {
+        if (docType === 'Orden de Acondicionamiento') {
+          list = globalPendingOrders.ordenesPendientesOA || [];
+          emptyMessage = 'No hay órdenes con OA pendiente';
+        } else if (docType === 'Certificado de Analisis') {
+          list = globalPendingOrders.ordenesPendientesCOA || [];
+          emptyMessage = 'No hay órdenes con COA pendiente';
+        }
+      } else {
+        // Para reemplazar o eliminar, mostrar las que YA tienen el documento
+        if (docType === 'Orden de Acondicionamiento') {
+          list = globalPendingOrders.cargadasOA || [];
+          emptyMessage = 'No hay órdenes con OA cargado';
+        } else if (docType === 'Certificado de Analisis') {
+          list = globalPendingOrders.cargadasCOA || [];
+          emptyMessage = 'No hay órdenes con COA cargado';
+        }
       }
       
       if (list.length === 0) {
@@ -642,13 +663,50 @@
     function handleDocTypeChange(docTypeSelect, rowId) {
       var row = document.getElementById(rowId);
       var referenceSelect = row.querySelector('.reference-select');
+      var actionSelect = row.querySelector('.action-select-input');
       var docType = docTypeSelect.value;
+      var action = actionSelect.value;
       
       // Limpiar selección actual
       referenceSelect.value = '';
       
       // Poblar con la lista correspondiente
-      populateReferenceSelect(referenceSelect, docType);
+      populateReferenceSelect(referenceSelect, docType, action);
+      
+      validateForm();
+    }
+
+    function handleActionChange(actionSelect, rowId) {
+      var row = document.getElementById(rowId);
+      var referenceSelect = row.querySelector('.reference-select');
+      var docTypeSelect = row.querySelector('.doc-type-select-input');
+      var fileInputWrapper = row.querySelector('.file-input-wrapper');
+      var fileInput = row.querySelector('input[type="file"]');
+      
+      var docType = docTypeSelect.value;
+      var action = actionSelect.value;
+      
+      // Limpiar selección actual
+      referenceSelect.value = '';
+      
+      // Si la acción es eliminar, ocultar/deshabilitar el input de archivo
+      if (action === 'eliminar') {
+        fileInputWrapper.style.display = 'none';
+        fileInput.value = ''; // limpiar
+        var fileName = fileInputWrapper.querySelector('.file-name');
+        var fileSize = fileInputWrapper.querySelector('.file-size');
+        var statusIndicator = document.getElementById(rowId + '-status');
+        fileName.textContent = '';
+        fileSize.textContent = '';
+        fileInputWrapper.classList.remove('has-file', 'has-error');
+        statusIndicator.style.display = 'none';
+        delete fileCache[rowId];
+      } else {
+        fileInputWrapper.style.display = 'flex'; // restaurar display flex de flexbox
+      }
+      
+      // Poblar con la lista correspondiente
+      populateReferenceSelect(referenceSelect, docType, action);
       
       validateForm();
     }
@@ -772,15 +830,27 @@
       }
 
       rows.forEach(function(row) {
+        var actionSelect = row.querySelector('.action-select-input');
         var referenceSelect = row.querySelector('.reference-select');
         var fileInput = row.querySelector('input[type="file"]');
         var rowId = row.id;
+        
+        var action = actionSelect.value;
         var hasReference = referenceSelect.value !== '';
-        var hasFile = fileInput.files.length > 0;
-        var hasCache = fileCache[rowId] !== undefined;
-
-        if (!hasReference || !hasFile || !hasCache) {
-          allValid = false;
+        
+        if (action === 'eliminar') {
+          // Para eliminar, solo se requiere la referencia
+          if (!hasReference) {
+            allValid = false;
+          }
+        } else {
+          // Para cargar o reemplazar, se requiere referencia y archivo cargado
+          var hasFile = fileInput.files.length > 0;
+          var hasCache = fileCache[rowId] !== undefined;
+          
+          if (!hasReference || !hasFile || !hasCache) {
+            allValid = false;
+          }
         }
       });
 
@@ -865,12 +935,14 @@
     async function uploadSingleRow(row, index, total, callback) {
       var rowId = row.id;
       var docTypeSelect = row.querySelector('.doc-type-select-input');
+      var actionSelect = row.querySelector('.action-select-input');
       var referenceSelect = row.querySelector('.reference-select');
       var statusIndicator = document.getElementById(rowId + '-status');
       var errorContainer = document.getElementById(rowId + '-error');
       
       var docType = docTypeSelect.value;
       var referenceNo = referenceSelect.value;
+      var action = actionSelect ? actionSelect.value : 'cargar';
       var selectedUser = getSelectedUploadUser();
       
       if (!selectedUser) {
@@ -884,8 +956,8 @@
         return;
       }
       
-      // Validar que exista en cache
-      if (!fileCache[rowId]) {
+      // Validar que exista en cache para cargar y reemplazar
+      if (action !== 'eliminar' && !fileCache[rowId]) {
         statusIndicator.textContent = '❌ No cargado';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
@@ -903,59 +975,48 @@
       }
       
       // Mostrar estado de carga
-      statusIndicator.textContent = '⏳ Subiendo...';
+      statusIndicator.textContent = action === 'eliminar' ? '⏳ Eliminando...' : '⏳ Procesando...';
       statusIndicator.className = 'status-indicator loading';
       
       try {
-        var cached = fileCache[rowId];
-        var result = await uploadFileFromCache(cached, referenceNo, docType, false, selectedUser.userId);
+        var result;
+        if (action === 'eliminar') {
+          // Confirmar eliminación
+          if (!confirm('¿Está seguro que desea eliminar el ' + docType + ' de la referencia ' + referenceNo + '? Esta acción moverá el archivo a la papelera.')) {
+            statusIndicator.textContent = '❌ Cancelado';
+            statusIndicator.className = 'status-indicator error';
+            callback(false);
+            return;
+          }
+          result = await eliminarDocumentoCentralAsync(referenceNo, docType, selectedUser.userId);
+        } else {
+          var cached = fileCache[rowId];
+          var overwriteConfirmed = (action === 'reemplazar'); 
+          
+          result = await uploadFileFromCache(cached, referenceNo, docType, overwriteConfirmed, selectedUser.userId);
+          
+          if (result.status === 'exists' && action === 'cargar') {
+            // Archivo existe, y querían cargarlo. Preguntar
+            var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
+            if (confirmOverwrite) {
+              result = await uploadFileFromCache(cached, referenceNo, docType, true, selectedUser.userId);
+            } else {
+              result = await uploadFileFromCache(cached, referenceNo, docType, 'skipUpload', selectedUser.userId);
+            }
+          }
+        }
         
         console.log('Fila', index + 1, '/', total, '- Status:', result.status, '- Ref:', referenceNo);
         
-        if (result.status === 'exists') {
-          // Archivo existe, pedir confirmación al usuario
-          var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
-          
-          if (confirmOverwrite) {
-            // Usuario aceptó REEMPLAZAR - reintentar con overwriteConfirmed = true
-            result = await uploadFileFromCache(cached, referenceNo, docType, true, selectedUser.userId);
-            
-            if (result.status === 'success') {
-              statusIndicator.textContent = '✅ Reemplazado';
-              statusIndicator.className = 'status-indicator success';
-              statusIndicator.title = 'Archivo reemplazado exitosamente';
-              callback(true);
-            } else {
-              statusIndicator.textContent = '❌ Error';
-              statusIndicator.className = 'status-indicator error';
-              if (errorContainer) {
-                errorContainer.textContent = result.message || 'Error desconocido';
-                errorContainer.classList.add('active');
-              }
-              callback(false);
-            }
+        if (result.status === 'success' || result.status === 'skipped') {
+          if (action === 'eliminar') {
+             statusIndicator.textContent = '✅ Eliminado';
+          } else if (result.status === 'skipped') {
+             statusIndicator.textContent = '✅ Ya existe';
+             statusIndicator.title = 'Archivo ya existe, estado actualizado sin reemplazar';
           } else {
-            // Usuario canceló REEMPLAZO - actualizar estado sin reemplazar archivo
-            // Llamar al backend para que actualice la celda a "✅ Cargado" sin tocar el archivo
-            result = await uploadFileFromCache(cached, referenceNo, docType, 'skipUpload', selectedUser.userId);
-            
-            if (result.status === 'success' || result.status === 'skipped') {
-              statusIndicator.textContent = '✅ Ya existe';
-              statusIndicator.className = 'status-indicator success';
-              statusIndicator.title = 'Archivo ya existe, estado actualizado sin reemplazar';
-              callback(true);
-            } else {
-              statusIndicator.textContent = '❌ Error';
-              statusIndicator.className = 'status-indicator error';
-              if (errorContainer) {
-                errorContainer.textContent = result.message || 'Error al actualizar estado';
-                errorContainer.classList.add('active');
-              }
-              callback(false);
-            }
+             statusIndicator.textContent = '✅ Completado';
           }
-        } else if (result.status === 'success') {
-          statusIndicator.textContent = '✅ Completado';
           statusIndicator.className = 'status-indicator success';
           callback(true);
         } else {
@@ -1025,198 +1086,38 @@
       });
     }
 
-    // FUNCIÓN LEGACY - Mantener por compatibilidad pero ya no se usa
-    async function uploadAll_OLD_SEQUENTIAL() {
-      var rows = rowsContainer.querySelectorAll('.upload-row');
-      var totalRows = rows.length;
-      var successCounter = 0;
-      var errorCounter = 0;
-
-      // Desactivar controles
-      btnAdd.disabled = true;
-      btnUpload.disabled = true;
-      btnCancel.disabled = true;
-      
-      rows.forEach(function(row) {
-        row.classList.add('disabled');
-        var deleteBtn = row.querySelector('.delete-btn');
-        if (deleteBtn) deleteBtn.disabled = true;
-      });
-
-      // Mostrar progreso
-      progressContainer.classList.add('active');
-      summary.classList.remove('active');
-
-      // Procesar cada fila secuencialmente (VIEJO)
-      for (var i = 0; i < rows.length; i++) {
-        var row = rows[i];
-        var rowId = row.id;
-        var docTypeSelect = row.querySelector('.doc-type-select-input');
-        var referenceSelect = row.querySelector('.reference-select');
-        var fileInput = row.querySelector('input[type="file"]');
-        var statusIndicator = document.getElementById(rowId + '-status');
-
-        var docType = docTypeSelect.value;
-        var referenceNo = referenceSelect.value;
-        var file = fileInput.files[0];
-        var errorContainer = document.getElementById(rowId + '-error');
-        var selectedUser = getSelectedUploadUser();
-
-        if (!selectedUser) {
-          statusIndicator.textContent = '❌ Usuario';
-          statusIndicator.className = 'status-indicator error';
-          if (errorContainer) {
-            errorContainer.textContent = 'Seleccione un usuario válido desde el listado.';
-            errorContainer.classList.add('active');
-          }
-          errorCounter++;
-          continue;
-        }
-
-        // Limpiar contenedor de error al inicio de cada intento
-        if (errorContainer) {
-          errorContainer.textContent = '';
-          errorContainer.classList.remove('active');
-        }
-
-        // Actualizar progreso
-        var progress = ((i) / totalRows) * 100;
-        progressFill.style.width = progress + '%';
-        progressText.textContent = 'Procesando fila ' + (i + 1) + ' de ' + totalRows + '...';
-
-        // Mostrar estado de carga
-        statusIndicator.textContent = '⏳ Cargando...';
-        statusIndicator.className = 'status-indicator loading';
-
-        try {
-          var result = await uploadFileAsync(file, referenceNo, docType, false, selectedUser.userId);
-          
-          console.log('Fila ID:', rowId, 'Status:', result.status, 'Msg:', result.message);
-          
-          if (result.status === 'exists') {
-            // Archivo existe, pedir confirmación al usuario
-            var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
-            
-            if (confirmOverwrite) {
-              // Usuario aceptó, reintentar con overwriteConfirmed = true
-              result = await uploadFileAsync(file, referenceNo, docType, true, selectedUser.userId);
-              
-              if (result.status === 'success') {
-                statusIndicator.textContent = '✅ Completado';
-                statusIndicator.className = 'status-indicator success';
-                successCounter++;
-              } else {
-                statusIndicator.textContent = '❌ Error';
-                statusIndicator.className = 'status-indicator error';
-                if (errorContainer) {
-                  errorContainer.textContent = result.message || 'Error desconocido';
-                  errorContainer.classList.add('active');
-                }
-                errorCounter++;
-              }
-            } else {
-              // Usuario canceló - marcar como subido
-              statusIndicator.textContent = '✅ Subido';
-              statusIndicator.className = 'status-indicator success';
-              statusIndicator.title = 'Archivo ya existe, considerado como subido';
-              successCounter++;
-            }
-          } else if (result.status === 'success') {
-            statusIndicator.textContent = '✅ Completado';
-            statusIndicator.className = 'status-indicator success';
-            successCounter++;
-          } else {
-            statusIndicator.textContent = '❌ Error';
-            statusIndicator.className = 'status-indicator error';
-            if (errorContainer) {
-              errorContainer.textContent = result.message || 'Error desconocido';
-              errorContainer.classList.add('active');
-            }
-            errorCounter++;
-          }
-        } catch (error) {
-          console.log('Error en catch:', error);
-          statusIndicator.textContent = '❌ Error';
-          statusIndicator.className = 'status-indicator error';
-          if (errorContainer) {
-            errorContainer.textContent = error.message || 'Error desconocido';
-            errorContainer.classList.add('active');
-          }
-          errorCounter++;
-        }
-
-        // SIN PAUSA - carga paralela optimizada
-      }
-
-      // Progreso completo
-      progressFill.style.width = '100%';
-      progressText.textContent = 'Proceso finalizado';
-
-      // Mostrar resumen
-      successCount.textContent = successCounter;
-      errorCount.textContent = errorCounter;
-      
-      if (errorCounter === 0) {
-        summaryMessage.textContent = 'Todos los archivos han sido subidos exitosamente.';
-      } else if (successCounter === 0) {
-        summaryMessage.textContent = 'Ningún archivo pudo ser subido. Revise los errores indicados.';
-      } else {
-        summaryMessage.textContent = successCounter + ' archivo(s) subido(s) exitosamente, ' + errorCounter + ' con error(es).';
-      }
-      
-      summary.classList.add('active');
-      progressContainer.classList.remove('active');
-    }
-
-    function uploadFileAsync(file, referenceNo, docType, overwriteConfirmed, userId) {
+    /**
+     * Elimina un archivo a través de la Web App.
+     */
+    function eliminarDocumentoCentralAsync(referenceNo, docType, userId) {
       return new Promise(function(resolve, reject) {
-        var reader = new FileReader();
+        if (!globalWebAppUrl) {
+          reject(new Error('URL de Web App no configurada.'));
+          return;
+        }
         
-        reader.onload = function(e) {
-          var base64Data = e.target.result;
-          var base64Content = base64Data.split(',')[1];
-          
-          if (!globalWebAppUrl) {
-            reject(new Error('URL de Web App no configurada. Ejecute setWebAppUrl con la URL del despliegue.'));
-            return;
-          }
-          if (!userId) {
-            reject(new Error('No se pudo identificar el UserID del usuario seleccionado.'));
-            return;
-          }
-
-          fetch(globalWebAppUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-              operation: 'uploadDocument',
-              base64Data: base64Content,
-              mimeType: file.type,
-              fileName: file.name,
-              referenceNo: referenceNo,
-              docType: docType,
-              overwriteConfirmed: overwriteConfirmed,
-              userId: userId
-            })
+        fetch(globalWebAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            operation: 'eliminarDocumento',
+            referenceNo: referenceNo,
+            docType: docType,
+            userId: userId
           })
-          .then(function(response) {
-            return response.json();
-          })
-          .then(function(result) {
-            resolve(result);
-          })
-          .catch(function(error) {
-            reject(new Error('Error al comunicarse con la Web App: ' + error.message));
-          });
-        };
-        
-        reader.onerror = function() {
-          reject(new Error('Error al leer el archivo'));
-        };
-        
-        reader.readAsDataURL(file);
+        })
+        .then(function(response) {
+          return response.json();
+        })
+        .then(function(result) {
+          resolve(result);
+        })
+        .catch(function(error) {
+          reject(new Error('Error al comunicarse con la Web App: ' + error.message));
+        });
       });
     }
+
 
     function resetForm() {
       rowsContainer.innerHTML = '';
