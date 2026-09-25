@@ -1,14 +1,14 @@
 // ============================================================
 // MODULE: AppInit
-// Descripción: Inicialización y validación de estructura del sistema
-// Prioridad de Carga: 11° (depende de casi todo)
+// DescripciÃ³n: InicializaciÃ³n y validaciÃ³n de estructura del sistema
+// Prioridad de Carga: 11Â° (depende de casi todo)
 // FASE 5 - Batch 5.1: App Initialization
 // ============================================================
 
-// --- PROMPT CON AUTENTICACIÓN ADMIN ---
+// --- PROMPT CON AUTENTICACIÃ“N ADMIN ---
 
 /**
- * Prompt para inicializar el sistema completo (requiere contraseña de admin).
+ * Prompt para inicializar el sistema completo (requiere contraseÃ±a de admin).
  */
 function promptInitializeApp() {
   withAdminAuth('Inicializar Sistema Completo (Admin)', function(ui) {
@@ -16,10 +16,10 @@ function promptInitializeApp() {
   });
 }
 
-// --- INICIALIZACIÓN BÁSICA ---
+// --- INICIALIZACIÃ“N BÃSICA ---
 
 /**
- * Inicializa la aplicación validando estructura y corrigiendo problemas.
+ * Inicializa la aplicaciÃ³n validando estructura y corrigiendo problemas.
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  */
 function initializeApp(ui) {
@@ -27,21 +27,21 @@ function initializeApp(ui) {
   var report = validateStructure();
   
   if (report.missingSheets.length === 0 && report.incorrectHeaders.length === 0) {
-    ui.alert('✅ Estructura válida. Todas las hojas y encabezados son correctos.');
+    ui.alert('âœ… Estructura vÃ¡lida. Todas las hojas y encabezados son correctos.');
     return;
   }
   
   var message = "Se detectaron discrepancias en la estructura:\n\n";
   
   if (report.missingSheets.length > 0) {
-    message += "❌ Hojas faltantes:\n" + report.missingSheets.join("\n") + "\n\n";
+    message += "âŒ Hojas faltantes:\n" + report.missingSheets.join("\n") + "\n\n";
   }
   
   if (report.incorrectHeaders.length > 0) {
-    message += "❌ Encabezados incorrectos:\n" + report.incorrectHeaders.join("\n") + "\n\n";
+    message += "âŒ Encabezados incorrectos:\n" + report.incorrectHeaders.join("\n") + "\n\n";
   }
   
-  message += "¿Desea corregir estos problemas automáticamente?";
+  message += "Â¿Desea corregir estos problemas automÃ¡ticamente?";
   
   var response = ui.alert("Inicializar App", message, ui.ButtonSet.YES_NO);
   
@@ -55,137 +55,137 @@ function initializeApp(ui) {
         ensureMatricesConfigSheet_();
       }
     } catch (e) {
-      Logger.log("⚠️ Error inicializando MatricesConfig desde initializeApp: " + e.message);
+      Logger.log("âš ï¸ Error inicializando MatricesConfig desde initializeApp: " + e.message);
     }
     
-    ui.alert('✅ Inicialización completada. Estructura y validaciones corregidas.\n\nIMPORTANTE: Si está actualizando desde una versión anterior, ejecute la función "migrarAdjuntoOrdenANuevasColumnas" desde el menú Script Editor.');
+    ui.alert('âœ… InicializaciÃ³n completada. Estructura y validaciones corregidas.\n\nIMPORTANTE: Si estÃ¡ actualizando desde una versiÃ³n anterior, ejecute la funciÃ³n "migrarAdjuntoOrdenANuevasColumnas" desde el menÃº Script Editor.');
 
-    // Registrar inicialización en Logs si existe
+    // Registrar inicializaciÃ³n en Logs si existe
     logInitialization();
   }
 }
 
-// --- INICIALIZACIÓN COMPLETA DEL SISTEMA ---
+// --- INICIALIZACIÃ“N COMPLETA DEL SISTEMA ---
 
 /**
- * Inicializa el sistema completo: estructura, Web App URL, protecciones, auditoría y diagnósticos.
+ * Inicializa el sistema completo: estructura, Web App URL, protecciones, auditorÃ­a y diagnÃ³sticos.
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  */
 function initializeCompleteSystem(ui) {
   if (!ui) ui = SpreadsheetApp.getUi();
   var summary = [];
   
-  // Limpiar caché al inicio para forzar recarga de plantillas actualizadas
+  // Limpiar cachÃ© al inicio para forzar recarga de plantillas actualizadas
   try {
     clearInitialDataCache();
-    summary.push("✓ Caché de plantillas limpiado");
+    summary.push("âœ“ CachÃ© de plantillas limpiado");
   } catch (e) {
-    summary.push("✗ Error limpiando caché: " + e.message);
+    summary.push("âœ— Error limpiando cachÃ©: " + e.message);
   }
   
   try {
     initializeWorkbookStructure_(ui);
-    summary.push("✓ Estructura de hojas validada/corregida");
+    summary.push("âœ“ Estructura de hojas validada/corregida");
   } catch (e) {
-    summary.push("✗ Error en estructura: " + e.message);
+    summary.push("âœ— Error en estructura: " + e.message);
     throw e;
   }
 
   try {
     ensureMatricesConfigSheet_();
-    summary.push("✓ Hoja de configuración de Matrices K verificada/creada");
+    summary.push("âœ“ Hoja de configuraciÃ³n de Matrices K verificada/creada");
   } catch (e) {
-    summary.push("✗ Error en hoja Matrices K: " + e.message);
-    // No se lanza: es no-crítico para el resto del sistema
+    summary.push("âœ— Error en hoja Matrices K: " + e.message);
+    // No se lanza: es no-crÃ­tico para el resto del sistema
   }
 
   try {
     ensureWebAppUrlConfigured_(ui);
-    summary.push("✓ URL de Web App configurada");
+    summary.push("âœ“ URL de Web App configurada");
   } catch (e) {
-    summary.push("✗ Error configurando Web App URL: " + e.message);
+    summary.push("âœ— Error configurando Web App URL: " + e.message);
     throw e;
   }
 
   try {
     applyNewProtectionScheme();
-    summary.push("✓ Nuevo esquema de protección aplicado");
+    summary.push("âœ“ Nuevo esquema de protecciÃ³n aplicado");
   } catch (e) {
-    summary.push("✗ Error aplicando protecciones: " + e.message);
+    summary.push("âœ— Error aplicando protecciones: " + e.message);
     throw e;
   }
 
   try {
     setupAuditTrailTrigger();
-    summary.push("✓ Auditoría activada/verificada");
+    summary.push("âœ“ AuditorÃ­a activada/verificada");
   } catch (e) {
-    summary.push("✗ Error activando auditoría: " + e.message);
+    summary.push("âœ— Error activando auditorÃ­a: " + e.message);
     throw e;
   }
 
   try {
-    aplicarValidacionesEstadoCarga(true); // silent=true para evitar error de UI en inicialización
-    summary.push("✓ Validaciones de estado de carga aplicadas");
+    aplicarValidacionesEstadoCarga(true); // silent=true para evitar error de UI en inicializaciÃ³n
+    summary.push("âœ“ Validaciones de estado de carga aplicadas");
   } catch (e) {
-    summary.push("⚠️ Validaciones de estado: " + e.message);
+    summary.push("âš ï¸ Validaciones de estado: " + e.message);
   }
 
   try {
-    applyStatusDataValidation(true); // silent=true para evitar error de UI en inicialización
-    summary.push("✓ Validaciones y colores de STATUS aplicados");
+    applyStatusDataValidation(true); // silent=true para evitar error de UI en inicializaciÃ³n
+    summary.push("âœ“ Validaciones y colores de STATUS aplicados");
   } catch (e) {
-    summary.push("⚠️ Validaciones de STATUS: " + e.message);
+    summary.push("âš ï¸ Validaciones de STATUS: " + e.message);
   }
 
 
-  // Migración de Seguridad de PIN y Bloqueo — requiere confirmación explícita, ya que
-  // puede reiniciar a "PENDIENTE" cualquier valor de Clave que no sea ya un hash válido
-  // (esto forzaría a esos usuarios a crear un PIN nuevo en su próximo inicio de sesión).
+  // MigraciÃ³n de Seguridad de PIN y Bloqueo â€” requiere confirmaciÃ³n explÃ­cita, ya que
+  // puede reiniciar a "PENDIENTE" cualquier valor de Clave que no sea ya un hash vÃ¡lido
+  // (esto forzarÃ­a a esos usuarios a crear un PIN nuevo en su prÃ³ximo inicio de sesiÃ³n).
   var confirmarMigracionPin = ui.alert(
-    "Migración de Seguridad de PIN",
-    "¿Desea ejecutar la migración de seguridad de PIN ahora?\n\n" +
-    "Esto normalizará la hoja 'Usuarios': cualquier valor de la columna 'Clave' que no sea ya " +
-    "un PIN encriptado válido se reiniciará a \"PENDIENTE\" (el usuario deberá crear un PIN nuevo " +
-    "en su próximo inicio de sesión). Los PIN ya encriptados correctamente NO se modifican.\n\n" +
-    "Si está en medio de otra migración de cambios y prefiere posponer este paso, seleccione \"No\".",
+    "MigraciÃ³n de Seguridad de PIN",
+    "Â¿Desea ejecutar la migraciÃ³n de seguridad de PIN ahora?\n\n" +
+    "Esto normalizarÃ¡ la hoja 'Usuarios': cualquier valor de la columna 'Clave' que no sea ya " +
+    "un PIN encriptado vÃ¡lido se reiniciarÃ¡ a \"PENDIENTE\" (el usuario deberÃ¡ crear un PIN nuevo " +
+    "en su prÃ³ximo inicio de sesiÃ³n). Los PIN ya encriptados correctamente NO se modifican.\n\n" +
+    "Si estÃ¡ en medio de otra migraciÃ³n de cambios y prefiere posponer este paso, seleccione \"No\".",
     ui.ButtonSet.YES_NO
   );
 
   if (confirmarMigracionPin === ui.Button.YES) {
     try {
       migrarSeguridadPIN();
-      summary.push("✓ Seguridad PIN encriptado migrada");
+      summary.push("âœ“ Seguridad PIN encriptado migrada");
     } catch (e) {
-      summary.push("⚠️ Migración Seguridad PIN: " + e.message);
+      summary.push("âš ï¸ MigraciÃ³n Seguridad PIN: " + e.message);
     }
   } else {
-    summary.push("⏭️ Migración de Seguridad PIN omitida (seleccionado por el usuario)");
+    summary.push("â­ï¸ MigraciÃ³n de Seguridad PIN omitida (seleccionado por el usuario)");
   }
 
-  // Migración de datos históricos (Fase 5): congelar IMPORTRANGE obsoletos
+  // MigraciÃ³n de datos histÃ³ricos (Fase 5): congelar IMPORTRANGE obsoletos
   try {
     var migracionResult = migrarFormulasAValoresEstaticos_();
     if (migracionResult.filasMigradas > 0) {
-      summary.push("✓ Migración histórica: " + migracionResult.filasMigradas + " fila(s) con fórmulas congeladas a valores estáticos");
+      summary.push("âœ“ MigraciÃ³n histÃ³rica: " + migracionResult.filasMigradas + " fila(s) con fÃ³rmulas congeladas a valores estÃ¡ticos");
     } else {
-      summary.push("✓ Migración histórica: Sin pendientes (datos ya estáticos)");
+      summary.push("âœ“ MigraciÃ³n histÃ³rica: Sin pendientes (datos ya estÃ¡ticos)");
     }
   } catch (e) {
-    summary.push("⚠️ Migración histórica: " + e.message);
+    summary.push("âš ï¸ MigraciÃ³n histÃ³rica: " + e.message);
   }
 
   try {
     logInitialization();
   } catch (e) {
-    Logger.log("No se pudo registrar inicialización completa: " + e.message);
+    Logger.log("No se pudo registrar inicializaciÃ³n completa: " + e.message);
   }
 
-  ui.alert("✅ Sistema inicializado completamente:\n\n" + summary.join("\n"));
+  ui.alert("âœ… Sistema inicializado completamente:\n\n" + summary.join("\n"));
 }
 
 /**
  * Wrapper invocable desde el sidebar (google.script.run) para inicializar el sistema completo.
- * El menú de la hoja usa promptInitializeApp; el botón del panel lateral usa esta función.
+ * El menÃº de la hoja usa promptInitializeApp; el botÃ³n del panel lateral usa esta funciÃ³n.
  * Verifica que el llamador sea administrador y reutiliza initializeCompleteSystem.
  * @returns {string} Mensaje de resultado para mostrar en el sidebar.
  * @throws {Error} Si el usuario no es administrador.
@@ -203,10 +203,10 @@ function inicializarSistemaCompleto() {
   }
 
   initializeCompleteSystem(SpreadsheetApp.getUi());
-  return "✅ Sistema inicializado: hojas, columnas, permisos, protecciones y validaciones aplicadas.";
+  return "âœ… Sistema inicializado: hojas, columnas, permisos, protecciones y validaciones aplicadas.";
 }
 
-// --- FUNCIONES AUXILIARES DE INICIALIZACIÓN ---
+// --- FUNCIONES AUXILIARES DE INICIALIZACIÃ“N ---
 
 /**
  * Inicializa la estructura del libro de trabajo (hojas y encabezados).
@@ -225,7 +225,7 @@ function initializeWorkbookStructure_(ui) {
 }
 
 /**
- * Asegura que la URL de la Web App esté configurada.
+ * Asegura que la URL de la Web App estÃ© configurada.
  * @param {Ui} ui - Objeto UI de SpreadsheetApp
  * @returns {string} URL configurada
  * @private
@@ -236,26 +236,26 @@ function ensureWebAppUrlConfigured_(ui) {
   
   // Si ya existe URL configurada, preguntar si desea mantenerla o modificarla
   if (savedUrl) {
-    var confirmMessage = "URL de Web App ya configurada:\n\n" + savedUrl + "\n\n¿Desea mantener esta URL?";
-    var confirmResponse = ui.alert("Configuración Web App URL", confirmMessage, ui.ButtonSet.YES_NO);
+    var confirmMessage = "URL de Web App ya configurada:\n\n" + savedUrl + "\n\nÂ¿Desea mantener esta URL?";
+    var confirmResponse = ui.alert("ConfiguraciÃ³n Web App URL", confirmMessage, ui.ButtonSet.YES_NO);
     
     if (confirmResponse === ui.Button.YES) {
-      Logger.log("✓ URL de Web App mantenida: " + savedUrl);
+      Logger.log("âœ“ URL de Web App mantenida: " + savedUrl);
       return savedUrl;
     }
   }
   
-  // Intentar obtener URL automáticamente
+  // Intentar obtener URL automÃ¡ticamente
   var currentUrl = "";
   try {
     currentUrl = ScriptApp.getService().getUrl();
   } catch (e) {
-    Logger.log("No se pudo obtener URL automática de Web App: " + e.message);
+    Logger.log("No se pudo obtener URL automÃ¡tica de Web App: " + e.message);
   }
 
   if (currentUrl && !savedUrl) {
     setWebAppUrl(currentUrl);
-    Logger.log("✓ URL de Web App configurada automáticamente: " + currentUrl);
+    Logger.log("âœ“ URL de Web App configurada automÃ¡ticamente: " + currentUrl);
     return currentUrl;
   }
 
@@ -267,40 +267,40 @@ function ensureWebAppUrlConfigured_(ui) {
   }
   
   if (currentUrl) {
-    promptMessage += "\n\nURL detectada automáticamente:\n" + currentUrl + "\n\n(Puede copiar esta URL o ingresar otra)";
+    promptMessage += "\n\nURL detectada automÃ¡ticamente:\n" + currentUrl + "\n\n(Puede copiar esta URL o ingresar otra)";
   }
 
   var response = ui.prompt("Configurar Web App URL", promptMessage, ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) {
     if (savedUrl) {
-      Logger.log("✓ Configuración cancelada, manteniendo URL anterior: " + savedUrl);
+      Logger.log("âœ“ ConfiguraciÃ³n cancelada, manteniendo URL anterior: " + savedUrl);
       return savedUrl;
     }
-    throw new Error("Configuración de Web App URL cancelada por el usuario.");
+    throw new Error("ConfiguraciÃ³n de Web App URL cancelada por el usuario.");
   }
 
   var enteredUrl = response.getResponseText().trim();
   
-  // Si no ingresó nada, usar la URL detectada automáticamente o la guardada
+  // Si no ingresÃ³ nada, usar la URL detectada automÃ¡ticamente o la guardada
   if (!enteredUrl) {
     if (currentUrl) {
       setWebAppUrl(currentUrl);
-      Logger.log("✓ URL de Web App configurada con URL detectada: " + currentUrl);
+      Logger.log("âœ“ URL de Web App configurada con URL detectada: " + currentUrl);
       return currentUrl;
     } else if (savedUrl) {
-      Logger.log("✓ Manteniendo URL anterior: " + savedUrl);
+      Logger.log("âœ“ Manteniendo URL anterior: " + savedUrl);
       return savedUrl;
     } else {
-      throw new Error("Debe ingresar una URL de Web App válida.");
+      throw new Error("Debe ingresar una URL de Web App vÃ¡lida.");
     }
   }
 
   setWebAppUrl(enteredUrl);
-  Logger.log("✓ URL de Web App configurada manualmente: " + enteredUrl);
+  Logger.log("âœ“ URL de Web App configurada manualmente: " + enteredUrl);
   return enteredUrl;
 }
 
-// --- VALIDACIÓN DE ESTRUCTURA ---
+// --- VALIDACIÃ“N DE ESTRUCTURA ---
 
 /**
  * Valida la estructura del libro de trabajo (hojas y encabezados).
@@ -351,7 +351,7 @@ function validateStructure() {
   };
 }
 
-// --- CREACIÓN Y CORRECCIÓN DE HOJAS ---
+// --- CREACIÃ“N Y CORRECCIÃ“N DE HOJAS ---
 
 /**
  * Crea las hojas faltantes con sus encabezados.
@@ -367,9 +367,9 @@ function createMissingSheets(ui) {
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.getRange(1, 1, 1, REQUIRED_SHEETS[sheetName].length).setValues([REQUIRED_SHEETS[sheetName]]);
-      Logger.log("✓ Hoja creada: " + sheetName);
+      Logger.log("âœ“ Hoja creada: " + sheetName);
       
-      // Si se creó PermisosRoles, insertar filas de ejemplo
+      // Si se creÃ³ PermisosRoles, insertar filas de ejemplo
       if (sheetName === 'PermisosRoles') {
         // Columnas: Rol, MENU_ADMIN, MENU_CONFIG, CARGAR_ORDENES, SUBIR_DOCUMENTOS,
         // REGISTRAR_NOVEDAD, IMPRIMIR_ORDEN, SOLICITAR_REIMPRESION, APROBAR_REIMPRESION,
@@ -378,7 +378,7 @@ function createMissingSheets(ui) {
         sheet.getRange(2, 1, 1, permCols).setValues([['ADMIN', true, true, true, true, true, true, true, true, true, true]]);
         sheet.getRange(3, 1, 1, permCols).setValues([['QA', true, false, true, true, true, true, true, true, true, true]]);
         sheet.getRange(4, 1, 1, permCols).setValues([['STANDARD', false, false, false, true, true, true, true, false, false, false]]);
-        Logger.log("✓ Filas de ejemplo insertadas en PermisosRoles");
+        Logger.log("âœ“ Filas de ejemplo insertadas en PermisosRoles");
       }
     }
   }
@@ -402,10 +402,10 @@ function fixHeaders(ui) {
       try {
         var columnCreated = ensureConsecutivoImpColumn_(sheet);
         if (columnCreated) {
-          Logger.log('✓ Columna ConsecutivoImp agregada a Ordenes');
+          Logger.log('âœ“ Columna ConsecutivoImp agregada a Ordenes');
         }
       } catch (e) {
-        Logger.log('⚠️ Error al verificar ConsecutivoImp: ' + e.message);
+        Logger.log('âš ï¸ Error al verificar ConsecutivoImp: ' + e.message);
         ui.alert('Error', 'No se pudo verificar/crear la columna ConsecutivoImp: ' + e.message, ui.ButtonSet.OK);
       }
     }
@@ -413,7 +413,7 @@ function fixHeaders(ui) {
     var expectedHeaders = REQUIRED_SHEETS[sheetName];
     var actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // Verificar si hay datos en la hoja (más allá de la fila de encabezados)
+    // Verificar si hay datos en la hoja (mÃ¡s allÃ¡ de la fila de encabezados)
     var hasData = sheet.getLastRow() > 1;
     
     var headersMatch = true;
@@ -434,26 +434,16 @@ function fixHeaders(ui) {
     }
     
     if (!headersMatch && hasData) {
-      // Advertencia: hoja tiene datos pero encabezados incorrectos
-      var warning = "La hoja '" + sheetName + "' tiene datos pero encabezados incorrectos.\n" +
-                   "Faltan: " + missingHeaders.join(", ") + "\n" +
-                   "¿Desea corregir los encabezados? (Esto podría afectar datos existentes)";
-      
-      var response = ui.alert("Advertencia", warning, ui.ButtonSet.YES_NO);
-      
-      if (response !== ui.Button.YES) {
-        Logger.log("⚠️ Corrección de encabezados cancelada por usuario en hoja: " + sheetName);
-        continue;
-      }
+      Logger.log('La hoja ' + sheetName + ' tiene datos pero le faltan los encabezados: ' + missingHeaders.join(', ') + '. Se agregaran automaticamente.');
     }
     
     if (!headersMatch && missingHeaders.length > 0) {
       // Agregar los encabezados faltantes al final de las columnas existentes sin sobreescribir
       var lastCol = sheet.getLastColumn();
-      var startCol = lastCol === 0 ? 1 : lastCol + 1; // Manejo por si la hoja está totalmente en blanco
+      var startCol = lastCol === 0 ? 1 : lastCol + 1; // Manejo por si la hoja estÃ¡ totalmente en blanco
       
       sheet.getRange(1, startCol, 1, missingHeaders.length).setValues([missingHeaders]);
-      Logger.log("✓ Encabezados faltantes agregados al final en la hoja " + sheetName + ": " + missingHeaders.join(", "));
+      Logger.log("âœ“ Encabezados faltantes agregados al final en la hoja " + sheetName + ": " + missingHeaders.join(", "));
       
       // Si la hoja es PermisosRoles, inicializar los nuevos permisos en 'true' para los administradores
       if (sheetName === 'PermisosRoles' && sheet.getLastRow() > 1) {
@@ -465,7 +455,7 @@ function fixHeaders(ui) {
             for (var k = 0; k < missingHeaders.length; k++) trues.push(true);
             sheet.getRange(r + 2, startCol, 1, missingHeaders.length).setValues([trues]);
           } else {
-            // Para los demás, por seguridad es false
+            // Para los demÃ¡s, por seguridad es false
             var falses = [];
             for (var k = 0; k < missingHeaders.length; k++) falses.push(false);
             sheet.getRange(r + 2, startCol, 1, missingHeaders.length).setValues([falses]);
@@ -482,8 +472,8 @@ function fixHeaders(ui) {
  * Aplica validaciones de datos tipo dropdown a las columnas de estado de carga.
  * Asegura que solo se usen valores predefinidos en AdjuntoCOA, AdjuntoOA y EstadoCarga.
  * 
- * IMPORTANTE: Ejecutar después de agregar las columnas o cuando se necesite reforzar las validaciones.
- * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicialización)
+ * IMPORTANTE: Ejecutar despuÃ©s de agregar las columnas o cuando se necesite reforzar las validaciones.
+ * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicializaciÃ³n)
  */
 function aplicarValidacionesEstadoCarga(silent) {
   try {
@@ -496,13 +486,13 @@ function aplicarValidacionesEstadoCarga(silent) {
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // Obtener índices de columnas
+    // Obtener Ã­ndices de columnas
     var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
     var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
     var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
     
     if (!colAdjuntoCOAIdx || !colAdjuntoOAIdx || !colEstadoCargaIdx) {
-      throw new Error("No se encontraron las columnas AdjuntoCOA, AdjuntoOA o EstadoCarga. Asegúrese de que existan.");
+      throw new Error("No se encontraron las columnas AdjuntoCOA, AdjuntoOA o EstadoCarga. AsegÃºrese de que existan.");
     }
     
     var lastRow = sheet.getMaxRows();
@@ -525,35 +515,35 @@ function aplicarValidacionesEstadoCarga(silent) {
     var ruleEstadoCarga = SpreadsheetApp.newDataValidation()
       .requireValueInList(valoresEstadoCarga, true)
       .setAllowInvalid(false)
-      .setHelpText("Estado calculado automáticamente. Valores: " + valoresEstadoCarga.join(", "))
+      .setHelpText("Estado calculado automÃ¡ticamente. Valores: " + valoresEstadoCarga.join(", "))
       .build();
     
-    // Aplicar validación a AdjuntoCOA (desde fila 2 hasta el final)
+    // Aplicar validaciÃ³n a AdjuntoCOA (desde fila 2 hasta el final)
     var rangeCOA = sheet.getRange(2, colAdjuntoCOAIdx, lastRow - 1, 1);
     rangeCOA.setDataValidation(ruleDocumento);
-    Logger.log("✓ Validación aplicada a columna AdjuntoCOA");
+    Logger.log("âœ“ ValidaciÃ³n aplicada a columna AdjuntoCOA");
     
-    // Aplicar validación a AdjuntoOA
+    // Aplicar validaciÃ³n a AdjuntoOA
     var rangeOA = sheet.getRange(2, colAdjuntoOAIdx, lastRow - 1, 1);
     rangeOA.setDataValidation(ruleDocumento);
-    Logger.log("✓ Validación aplicada a columna AdjuntoOA");
+    Logger.log("âœ“ ValidaciÃ³n aplicada a columna AdjuntoOA");
     
-    // Aplicar validación a EstadoCarga
+    // Aplicar validaciÃ³n a EstadoCarga
     var rangeEstado = sheet.getRange(2, colEstadoCargaIdx, lastRow - 1, 1);
     rangeEstado.setDataValidation(ruleEstadoCarga);
-    Logger.log("✓ Validación aplicada a columna EstadoCarga");
+    Logger.log("âœ“ ValidaciÃ³n aplicada a columna EstadoCarga");
     
     // Mostrar mensaje al usuario solo si no es modo silencioso
     if (!silent) {
       try {
         var ui = SpreadsheetApp.getUi();
         ui.alert(
-          '✅ Validaciones Aplicadas',
+          'âœ… Validaciones Aplicadas',
           'Se aplicaron validaciones de datos tipo dropdown a las columnas:\n\n' +
-          '• AdjuntoCOA: Pendiente, ✅ Cargado\n' +
-          '• AdjuntoOA: Pendiente, ✅ Cargado\n' +
-          '• EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, ✅ Cargados\n\n' +
-          'Ahora solo se podrán ingresar valores válidos en estas columnas.',
+          'â€¢ AdjuntoCOA: Pendiente, âœ… Cargado\n' +
+          'â€¢ AdjuntoOA: Pendiente, âœ… Cargado\n' +
+          'â€¢ EstadoCarga: Pendiente COA/OA, Pendiente OA, Pendiente COA, âœ… Cargados\n\n' +
+          'Ahora solo se podrÃ¡n ingresar valores vÃ¡lidos en estas columnas.',
           ui.ButtonSet.OK
         );
       } catch (uiError) {
@@ -587,7 +577,7 @@ function aplicarValidacionesEstadoCarga(silent) {
 }
 
 /**
- * Prompt para aplicar validaciones con autenticación admin.
+ * Prompt para aplicar validaciones con autenticaciÃ³n admin.
  */
 function promptAplicarValidacionesEstadoCarga() {
   withAdminAuth('Aplicar Validaciones de Estado de Carga', function(ui) {
@@ -598,7 +588,7 @@ function promptAplicarValidacionesEstadoCarga() {
 // --- LOGGING ---
 
 /**
- * Registra la inicialización del sistema en la hoja Logs.
+ * Registra la inicializaciÃ³n del sistema en la hoja Logs.
  */
 function logInitialization() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -613,21 +603,21 @@ function logInitialization() {
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
   var user = "Sistema";
   var tipoCambio = "INICIALIZACION";
-  var descripcion = "Inicialización de estructura del libro de trabajo";
+  var descripcion = "InicializaciÃ³n de estructura del libro de trabajo";
   
   sheetLogs.appendRow([timestamp, user, tipoCambio, descripcion]);
-  Logger.log("✓ Inicialización registrada en Logs");
+  Logger.log("âœ“ InicializaciÃ³n registrada en Logs");
 }
 
-// --- MIGRACIÓN HISTÓRICA ---
+// --- MIGRACIÃ“N HISTÃ“RICA ---
 
 /**
- * Congela las fórmulas IMPORTRANGE históricas de las columnas de validación
+ * Congela las fÃ³rmulas IMPORTRANGE histÃ³ricas de las columnas de validaciÃ³n
  * (VerifLote, VerifCant. Disponible, VerifExp, Fabricante, Decision, CantDispAFecha)
- * pasándolas a valores estáticos inmutables.
+ * pasÃ¡ndolas a valores estÃ¡ticos inmutables.
  *
- * Es IDEMPOTENTE: las filas que ya tienen valores estáticos (o que ya fueron migradas)
- * son detectadas y omitidas. Se puede llamar múltiples veces sin riesgo.
+ * Es IDEMPOTENTE: las filas que ya tienen valores estÃ¡ticos (o que ya fueron migradas)
+ * son detectadas y omitidas. Se puede llamar mÃºltiples veces sin riesgo.
  *
  * @returns {{ filasMigradas: number, filasOmitidas: number }}
  * @private
@@ -642,7 +632,7 @@ function migrarFormulasAValoresEstaticos_() {
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-  // Columnas que se deben congelar (si tienen fórmula IMPORTRANGE o similar)
+  // Columnas que se deben congelar (si tienen fÃ³rmula IMPORTRANGE o similar)
   var colsACongelar = [
     'VerifLote',
     'VerifCant. Disponible',
@@ -652,7 +642,7 @@ function migrarFormulasAValoresEstaticos_() {
     'CantDispAFecha'
   ];
 
-  // Resolver índices de columna (base-1). Omitir las que no existan aún.
+  // Resolver Ã­ndices de columna (base-1). Omitir las que no existan aÃºn.
   var colIndices = {};
   colsACongelar.forEach(function(nombre) {
     var idx = getColumnIndexByNameCaseInsensitive(headers, nombre, false);
@@ -660,7 +650,7 @@ function migrarFormulasAValoresEstaticos_() {
   });
 
   if (Object.keys(colIndices).length === 0) {
-    Logger.log('migrarFormulasAValoresEstaticos_: Ninguna columna de validación encontrada. Sin acción.');
+    Logger.log('migrarFormulasAValoresEstaticos_: Ninguna columna de validaciÃ³n encontrada. Sin acciÃ³n.');
     return { filasMigradas: 0, filasOmitidas: 0 };
   }
 
@@ -674,7 +664,7 @@ function migrarFormulasAValoresEstaticos_() {
     var colIdx = colIndices[nombre];
 
     var rangeData = sheet.getRange(2, colIdx, lastRow - 1, 1);
-    var formulas  = rangeData.getFormulas();   // Fórmula cruda si la hay, "" si es valor
+    var formulas  = rangeData.getFormulas();   // FÃ³rmula cruda si la hay, "" si es valor
     var values    = rangeData.getValues();     // Valor evaluado actual
 
     var updates = []; // { row: Number, value: any }
@@ -683,13 +673,13 @@ function migrarFormulasAValoresEstaticos_() {
       var formula = formulas[r][0];
       var value   = values[r][0];
 
-      // Solo actuar si la celda TIENE una fórmula (es decir, está usando IMPORTRANGE u otra)
+      // Solo actuar si la celda TIENE una fÃ³rmula (es decir, estÃ¡ usando IMPORTRANGE u otra)
       if (formula && formula.toString().trim().length > 0) {
         updates.push({ row: r + 2, value: value }); // +2: fila real (header en fila 1)
       }
     }
 
-    // Escribir en batch las celdas que tenían fórmula
+    // Escribir en batch las celdas que tenÃ­an fÃ³rmula
     if (updates.length > 0) {
       updates.forEach(function(u) {
         sheet.getRange(u.row, colIdx).setValue(u.value);
@@ -704,7 +694,7 @@ function migrarFormulasAValoresEstaticos_() {
   if (filasMigradas > 0) {
     logChange(
       'MIGRACION_FORMULAS',
-      'Fórmulas históricas congeladas como valores estáticos. Columnas: ' + colNombres.join(', ') + '. Filas afectadas: ~' + filasMigradas,
+      'FÃ³rmulas histÃ³ricas congeladas como valores estÃ¡ticos. Columnas: ' + colNombres.join(', ') + '. Filas afectadas: ~' + filasMigradas,
       'Sistema'
     );
   }

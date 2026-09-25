@@ -96,6 +96,7 @@ const REQUIRED_SHEETS = {
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol', 'Clave', 'Estado', 'IntentosFallidos'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio', 'OrdenRef', 'CampoAfectado', 'ValorAnterior', 'ValorNuevo', 'CorrelationId'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
+  'IndiceDocumentos': ['Tipo', 'Clave', 'FileId', 'NombreArchivo', 'FechaIndex'],
   'PermisosRoles': ['Rol', 'MENU_ADMIN', 'MENU_CONFIG', 'CARGAR_ORDENES', 'SUBIR_DOCUMENTOS', 'REGISTRAR_NOVEDAD', 'IMPRIMIR_ORDEN', 'SOLICITAR_REIMPRESION', 'APROBAR_REIMPRESION', 'AUTORIZAR_QA', 'GESTIONAR_AUTOAPROBACION'],
   'SolicitudesImpresion': ['ID_Solicitud', 'Fecha', 'NoOrden', 'SolicitadoPor', 'TipoSolicitud', 'Motivo', 'Plantillas', 'Estado', 'FirmaQA']
 };
