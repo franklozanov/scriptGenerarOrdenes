@@ -138,9 +138,15 @@ function handlePrivilegedOperation_(params) {
     'getMatricesConfig',
     'getSpreadsheetMetadata',
     'getSheetHeaders',
-      'checkAdminPassword',
-      'setAdminPassword',
-      'validateAdminPassword'
+    'checkAdminPassword',
+    'setAdminPassword',
+    'validateAdminPassword',
+    'getSessionPersistConfig',
+    'validarOrdenDuplicada',
+    'consultarAnalisisMatriz',
+    'checkFilesExist',
+    'diagnosticarMatrices',
+    'validarTarjetasMasivo'
   ];
 
   if (basicAuthOperations.indexOf(operation) !== -1) {

@@ -718,8 +718,9 @@
 
   <script>
     // Variables globales
-    var sysData = null;
-    var co_cardCount = 0;
+          var sysData = null;
+      var base64Data = {};
+      var co_cardCount = 0;
     var cardMemoryData = {}; // Memoria temporal para validaciones on-edit
     
     // Al cargar el DOM
@@ -946,7 +947,7 @@
         }
 
       }
-      userInfo.innerHTML = '<i data-lucide="user"></i> ' + data.currentUser.userId + ' - <strong>' + (data.currentUser.nombreCorto || data.currentUser.nombreCompleto) + '</strong>';
+      
       }
 
       // Inicializar checkbox de modo mantenimiento
