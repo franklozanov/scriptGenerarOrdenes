@@ -20,10 +20,11 @@ function ejecutarMigracion() {
     return;
   }
 
-  // TODO: Reemplaza con el ID de la hoja de cálculo de origen (Impresion_V2)
-  var SOURCE_SPREADSHEET_ID = 'COMPLETAR_ID_AQUI'; 
-  
-  if (SOURCE_SPREADSHEET_ID === 'COMPLETAR_ID_AQUI') {
+  // TODO: Reemplaza con los IDs de las hojas de cálculo
+  var SOURCE_SPREADSHEET_ID = 'COMPLETAR_ID_ORIGEN_AQUI'; 
+  var TARGET_SPREADSHEET_ID = 'COMPLETAR_ID_DESTINO_AQUI'; // Déjalo vacío ('') si ejecutarás el script directamente desde la hoja nueva
+
+  if (SOURCE_SPREADSHEET_ID === 'COMPLETAR_ID_ORIGEN_AQUI') {
     ui.alert('Error: Debes configurar el SOURCE_SPREADSHEET_ID en MigrationFixEB.gs antes de ejecutar.');
     return;
   }
@@ -36,7 +37,17 @@ function ejecutarMigracion() {
     return;
   }
 
-  var targetSS = SpreadsheetApp.getActiveSpreadsheet();
+  var targetSS;
+  try {
+    if (TARGET_SPREADSHEET_ID && TARGET_SPREADSHEET_ID !== 'COMPLETAR_ID_DESTINO_AQUI') {
+      targetSS = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+    } else {
+      targetSS = SpreadsheetApp.getActiveSpreadsheet(); // Toma la hoja actual si no se provee ID
+    }
+  } catch (e) {
+    ui.alert('Error: No se pudo abrir la hoja de destino. Verifica el ID y los permisos.');
+    return;
+  }
 
   ui.alert('La migración puede tomar varios minutos. Revisa los Logs (Ejecuciones) para seguir el progreso.');
 
