@@ -813,6 +813,14 @@
     function applyPermissions(perms) {
       if(!perms) return;
       
+      var esAdmin = false;
+      if (sysData && sysData.currentUser) {
+         var r = (sysData.currentUser.rol || '').toUpperCase();
+         if (r === 'ADMIN' || r === 'ADMINISTRADOR' || r === 'ADMINISTRADOR DE SISTEMA') esAdmin = true;
+      }
+      var headerAdminBtn = document.getElementById('header-admin-btn');
+      if (headerAdminBtn) headerAdminBtn.style.display = esAdmin ? 'flex' : 'none';
+
       // Habilitar botones de operaciones regulares si tienen permisos, de lo contrario deshabilitarlos
       document.getElementById("btn-load-orders").disabled = !perms["CARGAR_ORDENES"];
       document.getElementById("btn-upload-docs").disabled = !perms["SUBIR_DOCUMENTOS"];
