@@ -991,7 +991,95 @@
         });
       }
 
-      // ========================================================
+      
+      // === FLUJO ADMIN GLOBAL HEADER ===
+      async function startAdminInitFlow() {
+        showLoading('Verificando configuración...');
+        try {
+          const check = await postWebApp({ operation: 'checkAdminPassword', userId: sysData.currentUser.userId });
+          hideLoading();
+          
+          if (check.status !== 'success') {
+            showAlert(check.message, 'error');
+            return;
+          }
+
+          if (!check.configured) {
+             const newPass = await promptPassword('Configuración Inicial', 'Por favor, cree una Clave Maestra de Administrador (mínimo 4 caracteres):');
+             if (!newPass) return;
+             
+             showLoading('Configurando...');
+             const setRes = await postWebApp({ operation: 'setAdminPassword', userId: sysData.currentUser.userId, newPassword: newPass });
+             hideLoading();
+             if (setRes.status !== 'success') {
+               showAlert(setRes.message, 'error');
+               return;
+             }
+             showToast('Clave configurada exitosamente.', 'success');
+             ejecutarInicializacion();
+          } else {
+             const pass = await promptPassword('Acceso de Administrador', 'Ingrese su Clave Maestra de Administrador para inicializar la App:');
+             if (!pass) return;
+             
+             showLoading('Validando...');
+             const valRes = await postWebApp({ operation: 'validateAdminPassword', userId: sysData.currentUser.userId, password: pass });
+             hideLoading();
+             if (valRes.status !== 'success') {
+               showAlert(valRes.message, 'error');
+               return;
+             }
+             ejecutarInicializacion();
+          }
+        } catch(err) {
+          hideLoading();
+          showAlert('Error: ' + err.message, 'error');
+        }
+      }
+
+      function promptPassword(title, message) {
+        return new Promise((resolve) => {
+          const overlay = document.getElementById('custom-modal-overlay');
+          document.getElementById('custom-modal-title').innerText = title;
+          document.getElementById('custom-modal-message').innerText = message;
+          
+          const input = document.getElementById('custom-modal-input');
+          input.type = 'password';
+          input.value = '';
+          input.style.display = 'block';
+          
+          const btnOk = document.getElementById('custom-modal-ok');
+          const btnCancel = document.getElementById('custom-modal-cancel');
+          
+          btnOk.innerText = 'Aceptar';
+          btnOk.style.background = '#2563eb';
+          btnCancel.style.display = 'inline-block';
+          
+          overlay.classList.remove('hidden');
+          setTimeout(() => input.focus(), 100);
+          
+          const cleanup = () => {
+            overlay.classList.add('hidden');
+            input.style.display = 'none';
+            input.type = 'text';
+            btnOk.onclick = null;
+            btnCancel.onclick = null;
+          };
+          
+          btnOk.onclick = () => {
+            const val = input.value.trim();
+            cleanup();
+            resolve(val || null);
+          };
+          
+          btnCancel.onclick = () => {
+            cleanup();
+            resolve(null);
+          };
+        });
+      }
+      
+      // ===========================================
+=============
     // Configuración y Botones Simples
     async function toggleMaintenanceModeAction() {
       var toggle = document.getElementById("toggle-maintenance");

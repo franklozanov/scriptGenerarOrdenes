@@ -137,7 +137,10 @@ function handlePrivilegedOperation_(params) {
     'configurarNuevoPin', 
     'getMatricesConfig',
     'getSpreadsheetMetadata',
-    'getSheetHeaders'
+    'getSheetHeaders',
+      'checkAdminPassword',
+      'setAdminPassword',
+      'validateAdminPassword'
   ];
 
   if (basicAuthOperations.indexOf(operation) !== -1) {
@@ -570,6 +573,34 @@ function handlePrivilegedOperation_(params) {
       return { status: 'error', message: 'No tiene permisos para ver esta configuración.', diagnostic: 'PERMISSION_DENIED' };
     }
     return { status: 'success', minutos: getSessionPersistMinutes(), timeoutMinutos: getSessionTimeoutMinutes() };
+  }
+
+  
+  if (operation === 'checkAdminPassword') {
+    if (!esUsuarioRolAdmin_(callingUserId)) return { status: 'error', message: 'Acceso denegado.' };
+    const pass = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
+    return { status: 'success', configured: !!pass };
+  }
+
+  if (operation === 'setAdminPassword') {
+    if (!esUsuarioRolAdmin_(callingUserId)) return { status: 'error', message: 'Acceso denegado.' };
+    const pass = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
+    if (pass) return { status: 'error', message: 'La clave de administrador ya está configurada.' };
+    
+    const newPass = params.newPassword;
+    if (!newPass || newPass.length < 4) return { status: 'error', message: 'La clave debe tener al menos 4 caracteres.' };
+    
+    PropertiesService.getScriptProperties().setProperty('LOCK_PASSWORD', newPass);
+    return { status: 'success', message: 'Clave de administrador configurada correctamente.' };
+  }
+
+  if (operation === 'validateAdminPassword') {
+    if (!esUsuarioRolAdmin_(callingUserId)) return { status: 'error', message: 'Acceso denegado.' };
+    const pass = PropertiesService.getScriptProperties().getProperty('LOCK_PASSWORD');
+    if (!pass || params.password !== pass) {
+      return { status: 'error', message: 'Clave de administrador incorrecta.' };
+    }
+    return { status: 'success', message: 'Clave verificada.' };
   }
 
   if (operation === 'setSessionPersist') {
