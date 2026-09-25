@@ -774,12 +774,12 @@
       var user = data.currentUser;
 
       if (!user) {
-        overlayText.textContent = "<i data-lucide="ban"></i> Acceso denegado: su usuario no está registrado en el sistema.";
+        overlayText.innerHTML = '<i data-lucide="ban"></i> Acceso denegado: su usuario no est� registrado en el sistema.';
         return;
       }
 
       if (user.estado === "Bloqueado") {
-        overlayText.textContent = "<i data-lucide="ban"></i> Usuario bloqueado por intentos fallidos de PIN. Contacte al administrador.";
+        overlayText.innerHTML = '<i data-lucide="ban"></i> Usuario bloqueado por intentos fallidos de PIN. Contacte al administrador.';
         return;
       }
 
@@ -826,7 +826,7 @@
     // autorización QA. Devuelve el JSON de respuesta del servidor.
     async function postWebApp(payload) {
       try {
-        console.log("<i data-lucide="arrow-right"></i>️ Enviando postWebApp [Operación: " + payload.operation + "]");
+        
         const res = await fetch(sysData.webAppUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -838,15 +838,15 @@
         const jsonRes = await res.json();
         
         if (jsonRes.status === 'error') {
-          console.warn("<i data-lucide="alert-triangle"></i>️ Error devuelto por el servidor [Op: " + payload.operation + "]:", jsonRes.diagnostic || jsonRes.message);
+          
         } else {
-          console.log("<i data-lucide="check-circle-2"></i> Éxito en postWebApp [Op: " + payload.operation + "]");
+          
         }
         
         return jsonRes;
         
       } catch (err) {
-        console.error("<i data-lucide="x"></i> Error CRÍTICO de red/ejecución en postWebApp [Op: " + payload.operation + "]:", err);
+        
         return { 
           status: 'error', 
           message: 'Error de conexión con el servidor. Por favor, verifique su red o intente nuevamente más tarde.', 
@@ -1492,22 +1492,30 @@
     }
 
     async function sp_cerrarSesion() {
-      const confirmado = await showConfirm('Cerrar sesión', 'La próxima vez que abras el panel se te pedirá el PIN de nuevo. ¿Continuar?');
+      const confirmado = await showConfirm('Cambiar Sesi�n', 'Esto cerrar� tu sesi�n actual. �Deseas cambiar de usuario?');
       if (!confirmado) return;
-      showLoading('Cerrando sesión...');
+      
+      showLoading('Cerrando sesi�n segura...');
+      
+      // Mostrar skeleton loader de transici�n
+      document.getElementById('sidebar-content').innerHTML = 
+        '<div style="padding: 20px; text-align: center;"><i data-lucide="loader" class="spin"></i><p style="margin-top: 10px; color: #64748b;">Preparando cambio de usuario...</p></div>';
+      lucide.createIcons();
+
       google.script.run
         .withSuccessHandler(function () {
-          hideLoading();
-          showToast('Sesión cerrada. El panel se cerrará ahora.', 'success');
-          setTimeout(function() {
-            google.script.host.close();
-          }, 1500);
+           // No cerramos el host, el panel queda en estado de carga mientras se abre el modal.
+           // Cuando el usuario haga login en el modal, se recargar� autom�ticamente este sidebar.
+           document.getElementById('sidebar-content').innerHTML = 
+             '<div style="padding: 40px 20px; text-align: center;"><i data-lucide="shield-check" style="width:48px; height:48px; color:#10b981; margin-bottom:16px;"></i><h3 style="font-size:16px; font-weight:600; color:#0f172a;">Sesi�n Protegida</h3><p style="margin-top: 8px; font-size:13px; color: #64748b;">Por favor, ingresa tu PIN en la ventana emergente para continuar.</p></div>';
+           lucide.createIcons();
+           hideLoading();
         })
         .withFailureHandler(function (err) {
           hideLoading();
-          showError('No se pudo cerrar la sesión: ' + err.message);
+          showError('No se pudo iniciar el cambio: ' + err.message);
         })
-        .cerrarSesionQMS();
+        .cambiarUsuarioDesdePanel();
     }
 
     // --- Control de Inactividad (21 CFR 11) ---
@@ -1905,12 +1913,12 @@
           inputEl.classList.add('input-error');
           inputEl.classList.remove('input-success');
           msgEl.className = 'field-msg error';
-          msgEl.innerText = '<i data-lucide="x"></i> La orden ya existe';
+          msgEl.innerHTML = '<i data-lucide="x"></i> La orden ya existe';
         } else {
           inputEl.classList.remove('input-error');
           inputEl.classList.add('input-success');
           msgEl.className = 'field-msg success';
-          msgEl.innerText = '<i data-lucide="check-circle-2"></i> Orden válida';
+          msgEl.innerHTML = '<i data-lucide="check-circle-2"></i> Orden válida';
         }
       } catch (e) {
         msgEl.innerText = 'Error de red';
@@ -1960,7 +1968,7 @@
           inputEl.classList.add('input-error');
           inputEl.classList.remove('input-success');
           msgEl.className = 'field-msg error';
-          msgEl.innerText = '<i data-lucide="x"></i> No encontrado en matrices K';
+          msgEl.innerHTML = '<i data-lucide="x"></i> No encontrado en matrices K';
           cardMemoryData[card.id] = null;
           if(fabricanteInput) fabricanteInput.value = '';
         }
@@ -1987,7 +1995,7 @@
         inputEl.classList.remove('input-success');
         inputEl.classList.add('input-error');
         msgEl.className = 'field-msg error';
-        msgEl.innerText = '<i data-lucide="x"></i> Ingrese primero un No Análisis K válido';
+        msgEl.innerHTML = '<i data-lucide="x"></i> Ingrese primero un No Análisis K válido';
         return;
       }
 
@@ -2020,7 +2028,7 @@
         inputEl.classList.remove('input-error');
         inputEl.classList.add('input-success');
         msgEl.className = 'field-msg success';
-        msgEl.innerText = '<i data-lucide="check-circle-2"></i> Correcto';
+        msgEl.innerHTML = '<i data-lucide="check-circle-2"></i> Correcto';
       }
     }
 
@@ -2319,20 +2327,20 @@
       }
 
       if (file.type !== 'application/pdf') {
-        statusEl.innerText = '<i data-lucide="x"></i> Solo PDF';
+        statusEl.innerHTML = '<i data-lucide="x"></i> Solo PDF';
         delete up_fileCache[cacheKey];
         up_validate();
         return;
       }
       
       if (file.size > 10 * 1024 * 1024) {
-        statusEl.innerText = '<i data-lucide="x"></i> >10MB';
+        statusEl.innerHTML = '<i data-lucide="x"></i> >10MB';
         delete up_fileCache[cacheKey];
         up_validate();
         return;
       }
 
-      statusEl.innerText = '<i data-lucide="loader"></i> Convirtiendo...';
+      statusEl.innerHTML = '<i data-lucide="loader"></i> Convirtiendo...';
       statusEl.style.color = '#f57c00';
       
       var reader = new FileReader();
@@ -2348,7 +2356,7 @@
         up_validate();
       };
       reader.onerror = function() {
-        statusEl.innerText = '<i data-lucide="x"></i> Error lectura';
+        statusEl.innerHTML = '<i data-lucide="x"></i> Error lectura';
         statusEl.style.color = '#c5221f';
         delete up_fileCache[cacheKey];
         up_validate();
@@ -2411,7 +2419,7 @@
          progressText.innerText = `Subiendo ${i+1}/${tasks.length}...`;
          let statusId = t.isOA ? `${t.cardId}_oa_status` : `${t.cardId}_coa_status`;
          let statusEl = document.getElementById(statusId);
-         statusEl.innerText = '<i data-lucide="loader"></i> Subiendo...';
+         statusEl.innerHTML = '<i data-lucide="loader"></i> Subiendo...';
          
          try {
            let res = await up_doUploadRequest(t, userId, false);
@@ -2427,10 +2435,10 @@
            if(res.status === 'success' || res.status === 'skipped') {
               statusEl.innerText = '<i data-lucide="check-circle-2"></i> ' + (res.status === 'skipped' ? 'Ya existe' : 'Subido');
            } else {
-              statusEl.innerText = '<i data-lucide="x"></i> Error';
+              statusEl.innerHTML = '<i data-lucide="x"></i> Error';
            }
          } catch(e) {
-           statusEl.innerText = '<i data-lucide="x"></i> Error';
+           statusEl.innerHTML = '<i data-lucide="x"></i> Error';
          }
       }
       progressText.innerText = 'Finalizado';
@@ -3156,7 +3164,7 @@
       if (!userId) return showError("Usuario no válido.");
 
       btn.disabled = true;
-      status.innerText = "<i data-lucide="loader"></i> Generando PDF (Puede tardar unos segundos)...";
+      status.innerHTML = '<i data-lucide="loader"></i> Generando PDF (Puede tardar unos segundos)...';
       status.style.color = "#1a73e8";
 
       // Handshake con el visor seguro: se abre apuntando a modo 'pending' para poder
@@ -3234,7 +3242,7 @@
 
         for (let i = 0; i < payload.pdfs.length; i++) {
           const item = payload.pdfs[i];
-          status.innerText = `<i data-lucide="loader"></i> Procesando ${item.key}...`;
+          status.innerHTML = `<i data-lucide="loader"></i> Procesando ${item.key}...`;
           await new Promise(r => setTimeout(r, 10)); // yield
 
           const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
@@ -3268,7 +3276,7 @@
         }
 
         const allPages = finalPdf.getPages();
-        status.innerText = `<i data-lucide="loader"></i> Añadiendo pie de página...`;
+        status.innerHTML = `<i data-lucide="loader"></i> Añadiendo pie de página...`;
         await new Promise(r => setTimeout(r, 10));
         
         for (let pIdx = 0; pIdx < allPages.length; pIdx++) {
@@ -3294,7 +3302,7 @@
         
         try { finalPdf.getForm().flatten(); } catch(e) {}
         
-        status.innerText = "<i data-lucide="loader"></i> Guardando PDF optimizado...";
+        status.innerHTML = '<i data-lucide="loader"></i> Guardando PDF optimizado...';
         await new Promise(r => setTimeout(r, 10));
         
         const pdfData = await finalPdf.save({ useObjectStreams: true });
@@ -3310,7 +3318,7 @@
         // Vista previa instantánea: el visor ya puede mostrar el documento con los bytes que
         // tenemos en memoria, sin esperar a que termine el guardado oficial en Drive.
         previewBase64 = finalBase64;
-        status.innerText = "<i data-lucide="eye"></i>️ Vista previa lista. Registrando impresión (firma electrónica)...";
+        status.innerHTML = '<i data-lucide="eye"></i>️ Vista previa lista. Registrando impresión (firma electrónica)...';
         trySendPreview();
 
         // Se enruta por la Web App (corre como propietario) para poder escribir en las columnas
@@ -3330,7 +3338,7 @@
 
           if (res.status === 'success') {
             const data = res.data || {};
-            status.innerText = "<i data-lucide="check-circle-2"></i> Listo. Documento oficial guardado.";
+            status.innerHTML = '<i data-lucide="check-circle-2"></i> Listo. Documento oficial guardado.';
             status.style.color = "#0f5132";
             btn.disabled = false;
 
@@ -3343,13 +3351,13 @@
             imp_resetPreload();
             imp_setBanner('', '');
           } else {
-            status.innerText = "<i data-lucide="x"></i> Error: " + (res.message || 'No se pudo registrar la impresión.');
+            status.innerHTML = '<i data-lucide="x"></i> Error: ' + (res.message || 'No se pudo registrar la impresi�n.');
             status.style.color = "#dc2626";
             btn.disabled = false;
             printWindow.postMessage({ type: 'vp-failed', nonce: nonce, message: res.message || 'No se pudo registrar la impresión.' }, '*');
           }
         } catch (postErr) {
-          status.innerText = "<i data-lucide="x"></i> Error de comunicación: " + postErr.message;
+          status.innerHTML = '<i data-lucide="x"></i> Error de comunicación: ' + postErr.message;
           status.style.color = "#dc2626";
           btn.disabled = false;
           printWindow.postMessage({ type: 'vp-failed', nonce: nonce, message: postErr.message }, '*');
@@ -3359,7 +3367,7 @@
 
       } catch (err) {
         window.removeEventListener('message', onViewerMessage);
-        status.innerText = "<i data-lucide="x"></i> Error: " + err.message;
+        status.innerHTML = '<i data-lucide="x"></i> Error: ' + err.message;
         status.style.color = "#dc2626";
         btn.disabled = false;
         if (printWindow) printWindow.close();
@@ -3399,7 +3407,7 @@
         });
         hideLoading();
         if (res.status === 'success') {
-          showToast(res.autoAprobada ? "<i data-lucide="check-circle-2"></i> Autoaprobada — ya puede imprimir" : "Solicitud enviada a QA", "success");
+          showToast(res.autoAprobada ? '<i data-lucide="check-circle-2"></i> Autoaprobada — ya puede imprimir' : 'Solicitud enviada a QA', 'success');
           document.getElementById('imp_orderNo').value = '';
           imp_resetPreload();
         } else {

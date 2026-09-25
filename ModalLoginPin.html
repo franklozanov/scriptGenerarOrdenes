@@ -259,9 +259,7 @@
         return;
       }
 
-      if (!isPinConfiguredClient_(candidato.pin)) {
-        iniciarCreacionPin(nombre, candidato);
-      } else {
+      if (!isPinConfiguredClient_(candidato.pin)) { iniciarCreacionPin(nombre, candidato); } else {
         setTitle('Verificación de Identidad');
         setSubtitle('Hola, ' + nombre + '. Ingrese su PIN de seguridad para continuar:');
         renderPinInputs(function (pin, inputs) {
@@ -432,25 +430,90 @@
     }
 
     // === Creación de PIN en dos pasos (usuario sin PIN configurado) ===
-    function iniciarCreacionPin(nombre, candidato) {
-      setTitle('Crear Firma Electrónica', '#2563eb');
-      setSubtitle('Hola, ' + nombre + '. Necesita configurar su PIN (4 dígitos) por primera vez:');
-      renderPinInputs(function (pin1, inputs1) {
-        setPinInputsDisabled(inputs1, true);
-        setTitle('Confirmar Firma Electrónica', '#2563eb');
-        setSubtitle('Vuelva a ingresar el PIN para confirmar:');
-        renderPinInputs(function (pin2, inputs2) {
-          if (pin1 !== pin2) {
-            showPinError('Los PIN ingresados no coinciden. Intente nuevamente.');
-            iniciarCreacionPin(nombre, candidato);
-            return;
-          }
-          confirmarNuevoPin(pin1, inputs2, nombre, candidato);
+    
+      function iniciarCreacionPin(nombre, candidato, errorMessage) {
+        setTitle('?? Configurar Firma Electr�nica', '#0f172a');
+        setSubtitle('');
+        
+        var onboardingHtml = 
+          '<div style="text-align: left; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">' +
+          '  <div style="display: flex; align-items: center; margin-bottom: 8px;">' +
+          '    <div style="background: #e0e7ff; color: #4f46e5; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-right: 12px;"><i data-lucide="shield-check" style="width: 16px; height: 16px;"></i></div>' +
+          '    <h4 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b;">�Hola, ' + escapeHtml(nombre) + '!</h4>' +
+          '  </div>' +
+          '  <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.5; padding-left: 40px;">' +
+          '    Por normativas de calidad (21 CFR Part 11), debes crear un <b>PIN de 4 d�gitos</b> que usar�s como tu firma electr�nica para aprobar documentos.' +
+          '  </p>' +
+          '</div>' +
+          '<div id="pin-render-area"></div>';
+          
+        setBody(onboardingHtml);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        
+        renderPinInputsCustom(document.getElementById('pin-render-area'), function (pin1, inputs1) {
+          setPinInputsDisabled(inputs1, true);
+          setTitle('? Confirmar Firma Electr�nica', '#0f172a');
+          document.getElementById('pin-render-area').innerHTML = '<p style="font-size:13px; color:#475569; margin-bottom:16px;">Por favor, ingresa tu PIN nuevamente para confirmar:</p><div id="pin-render-area-2"></div>';
+          
+          renderPinInputsCustom(document.getElementById('pin-render-area-2'), function (pin2, inputs2) {
+            if (pin1 !== pin2) {
+              iniciarCreacionPin(nombre, candidato, 'Los PIN ingresados no coinciden. Intente nuevamente.');
+              return;
+            }
+            confirmarNuevoPin(pin1, inputs2, nombre, candidato);
+          });
         });
-      });
-    }
+        
+        if (errorMessage) {
+          showPinError(errorMessage);
+        }
+      }
 
-    function confirmarNuevoPin(pin, inputs, nombre, candidato) {
+      function renderPinInputsCustom(container, onComplete) {
+        container.innerHTML = 
+          '<div class="pin-inputs-container">' +
+          '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+          '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+          '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+          '<input type="password" class="modern-pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">' +
+          '</div>' +
+          '<div class="lp-error" id="lp-error"></div>';
+          
+        var inputs = container.querySelectorAll('.modern-pin-input');
+        function currentValue() { return Array.prototype.map.call(inputs, function (i) { return i.value; }).join(''); }
+  
+        inputs.forEach(function (input, index) {
+          input.addEventListener('input', function () {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            if (input.value.length === 1 && index < inputs.length - 1) inputs[index + 1].focus();
+            if (currentValue().length === 4) setTimeout(function () { onComplete(currentValue(), inputs); }, 100);
+          });
+  
+          input.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace' && input.value === '' && index > 0) {
+              inputs[index - 1].focus();
+              inputs[index - 1].value = '';
+            }
+          });
+  
+          input.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var pasted = (e.clipboardData || window.clipboardData).getData('text');
+            var digits = pasted.replace(/[^0-9]/g, '').substring(0, 4);
+            if (digits.length === 0) return;
+            for (var i = 0; i < digits.length; i++) {
+              if (index + i < inputs.length) inputs[index + i].value = digits[i];
+            }
+            inputs[Math.min(index + digits.length - 1, inputs.length - 1)].focus();
+            if (currentValue().length === 4) setTimeout(function () { onComplete(currentValue(), inputs); }, 100);
+          });
+        });
+  
+        setTimeout(function () { inputs[0].focus(); }, 50);
+        return inputs;
+      }
+
+      function confirmarNuevoPin(pin, inputs, nombre, candidato) {
       setPinInputsDisabled(inputs, true);
       showPinError('Configurando PIN...');
 
@@ -464,12 +527,11 @@
             finalizarLogin(candidato.userId);
             return;
           }
-          showPinError(data.message || 'No se pudo configurar el PIN.');
-          iniciarCreacionPin(nombre, candidato);
+          iniciarCreacionPin(nombre, candidato, data.message || 'No se pudo configurar el PIN.');
         })
         .catch(function (err) {
           showPinError('Error de conexión: ' + (err && err.message ? err.message : err));
-          iniciarCreacionPin(nombre, candidato);
+          iniciarCreacionPin(nombre, candidato, 'Error al configurar PIN, intente nuevamente.');
         });
     }
 

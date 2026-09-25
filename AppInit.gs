@@ -84,7 +84,15 @@ function initializeCompleteSystem(ui) {
   }
   
   try {
-    initializeWorkbookStructure_(ui);
+      ensureAdminPinSetup_(ui);
+      summary.push("?? PIN Maestro verificado");
+    } catch (e) {
+      summary.push("?? Error verificando PIN Maestro: " + e.message);
+      throw e;
+    }
+
+    try {
+      initializeWorkbookStructure_(ui);
     summary.push("âœ“ Estructura de hojas validada/corregida");
   } catch (e) {
     summary.push("âœ— Error en estructura: " + e.message);
@@ -700,4 +708,68 @@ function migrarFormulasAValoresEstaticos_() {
   }
 
   return { filasMigradas: filasMigradas, filasOmitidas: filasOmitidas };
+}
+
+
+/**
+ * Verifica si el usuario que ejecuta el script es Administrador y no tiene PIN.
+ * Si es as�, le exige crearlo en este momento por seguridad.
+ */
+function ensureAdminPinSetup_(ui) {
+  var email = Session.getEffectiveUser().getEmail();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) return;
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+
+  var headers = data[0];
+  var colEmailIdx = getColumnIndexByNameCaseInsensitive(headers, 'Email', false) || getColumnIndexByNameCaseInsensitive(headers, 'Correo', false);
+  var colRolIdx = getColumnIndexByNameCaseInsensitive(headers, 'Rol', false);
+  var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+  var colUserIdIdx = getColumnIndexByNameCaseInsensitive(headers, 'UserID', false);
+
+  if (!colEmailIdx || !colRolIdx || !colClaveIdx || !colUserIdIdx) return;
+
+  var isOwnerAdmin = false;
+  var ownerUserId = null;
+  var ownerClave = "";
+
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = data[i][colEmailIdx - 1] ? data[i][colEmailIdx - 1].toString().trim().toLowerCase() : "";
+    var rowRol = data[i][colRolIdx - 1] ? data[i][colRolIdx - 1].toString().trim().toUpperCase() : "";
+    
+    if (rowEmail === email.toLowerCase() && (rowRol === 'ADMIN' || rowRol === 'ADMINISTRADOR' || rowRol === 'ADMINISTRADOR DE SISTEMA')) {
+      isOwnerAdmin = true;
+      ownerUserId = data[i][colUserIdIdx - 1];
+      ownerClave = data[i][colClaveIdx - 1] ? data[i][colClaveIdx - 1].toString().trim() : "";
+      break;
+    }
+  }
+
+  // Comprobar si no tiene PIN (vac�o, "PENDIENTE" o menor a 64 chars indicando que no est� hasheado correctamente)
+  var isConfigured = ownerClave !== "" && ownerClave !== "PENDIENTE" && ownerClave.length === 64;
+
+  if (isOwnerAdmin && !isConfigured) {
+    var response = ui.prompt(
+      '?? Configuraci�n de Seguridad Inicial',
+      'Detectamos que eres el Administrador (' + email + ') y a�n no tienes tu PIN Maestro configurado.\n\n' +
+      'Por seguridad (21 CFR Part 11), debes crear un PIN de 4 d�gitos ahora mismo para proteger tu cuenta:',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (response.getSelectedButton() == ui.Button.OK) {
+      var pin = response.getResponseText().trim();
+      if (/^\d{4}$/.test(pin)) {
+        var hash = hashPin_(pin);
+        updateUserSecurityState_(ownerUserId, 0, 'Activo', hash);
+        ui.alert('? �xito', 'PIN Maestro configurado y encriptado correctamente.', ui.ButtonSet.OK);
+      } else {
+        throw new Error('El PIN debe tener exactamente 4 d�gitos num�ricos. Inicializaci�n abortada.');
+      }
+    } else {
+      throw new Error('Configuraci�n de PIN de administrador cancelada. Es obligatorio para usar el sistema.');
+    }
+  }
 }

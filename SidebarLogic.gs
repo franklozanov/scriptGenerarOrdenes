@@ -246,3 +246,23 @@ function checkPermissionForAction(actionCode) {
   if (!user || !user.rol) return false;
   return hasPermissionByRol(user.rol, actionCode);
 }
+
+
+/**
+ * Se llama desde el panel cuando el usuario quiere cambiar de sesi�n sin cerrar el panel.
+ * Limpia la sesi�n actual y vuelve a abrir el modal de login superpuesto.
+ */
+function cambiarUsuarioDesdePanel() {
+  cerrarSesionQMS();
+  var ui = SpreadsheetApp.getUi();
+  var template = HtmlService.createTemplateFromFile('ModalLoginPin');
+  template.identidad = JSON.stringify(resolverIdentidadSesion());
+  template.webAppUrl = PropertiesService.getScriptProperties().getProperty('WEB_APP_URL') || '';
+  
+  var html = template.evaluate()
+    .setWidth(420)
+    .setHeight(520)
+    .setTitle('Cambio de Usuario');
+    
+  ui.showModalDialog(html, ' ');
+}

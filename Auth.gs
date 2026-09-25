@@ -187,10 +187,13 @@ function updateUserSecurityState_(userId, intentos, estado, nuevaClave) {
     if (rowUserId === targetUserId) {
       sheet.getRange(i + 1, colIntentosIdx).setValue(intentos);
       sheet.getRange(i + 1, colEstadoIdx).setValue(estado);
-      
-      if (nuevaClave !== undefined) {
-        sheet.getRange(i + 1, colClaveIdx).setValue(nuevaClave);
-      }
+        if (nuevaClave !== undefined) {
+          sheet.getRange(i + 1, colClaveIdx).setValue(nuevaClave);
+        }
+        
+        // FORZAR COMMIT INMEDIATO Y LIMPIAR CACH� PARA EVITAR LOOPS DE PIN
+        SpreadsheetApp.flush();
+        try { clearInitialDataCache(); } catch (e) {}
       return;
     }
   }
