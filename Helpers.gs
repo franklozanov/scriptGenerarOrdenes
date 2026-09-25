@@ -243,12 +243,49 @@ function calcularEstadoDocumentos(tieneOA, tieneCOA) {
 function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
   var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
   var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+  
+  // Columnas Legacy / Simples
   var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
   
-  if (!colNoOrdenIdx || !colEstadoIdx) {
-    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoDocumentos");
+  // Columnas Nuevas FASE 1
+  var colEstadoCargaIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+  var colAdjuntoOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+  var colAdjuntoCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
+  
+  if (!colNoOrdenIdx) {
+    Logger.log("ADVERTENCIA: No se encontro columna NoOrden");
     return;
   }
+  
+  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
+  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
+  
+  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
+  
+  // Actualizar Sistema Legacy
+  if (colEstadoIdx) {
+    var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
+    sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
+  }
+  
+  // Actualizar Sistema Nuevo
+  if (colEstadoCargaIdx || colAdjuntoOAIdx || colAdjuntoCOAIdx) {
+    if (colAdjuntoOAIdx) {
+      sheet.getRange(rowIndex, colAdjuntoOAIdx).setValue(res.tieneOA ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE);
+    }
+    if (colAdjuntoCOAIdx) {
+      sheet.getRange(rowIndex, colAdjuntoCOAIdx).setValue(res.tieneCOA ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE);
+    }
+    if (colEstadoCargaIdx) {
+      var estadoCarga = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
+      if (res.tieneOA && res.tieneCOA) estadoCarga = VALORES_ESTADO_CARGA.CARGADOS;
+      else if (res.tieneOA && !res.tieneCOA) estadoCarga = VALORES_ESTADO_CARGA.PENDIENTE_COA;
+      else if (!res.tieneOA && res.tieneCOA) estadoCarga = VALORES_ESTADO_CARGA.PENDIENTE_OA;
+      
+      sheet.getRange(rowIndex, colEstadoCargaIdx).setValue(estadoCarga);
+    }
+  }
+}
   
   var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
   var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
