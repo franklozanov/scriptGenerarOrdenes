@@ -1,3 +1,4 @@
+/* global getColumnIndexByNameCaseInsensitive, VALORES_ESTADO_DOCUMENTOS */
 /**
  * NovedadLogic.gs
  * 
@@ -142,7 +143,7 @@ function getOrdenesParaNovedad() {
  * @property {string} codigo - Código del producto
  * @property {string} descripcion - Descripción del producto
  * @property {string} lote - Número de lote
- * @property {string} estadoCarga - Estado de carga de documentos
+ * @property {string} estadoDocumentos - Estado de carga de documentos
  */
 function getOrdenesSolicitadasParaQA() {
   try {
@@ -161,7 +162,7 @@ function getOrdenesSolicitadasParaQA() {
     var colCodigoCol       = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', true);
     var colDescripcionCol  = getColumnIndexByNameCaseInsensitive(headers, 'Descripcion', false);
     var colLoteCol         = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
-    var colEstadoCargaCol  = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
+    var colEstadoDocsCol = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
     var colStatusCol       = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
     var colDecisionCol     = getColumnIndexByNameCaseInsensitive(headers, 'Decision', false);
     var colNoAnalisisCol   = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
@@ -175,7 +176,7 @@ function getOrdenesSolicitadasParaQA() {
       var codigo     = values[i][colCodigoCol - 1];
       var descripcion = colDescripcionCol ? values[i][colDescripcionCol - 1] : "";
       var lote       = colLoteCol  ? values[i][colLoteCol - 1]  : "";
-      var estadoCarga = colEstadoCargaCol ? values[i][colEstadoCargaCol - 1] : "";
+      var estadoDocumentos = colEstadoDocsCol ? values[i][colEstadoDocsCol - 1] : "";
       var status     = colStatusCol ? values[i][colStatusCol - 1] : "";
       var decision   = colDecisionCol  ? values[i][colDecisionCol - 1]  : "";
       var noAnalisis = colNoAnalisisCol ? values[i][colNoAnalisisCol - 1] : "";
@@ -191,7 +192,7 @@ function getOrdenesSolicitadasParaQA() {
           codigo:     codigoStr,
           descripcion: descripcion ? descripcion.toString().trim() : "",
           lote:       lote       ? lote.toString().trim()       : "",
-          estadoCarga: estadoCarga ? estadoCarga.toString().trim() : "",
+          estadoDocumentos: estadoDocumentos ? estadoDocumentos.toString().trim() : "",
           decision:   decision   ? decision.toString().trim()   : "",
           noAnalisis: noAnalisis ? noAnalisis.toString().trim() : ""
         });
@@ -423,12 +424,14 @@ function procesarCargaOrdenesMasivas(params, userId) {
     var colNoAnalisis = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoAnalisis', false);
     var colNoOrden = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoOrden', false);
     var colFabricante = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Fabricante', false);
+    var colEstadoDocs = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'EstadoDocumentos', false);
     
     
     
     var colConsecutivoImp = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'ConsecutivoImp', false);
     var colImpresoPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'ImpresoPor', false);
     var colStatus = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
+    var colEstadoDocs = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'EstadoDocumentos', false);
     var colSolicitadaPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'SolicitadaPor', false);
 
     // Columnas de validación de Matriz K (Fase 2)
@@ -531,14 +534,14 @@ function procesarCargaOrdenesMasivas(params, userId) {
             folderDocOrdenes.createFile(blobOA);
           }
           
-          row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.CARGADO;
+          
           oaCargado = true;
         } catch (e) {
           Logger.log('ERROR al guardar archivo OA para orden ' + record.NoOrden + ': ' + e.message);
-          row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+          
         }
       } else {
-        row[colAdjuntoOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+        
       }
 
       // Procesar archivo COA si viene
@@ -564,21 +567,21 @@ function procesarCargaOrdenesMasivas(params, userId) {
             folderDocAnalisis.createFile(blobCOA);
           }
           
-          row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.CARGADO;
+          
           coaCargado = true;
         } catch (e) {
           Logger.log('ERROR al guardar archivo COA para orden ' + record.NoOrden + ': ' + e.message);
-          row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+          
         }
       } else {
-        row[colAdjuntoCOA - 1] = VALORES_DOCUMENTO.PENDIENTE;
+        
       }
 
       // Calcular EstadoCarga dinámicamente
-      if (oaCargado && coaCargado)        row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.CARGADOS;
-      else if (oaCargado && !coaCargado)  row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_COA;
-      else if (!oaCargado && coaCargado)  row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_OA;
-      else                                row[colEstadoCarga - 1] = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
+      if (oaCargado && coaCargado)        row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.LISTOS;
+      else if (oaCargado && !coaCargado)  row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
+      else if (!oaCargado && coaCargado)  row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
+      else                                row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
 
       if (colConsecutivoImp) row[colConsecutivoImp - 1] = '';
       if (colImpresoPor)     row[colImpresoPor - 1]     = '';
@@ -688,11 +691,12 @@ function procesarAutorizacionQA(params, userId) {
     
     var colSolicitadaPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'SolicitadaPor', false);
     
+    var colEstadoDocs = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'EstadoDocumentos', false);
     if (!colNoOrden || !colStatus || !colEstadoDocs || !colSolicitadaPor) {
       var faltantes = [];
       if (!colNoOrden) faltantes.push('NoOrden');
       if (!colStatus) faltantes.push('STATUS');
-      if (!colEstadoCarga) faltantes.push('EstadoCarga');
+      if (!colEstadoDocs) faltantes.push('EstadoDocumentos');
       if (!colSolicitadaPor) faltantes.push('SolicitadaPor');
       return { status: 'error', message: 'No se encontraron las siguientes columnas requeridas en la fila 1 de Ordenes (buscando por nombre exacto): ' + faltantes.join(', ') };
     }
@@ -717,18 +721,18 @@ function procesarAutorizacionQA(params, userId) {
     for (var i = 0; i < values.length; i++) {
       var noOrden = values[i][colNoOrden - 1];
       var status = values[i][colStatus - 1];
-      var estadoCarga = values[i][colEstadoCarga - 1];
+      var estadoDocumentos = values[i][colEstadoDocs - 1];
       var solicitadaPor = values[i][colSolicitadaPor - 1];
       
       var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
       var statusStr = status ? status.toString().trim() : "";
-      var estadoCargaStr = estadoCarga ? estadoCarga.toString().trim() : "";
+      var estadoDocumentosStr = estadoDocumentos ? estadoDocumentos.toString().trim() : "";
       var solicitadaPorStr = solicitadaPor ? solicitadaPor.toString().trim() : "";
       
       // Verificar si esta orden está en targetIds y tiene STATUS 'Solicitada'
       if (targetIds.indexOf(noOrdenStr) !== -1 && statusStr === 'Solicitada') {
         // DOBLE VALIDACIÓN: Verificar que EstadoCarga no contenga "Pendiente"
-        if (estadoCargaStr.toLowerCase().indexOf('pendiente') !== -1) {
+        if (estadoDocumentosStr !== VALORES_ESTADO_DOCUMENTOS.LISTOS) {
           ordenesIgnoradas.push(noOrdenStr + ' (documentos pendientes)');
           Logger.log("procesarAutorizacionQA: Orden " + noOrdenStr + " ignorada por documentos pendientes.");
           continue;
