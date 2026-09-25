@@ -101,6 +101,8 @@ function ejecutarRefactorEstructural() {
     }
 
     // 5. Pegar la data mapeada
+    // Limpiamos las validaciones de datos heredadas antes de pegar
+    sheetOrdenes.getRange(2, colEstadoDocsIdx, numRows, 3).clearDataValidations();
     sheetOrdenes.getRange(2, colEstadoDocsIdx, numRows, 3).setValues(nuevosDatos);
   }
 
