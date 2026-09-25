@@ -241,17 +241,17 @@
         var row = document.createElement('tr');
         
         // Determinar si el checkbox debe estar deshabilitado
-        var estadoCarga = orden.estadoCarga || '';
+        var estadoDocs = orden.estadoDocumentos || '';
         var isPendiente = (
-          estadoCarga === 'Pendiente COA/OA' ||
-          estadoCarga === 'Pendiente OA' ||
-          estadoCarga === 'Pendiente COA' ||
-          estadoCarga === 'Pendiente Ambos'
+          estadoDocs.indexOf('Faltan Ambos') !== -1 ||
+          estadoDocs.indexOf('Falta OA') !== -1 ||
+          estadoDocs.indexOf('Falta COA') !== -1 ||
+          estadoDocs === ''
         );
-        
+
         // Clase para el badge de estado
-        var estadoClass = (estadoCarga === 'Cargados' || estadoCarga === '<i data-lucide="check-circle-2"></i> Cargados') ? 'estado-cargados' : 'estado-pendiente';
-        var estadoDisplay = estadoCarga || 'Desconocido';
+        var estadoClass = (estadoDocs.indexOf('Listos para Imprimir') !== -1) ? 'estado-cargados' : 'estado-pendiente';
+        var estadoDisplay = estadoDocs || 'Pendiente Verificación';
         
         row.innerHTML = `
           <td class="checkbox-cell">

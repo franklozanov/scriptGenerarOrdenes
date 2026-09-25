@@ -194,9 +194,9 @@ function procesarAgregarPlantilla(params) {
   }
 }
 
-const VALORES_ESTADO_DOCUMENTOS = {
-  FALTAN_AMBOS: "?? Faltan Ambos",
-  FALTA_OA: "?? Falta OA",
-  FALTA_COA: "?? Falta COA",
-  LISTOS: "?? Listos para Imprimir"
+var VALORES_ESTADO_DOCUMENTOS = {
+  FALTAN_AMBOS: "🔴 Faltan Ambos",
+  FALTA_OA: "🟡 Falta OA",
+  FALTA_COA: "🟡 Falta COA",
+  LISTOS: "🟢 Listos para Imprimir"
 };

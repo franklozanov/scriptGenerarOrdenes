@@ -478,7 +478,7 @@ function fixHeaders(ui) {
 
 /**
  * Aplica validaciones de datos tipo dropdown a las columnas de estado de carga.
- * Asegura que solo se usen valores predefinidos en AdjuntoCOA, AdjuntoOA y EstadoCarga.
+ * Asegura que solo se usen valores predefinidos en EstadoDocumentos.
  * 
  * IMPORTANTE: Ejecutar despuÃ©s de agregar las columnas o cuando se necesite reforzar las validaciones.
  * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicializaciÃ³n)

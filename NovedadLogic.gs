@@ -577,7 +577,7 @@ function procesarCargaOrdenesMasivas(params, userId) {
         
       }
 
-      // Calcular EstadoCarga dinámicamente
+      // Calcular EstadoDocumentos dinámicamente
       if (oaCargado && coaCargado)        row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.LISTOS;
       else if (oaCargado && !coaCargado)  row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
       else if (!oaCargado && coaCargado)  row[colEstadoDocs - 1] = VALORES_ESTADO_DOCUMENTOS.FALTA_OA;

@@ -1,17 +1,16 @@
-/* global IndiceDocs */
 // ============================================================
 // MODULE: Helpers
-// DescripciÃ³n: Funciones utilitarias de acceso a columnas
-// Prioridad de Carga: 2Â° (base de todos los demÃ¡s mÃ³dulos)
+// Descripción: Funciones utilitarias de acceso a columnas
+// Prioridad de Carga: 2° (base de todos los demás módulos)
 // ============================================================
 
 /**
- * Busca el Ã­ndice de una columna por su nombre de encabezado.
- * Devuelve Ã­ndice base-1 para usar con getRange(), o null si no existe.
+ * Busca el índice de una columna por su nombre de encabezado.
+ * Devuelve índice base-1 para usar con getRange(), o null si no existe.
  * @param {Array} headers - Array de encabezados (fila 1 de la hoja)
  * @param {string} columnName - Nombre exacto de la columna a buscar
  * @param {boolean} required - Si es true, lanza error si no encuentra la columna
- * @returns {number|null} Ãndice base-1 de la columna, o null si no existe y required=false
+ * @returns {number|null} Índice base-1 de la columna, o null si no existe y required=false
  */
 function getColumnIndexByName(headers, columnName, required) {
   if (required === undefined) required = true;
@@ -23,18 +22,18 @@ function getColumnIndexByName(headers, columnName, required) {
   }
   
   if (required) {
-    throw new Error("No se encontrÃ³ la columna '" + columnName + "' en los encabezados.");
+    throw new Error("No se encontró la columna '" + columnName + "' en los encabezados.");
   }
   return null;
 }
 
 /**
- * Busca el Ã­ndice de una columna por su nombre de encabezado (case-insensitive).
- * Devuelve Ã­ndice base-1 para usar con getRange().
+ * Busca el índice de una columna por su nombre de encabezado (case-insensitive).
+ * Devuelve índice base-1 para usar con getRange().
  * @param {Array} headers - Array de encabezados (fila 1 de la hoja)
  * @param {string} columnName - Nombre de la columna a buscar
  * @param {boolean} required - Si es true, lanza error si no encuentra la columna
- * @returns {number|null} Ãndice base-1 de la columna, o null si no existe y required=false
+ * @returns {number|null} Índice base-1 de la columna, o null si no existe y required=false
  */
 function getColumnIndexByNameCaseInsensitive(headers, columnName, required) {
   if (required === undefined) required = true;
@@ -47,15 +46,15 @@ function getColumnIndexByNameCaseInsensitive(headers, columnName, required) {
   }
   
   if (required) {
-    throw new Error("No se encontrÃ³ la columna '" + columnName + "' en los encabezados.");
+    throw new Error("No se encontró la columna '" + columnName + "' en los encabezados.");
   }
   return null;
 }
 
 /**
- * Obtiene el valor de una celda por nombre de columna y nÃºmero de fila.
- * @param {Sheet} sheet - Hoja de cÃ¡lculo
- * @param {number} rowIndex - NÃºmero de fila (base-1)
+ * Obtiene el valor de una celda por nombre de columna y número de fila.
+ * @param {Sheet} sheet - Hoja de cálculo
+ * @param {number} rowIndex - Número de fila (base-1)
  * @param {string} columnName - Nombre de la columna
  * @returns {*} Valor de la celda
  */
@@ -66,9 +65,9 @@ function getCellValueByColumnName(sheet, rowIndex, columnName) {
 }
 
 /**
- * Establece el valor de una celda por nombre de columna y nÃºmero de fila.
- * @param {Sheet} sheet - Hoja de cÃ¡lculo
- * @param {number} rowIndex - NÃºmero de fila (base-1)
+ * Establece el valor de una celda por nombre de columna y número de fila.
+ * @param {Sheet} sheet - Hoja de cálculo
+ * @param {number} rowIndex - Número de fila (base-1)
  * @param {string} columnName - Nombre de la columna
  * @param {*} value - Valor a establecer
  */
@@ -79,157 +78,70 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
 }
 
 /**
- * Calcula el estado consolidado de carga basado en los estados de COA y OA.
- * @param {string} estadoCOA - Estado del Certificado de AnÃ¡lisis ("Pendiente" o "âœ… Cargado")
- * @param {string} estadoOA - Estado de la Orden de Acondicionamiento ("Pendiente" o "âœ… Cargado")
- * @returns {string} Estado consolidado
+ * Verifica si existen los PDFs de NoOrden (OA) y NoAnalisis (COA).
+ * [ÍNDICE] Consulta el índice materializado en memoria (O(1)) en lugar de
+ * escanear las carpetas de Drive por cada orden. El índice lo mantiene
+ * IndiceDocumentos.gs (rebuild horario + hook de subida + menú on-demand).
+ * La firma queda idéntica: ModDrive, el legacy y la impresión no cambian.
  */
-/**
- * Actualiza el estado consolidado de carga en una fila especÃ­fica.
- * @param {Sheet} sheet - Hoja de cÃ¡lculo 'Ordenes'
- * @param {number} rowIndex - NÃºmero de fila (base-1)
- * @param {Array} headers - Array de encabezados de la hoja
- */
-/**
- * Extrae el ID de Google Drive a partir de una URL compartida.
- * Si el parÃ¡metro ya es un ID (no contiene 'http'), lo devuelve tal cual.
- * @param {string} urlOrId - URL de Drive o ID directo
- * @returns {string} El ID extraÃ­do
- */
-function extractDriveId(urlOrId) {
-  if (!urlOrId) return "";
-  var str = urlOrId.toString().trim();
-  if (str.indexOf("http") === -1 && str.indexOf("drive.google.com") === -1) {
-    return str; // Probablemente ya es un ID
+function verificarDocumentosEnDrive(noOrden, noAnalisis) {
+  var noOrdenStr = noOrden ? String(noOrden).trim() : "";
+  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim() : "";
+
+  if (!noOrdenStr && !noAnalisisStr) {
+    return { tieneOA: false, tieneCOA: false };
   }
-  
-  // ExpresiÃ³n regular para extraer IDs de archivos o carpetas de Drive (generalmente de 25 a 35 caracteres)
-  var match = str.match(/[-\w]{25,}/);
-  if (match) {
-    return match[0];
+
+  var idx = IndiceDocs.cargar();
+  var tieneOA = noOrdenStr ? (idx.OA[normalizarClaveDoc_(noOrdenStr)] !== undefined) : false;
+  var tieneCOA = noAnalisisStr ? (idx.COA[normalizarClaveDoc_(noAnalisisStr)] !== undefined) : false;
+
+  return { tieneOA: tieneOA, tieneCOA: tieneCOA };
+}
+
+/**
+ * Calcula el EstadoDocumentos a partir de la existencia de archivos.
+ */
+function calcularEstadoDocumentos(tieneOA, tieneCOA) {
+  if (tieneOA && tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.LISTOS;
+  } else if (tieneOA && !tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
+  } else if (!tieneOA && tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
+  } else {
+    return VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
   }
-  return str;
 }
 
 /**
- * Normaliza un valor de tipo de impresiÃ³n eliminando acentos y espacios.
- * Unifica las variantes histÃ³ricas ('ReimpresiÃ³n' con acento vs 'Reimpresion' sin acento).
- * @param {string} printType - Valor recibido (ej: 'ReimpresiÃ³n', 'Adicional', 'Inicial')
- * @returns {string} Valor normalizado en minÃºsculas sin acentos
- */
-function normalizePrintType_(printType) {
-  if (!printType) return "";
-  var s = printType.toString().trim().toLowerCase();
-  // Reemplazo simple de vocales acentuadas (Apps Script no siempre soporta normalize())
-  s = s.replace(/Ã¡/g, 'a').replace(/Ã©/g, 'e').replace(/Ã­/g, 'i').replace(/Ã³/g, 'o').replace(/Ãº/g, 'u');
-  return s;
-}
-
-/**
- * Determina si un tipo de impresiÃ³n corresponde a una reimpresiÃ³n.
- * Acepta cualquier variante de acento/caso ('ReimpresiÃ³n', 'Reimpresion', ...).
- * @param {string} printType - Valor de tipo de impresiÃ³n
- * @returns {boolean} true si es reimpresiÃ³n
- */
-function isReimpresionType_(printType) {
-  return normalizePrintType_(printType).indexOf('reimp') === 0;
-}
-
-/**
- * Agrega una lÃ­nea con timestamp al historial consolidado de una orden.
- * Escribe en la columna 'HistorialImpresion' de la hoja Ordenes (append, no sobrescribe).
- * Si la columna no existe, no falla (registra advertencia) para no romper transacciones.
- * @param {Sheet} sheet - Hoja 'Ordenes'
- * @param {number} rowIndex - Fila base-1 de la orden
- * @param {Array} headers - Encabezados de la hoja
- * @param {string} texto - Texto del evento a registrar
+ * Actualiza el estado consolidado (EstadoDocumentos) de una fila revisando Drive.
  */
 function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
-  var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-  var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
   var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+  if (!colEstadoIdx) return;
   
-  if (!colNoOrdenIdx || !colEstadoIdx) {
-    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoDocumentos");
-    return;
-  }
+  var colOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
+  var colAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
   
-  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
-  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
+  var noOrden = colOrdenIdx ? sheet.getRange(rowIndex, colOrdenIdx).getValue() : "";
+  var noAnalisis = colAnalisisIdx ? sheet.getRange(rowIndex, colAnalisisIdx).getValue() : "";
   
-  // Si la fila esta vacia, borrar estado
-  if ((!noOrden || String(noOrden).trim() === "") && 
-      (!noAnalisis || String(noAnalisis).trim() === "")) {
+  // Si la fila está vacía, borrar estado
+  if ((!noOrden || noOrden.toString().trim() === "") && 
+      (!noAnalisis || noAnalisis.toString().trim() === "")) {
     sheet.getRange(rowIndex, colEstadoIdx).setValue("");
     return;
   }
   
-  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
-  var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
-  
-  sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
-}
-
-/**
- * Agrega una línea de historial a la orden (columna HistorialImpresion).
-function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
-  var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
-  var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
-  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
-  
-  if (!colNoOrdenIdx || !colEstadoIdx) {
-    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoDocumentos");
-    return;
-  }
-  
-  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
-  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
-  
-  // Si la fila esta vacia, borrar estado
-  if ((!noOrden || String(noOrden).trim() === "") && 
-      (!noAnalisis || String(noAnalisis).trim() === "")) {
-    sheet.getRange(rowIndex, colEstadoIdx).setValue("");
-    return;
-  }
-  
-  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
-  var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
-  
-  sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
-}
-  
-  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
-  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
-  
-  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
-  
-  // Actualizar Sistema Legacy
-  if (colEstadoIdx) {
-    var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
-    sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
-  }
-  
-  // Actualizar Sistema Nuevo
-  if (colEstadoCargaIdx || colAdjuntoOAIdx || colAdjuntoCOAIdx) {
-    if (colAdjuntoOAIdx) {
-      sheet.getRange(rowIndex, colAdjuntoOAIdx).setValue(res.tieneOA ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE);
-    }
-    if (colAdjuntoCOAIdx) {
-      sheet.getRange(rowIndex, colAdjuntoCOAIdx).setValue(res.tieneCOA ? VALORES_DOCUMENTO.CARGADO : VALORES_DOCUMENTO.PENDIENTE);
-    }
-    if (colEstadoCargaIdx) {
-      var estadoCarga = VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
-      if (res.tieneOA && res.tieneCOA) estadoCarga = VALORES_ESTADO_CARGA.CARGADOS;
-      else if (res.tieneOA && !res.tieneCOA) estadoCarga = VALORES_ESTADO_CARGA.PENDIENTE_COA;
-      else if (!res.tieneOA && res.tieneCOA) estadoCarga = VALORES_ESTADO_CARGA.PENDIENTE_OA;
-      
-      sheet.getRange(rowIndex, colEstadoCargaIdx).setValue(estadoCarga);
+  var colStatusIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+  if (colStatusIdx) {
+    var currentStatus = sheet.getRange(rowIndex, colStatusIdx).getValue().toString().trim();
+    if (currentStatus === VALORES_STATUS.ANULADA) {
+      sheet.getRange(rowIndex, colEstadoIdx).setValue("🚫 Orden Anulada");
+      return;
     }
   }
-}
-  
-  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
-  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
   
   var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
   var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
