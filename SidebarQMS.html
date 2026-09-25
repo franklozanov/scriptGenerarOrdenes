@@ -873,6 +873,12 @@
     // así que aquí solo queda aplicar los permisos. Se conservan los chequeos defensivos
     // de usuario no registrado / bloqueado por si el Sidebar se abre por alguna otra vía.
     async function runLoginGate(data) {
+      if (data && data.isPrewarming) {
+        var overlayText = document.getElementById("loading-text");
+        if (overlayText) overlayText.innerHTML = '<i data-lucide="shield-check" style="width:24px; height:24px; margin-bottom:10px; color:#10b981;"></i><br>Por favor, ingresa tu PIN en la ventana emergente para continuar.';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+      }
       var overlayText = document.getElementById("loading-text");
       var user = data.currentUser;
 
@@ -929,6 +935,15 @@
           const timeEl = document.getElementById('session-time-el');
           if (timeEl) timeEl.textContent = 'Sesi�n activa';
         }
+        // Hide skeleton and show real menu
+        const skel = document.getElementById('gestion-skeleton');
+        const cont = document.getElementById('gestion-content');
+        if (skel) skel.style.display = 'none';
+        if (cont) {
+          cont.style.display = 'block';
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
       }
       userInfo.innerHTML = '<i data-lucide="user"></i> ' + data.currentUser.userId + ' - <strong>' + (data.currentUser.nombreCorto || data.currentUser.nombreCompleto) + '</strong>';
       }

@@ -47,23 +47,31 @@ function abrirSidebarQMS() {
  * real) de bloqueo de acceso a los datos durante la autenticación.
  */
 function abrirPanelQMS() {
-  // Si la sesión validada por PIN sigue vigente (dentro de la ventana de persistencia
-  // configurada por el admin), se salta el modal de PIN y se abre el panel directamente.
-  // Las firmas 21 CFR Part 11 (impresión, autorización QA, aprobaciones) NO se ven
-  // afectadas: siguen pidiendo PIN por su cuenta al ejecutarse.
-  var sesion = sesionSigueVigente_();
-  if (sesion.vigente) {
-    abrirSidebarQMS();
-    return;
-  }
+    // Si la sesión validada por PIN sigue vigente (dentro de la ventana de persistencia
+    // configurada por el admin), se salta el modal de PIN y se abre el panel directamente.
+    var sesion = sesionSigueVigente_();
+    if (sesion.vigente) {
+      abrirSidebarQMS();
+      return;
+    }
 
-  var template = HtmlService.createTemplateFromFile('ModalLoginPin');
-  template.identidad = JSON.stringify(resolverIdentidadSesion());
-  var html = template.evaluate()
-      .setWidth(380)
-      .setHeight(520);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Ingreso Seguro QMS');
-}
+    // PRE-WARM SIDEBAR
+    // Al abrir el sidebar en estado "prewarming", el HTML, CSS y scripts pesados
+    // (como pdf-lib y los iconos) se cargan y parsean en el navegador mientras
+    // el usuario tipea el PIN, dando la impresión de carga instantánea post-login.
+    var sbTemplate = HtmlService.createTemplateFromFile('SidebarQMS');
+    sbTemplate.initialData = JSON.stringify({ isPrewarming: true });
+    var sbHtml = sbTemplate.evaluate().setTitle('Panel Principal QMS').setWidth(300);
+    SpreadsheetApp.getUi().showSidebar(sbHtml);
+  
+    // MOSTRAR MODAL LOGIN
+    var template = HtmlService.createTemplateFromFile('ModalLoginPin');
+    template.identidad = JSON.stringify(resolverIdentidadSesion());
+    var html = template.evaluate()
+        .setWidth(380)
+        .setHeight(520);
+    SpreadsheetApp.getUi().showModalDialog(html, 'Ingreso Seguro QMS');
+  }
 
 /**
  * Resuelve la(s) identidad(es) asociadas al correo de la sesión activa, para el
