@@ -6,77 +6,101 @@
   <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
   <style>
     body { padding: 0; margin: 0; font-family: 'Inter', sans-serif; background-color: #f8f9fa; overflow-x: hidden; }
-    
-    /* Navigation System */
     .view-container { display: flex; width: 200vw; transition: transform 0.3s ease-in-out; }
     .view-panel { width: 100vw; height: 100vh; overflow-y: auto; flex-shrink: 0; }
     .show-main { transform: translateX(0); }
     .show-sub { transform: translateX(-100vw); }
-    
-    /* Header del Sub-view */
-    .sub-header { background: #fff; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-    .btn-back { background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b; padding: 6px; margin-right: 12px; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+    .sub-header { background: #fff; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; position: sticky; top: 0; z-index: 10; }
+    .btn-back { background: none; border: none; cursor: pointer; color: #64748b; margin-right: 8px; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
     .btn-back:hover { background: #f1f5f9; color: #0f172a; }
-    .sub-title { font-size: 16px; font-weight: 600; color: #0f172a; margin: 0; }
-
-    /* Estilos del Main View (Tabs) */
-    .tabs { display: flex; flex-direction: column; width: 100%; height: 100%; }
-    .tab-header { display: flex; background: #fff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; box-shadow: 0 2px 4px -1px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 10; }
-    .tab-btn { flex: 1; min-width: 50%; padding: 14px 4px; cursor: pointer; text-align: center; border: none; background: none; font-weight: 500; font-size: 13px; color: #64748b; border-bottom: 2px solid transparent; transition: all 0.2s ease; }
+    .btn-back i[data-lucide] { width: 16px; height: 16px; }
+    .sub-title { font-size: 14px; font-weight: 600; color: #0f172a; margin: 0; }
+    .tabs { display: flex; flex-direction: column; width: 100%; min-height: 100%; }
+    .tab-header { display: flex; background: #fff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 10; }
+    .tab-btn { flex: 1; padding: 11px 4px; cursor: pointer; text-align: center; border: none; background: none; font-weight: 500; font-size: 12px; color: #64748b; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; font-family: inherit; }
     .tab-btn:hover { background: #f8fafc; color: #1e293b; }
     .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; font-weight: 600; }
-    .tab-content { flex: 1; padding: 20px; display: none; }
-    .tab-content.active { display: block; animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-    
-    .section-title { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; margin-top: 8px; }
-    
-    .btn-action { width: 100%; padding: 14px 16px; text-align: left; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; margin-bottom: 12px; font-size: 14px; color: #334155; font-weight: 500; display: flex; align-items: center; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.02); transition: all 0.2s ease; }
-    .btn-action:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; background-color: #f1f5f9; color: #94a3b8; }
-    .icon { margin-right: 14px; font-size: 18px; width: 24px; text-align: center; }
-    
-    /* Overlay global compatible con GlobalScripts */
-    #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: #334155; font-size: 14px; font-weight: 500; }
-    .spinner { border: 4px solid #f1f5f9; border-top: 4px solid #3b82f6; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; margin-bottom: 12px; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .tab-btn i[data-lucide] { width: 14px; height: 14px; }
+    .tab-content { flex: 1; padding: 0 14px 80px; display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    /* USER HEADER */
+    .user-header { background: #fff; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 10px; }
+    .user-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; letter-spacing: -0.3px; }
+    .user-avatar.skeleton-avatar { background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name { font-size: 13px; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: #eff6ff; color: #2563eb; margin-top: 2px; }
+    .user-role-badge.admin { background: #faf5ff; color: #7c3aed; }
+    .user-role-badge.qa { background: #f0fdf4; color: #16a34a; }
+    .btn-switch-user { background: none; border: 1px solid #e2e8f0; color: #64748b; border-radius: 7px; padding: 5px 8px; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.18s; flex-shrink: 0; display: flex; align-items: center; gap: 3px; font-family: inherit; }
+    .btn-switch-user:hover { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+    .btn-switch-user i[data-lucide] { width: 12px; height: 12px; }
+    .session-pill { display: flex; align-items: center; gap: 6px; margin: 0 14px 2px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 5px 10px; font-size: 10px; color: #166534; font-weight: 500; }
+    .session-dot { width: 5px; height: 5px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+    /* SECTION LABELS */
+    .section-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; padding: 14px 0 6px; display: flex; align-items: center; gap: 8px; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: #f1f5f9; }
+    /* ACTION BUTTONS */
+    .btn-action { width: 100%; padding: 11px 12px; text-align: left; background: #fff; border: 1px solid #e8ecf0; border-radius: 10px; cursor: pointer; margin-bottom: 7px; font-family: inherit; display: flex; align-items: center; gap: 11px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: all 0.15s ease; }
+    .btn-action:hover:not(:disabled) { background: #f8fafc; border-color: #bfdbfe; box-shadow: 0 2px 8px rgba(37,99,235,0.06); transform: translateY(-1px); }
+    .btn-action:active:not(:disabled) { transform: none; box-shadow: none; }
+    .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
+    .action-icon { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #eff6ff; color: #2563eb; }
+    .action-icon i[data-lucide], .action-icon svg { width: 15px; height: 15px; }
+    .action-icon.green { background: #f0fdf4; color: #16a34a; }
+    .action-icon.purple { background: #faf5ff; color: #7c3aed; }
+    .action-icon.amber { background: #fffbeb; color: #d97706; }
+    .action-icon.red { background: #fef2f2; color: #dc2626; }
+    .action-icon.slate { background: #f8fafc; color: #64748b; }
+    .action-text { flex: 1; }
+    .action-title { font-size: 13px; font-weight: 600; color: #0f172a; display: block; line-height: 1.2; }
+    .action-sub { font-size: 11px; color: #94a3b8; display: block; margin-top: 2px; }
+    .action-arrow { color: #d1d5db; flex-shrink: 0; }
+    .action-arrow i[data-lucide] { width: 13px; height: 13px; }
+    .btn-action:hover:not(:disabled) .action-arrow { color: #9ca3af; }
+    .badge-admin { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; white-space: nowrap; }
+    /* SKELETON */
+    .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; border-radius: 10px; }
+    .skeleton-btn { height: 54px; margin-bottom: 7px; }
+    /* Overlay */
+    #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: #334155; font-size: 13px; font-weight: 500; }
+    .spinner { border: 3px solid #f1f5f9; border-top: 3px solid #3b82f6; border-radius: 50%; width: 26px; height: 26px; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
     .hidden { display: none !important; }
-
-    /* Estilos para Carga de Órdenes (Cards) */
-    .view-body { padding: 20px; }
-    .paste-instruction { background-color: #eff6ff; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #1e40af; border-radius: 8px; border-left: 4px solid #3b82f6; }
-    
-    .order-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 2px 4px -1px rgba(0,0,0,0.03); overflow: hidden; transition: all 0.2s; }
-    .order-card:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-color: #cbd5e1; }
-    .card-header { background: #f8fafc; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: #1e293b; }
-    .btn-delete-card { background: #fef2f2; color: #dc2626; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .btn-delete-card:hover { background: #fee2e2; }
-    
-    .card-body { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .card-body input.form-input, select.form-input, textarea.form-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; font-family: inherit; transition: all 0.2s; }
-    .card-body input.form-input:focus, select.form-input:focus, textarea.form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    /* Cards/Forms */
+    .view-body { padding: 14px 16px; }
+    .paste-instruction { background: #eff6ff; padding: 11px 13px; margin-bottom: 14px; font-size: 13px; color: #1e40af; border-radius: 8px; border-left: 3px solid #3b82f6; }
+    .order-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); overflow: hidden; transition: all 0.2s; }
+    .order-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.06); }
+    .card-header { background: #f8fafc; padding: 9px 13px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #1e293b; }
+    .btn-delete-card { background: #fef2f2; color: #dc2626; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .card-body { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .card-body input.form-input, select.form-input, textarea.form-input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-family: inherit; transition: all 0.2s; }
+    .card-body input.form-input:focus, select.form-input:focus, textarea.form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
     .card-body .full-width { grid-column: span 2; }
-    
     .field-wrapper { position: relative; }
     .field-wrapper.full-width { grid-column: span 2; }
-    .field-msg { font-size: 10px; margin-top: 3px; display: none; padding-left: 2px; }
+    .field-msg { font-size: 10px; margin-top: 2px; display: none; }
     .field-msg.error { display: block; color: #ef4444; }
     .field-msg.success { display: block; color: #10b981; }
     .input-error { border-color: #ef4444 !important; }
     .input-success { border-color: #10b981 !important; }
-    
-    .file-upload-box { border: 1px dashed #cbd5e1; padding: 10px; border-radius: 6px; text-align: center; font-size: 11px; margin-top: 6px; background: #f8fafc; transition: all 0.2s; }
+    .file-upload-box { border: 1px dashed #cbd5e1; padding: 10px; border-radius: 6px; text-align: center; font-size: 11px; margin-top: 6px; background: #f8fafc; }
     .file-upload-box:hover { border-color: #94a3b8; background: #f1f5f9; }
     .file-upload-box input { max-width: 100%; font-size: 11px; }
-    
-    .bottom-actions { position: sticky; bottom: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; gap: 12px; z-index: 10; }
-    .btn-primary-small { background: #2563eb; color: white; border: none; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; flex: 1; transition: all 0.2s; box-shadow: 0 1px 2px rgba(37,99,235,0.1); }
-    .btn-primary-small:hover:not(:disabled) { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(37,99,235,0.2); }
-    .btn-primary-small:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-secondary-small { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-    .btn-secondary-small:hover { background: #e2e8f0; color: #1e293b; }
-    
-    #tableInfo { font-size: 13px; color: #64748b; margin-bottom: 12px; text-align: center; }
+    .bottom-actions { position: sticky; bottom: 0; background: rgba(255,255,255,0.97); backdrop-filter: blur(6px); padding: 10px 16px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; z-index: 10; }
+    .btn-primary-small { background: #2563eb; color: white; border: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex: 1; transition: all 0.18s; font-family: inherit; }
+    .btn-primary-small:hover:not(:disabled) { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+    .btn-primary-small:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary-small { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 9px 13px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.18s; font-family: inherit; }
+    .btn-secondary-small:hover { background: #f1f5f9; color: #1e293b; border-color: #cbd5e1; }
+    #tableInfo { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+    .icon { margin-right: 10px; width: 20px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+    .section-title { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; margin: 14px 0 8px; }
   </style>
 </head>
 <body>
@@ -128,6 +152,21 @@
     
     <!-- MAIN VIEW: Tabs y Menús -->
     <div class="view-panel" id="mainView">
+      <!-- USER HEADER (Stripe-style) -->
+      <div class="user-header" id="user-header-block">
+        <div class="user-avatar skeleton-avatar" id="user-avatar-el"></div>
+        <div class="user-info">
+          <div class="user-name skeleton" style="width:100px; height:12px; margin-bottom:4px;" id="user-name-el"></div>
+          <div class="user-role-badge skeleton" style="width:60px; height:10px;" id="user-role-el"></div>
+        </div>
+        <button class="btn-switch-user" onclick="sp_cerrarSesion()" title="Cambiar usuario">
+          <i data-lucide="log-out"></i>
+        </button>
+      </div>
+      <div class="session-pill hidden" id="session-pill-el">
+        <div class="session-dot"></div>
+        <span id="session-time-el">Sesi�n activa</span>
+      </div>
       <div class="tabs">
         <div class="tab-header">
           <button class="tab-btn active" data-target="tab-gestion"><i data-lucide="clipboard-list"></i> Gestión de Órdenes</button>
@@ -135,42 +174,101 @@
         </div>
         
         <div id="tab-gestion" class="tab-content active">
-          <div class="section-title">Gestión de Documentos</div>
-          <button id="btn-load-orders" class="btn-action" onclick="openSubView('carga-ordenes')">
-            <span class="icon"><i data-lucide="download"></i></span>  Solicitar Nueva Órden
-          </button>
-          <button id="btn-upload-docs" class="btn-action" onclick="openSubView('subida-documentos')">
-            <span class="icon"><i data-lucide="upload"></i></span> Subir Documentos Adjuntos
-          </button>
+          <!-- SKELETON STATE while loading -->
+          <div id="gestion-skeleton">
+            <div class="section-label" style="padding: 14px 0 8px;">Cargando...</div>
+            <div class="skeleton skeleton-btn"></div>
+            <div class="skeleton skeleton-btn"></div>
+            <div class="skeleton skeleton-btn" style="opacity:0.6;"></div>
+            <div class="skeleton skeleton-btn" style="opacity:0.4;"></div>
+          </div>
 
-          <div class="section-title" style="margin-top: 24px;">Centro de Impresión</div>
-          <button id="btn-print-order" class="btn-action" onclick="openSubView('imprimir-orden')">
-            <span class="icon"><i data-lucide="printer"></i>️</span> Imprimir Orden
-          </button>
-          <button id="btn-request-reprint" class="btn-action" onclick="openSubView('imprimir-orden')">
-            <span class="icon"><i data-lucide="clipboard-list"></i></span> Solicitar Reimpresión
-          </button>
+          <!-- REAL CONTENT (shown after load) -->
+          <div id="gestion-content" style="display:none;">
 
-          <div class="section-title" style="margin-top: 24px;">Gestión de Piso</div>
-          <button id="btn-register-novelty" class="btn-action" onclick="openSubView('registro-novedad')">
-            <span class="icon"><i data-lucide="file-edit"></i></span> Registrar Novedad / Entrega
-          </button>
+            <div class="section-label">Documentos</div>
 
-          <div class="section-title" style="margin-top: 24px;">Aprobaciones QA</div>
-          <button id="btn-auth-qa" class="btn-action" onclick="openSubView('qa-autorizar')">
-            <span class="icon"><i data-lucide="check-circle-2"></i></span> Autorizar Órdenes
-          </button>
-          <button id="btn-approve-print" class="btn-action" onclick="openSubView('qa-impresion')">
-            <span class="icon"><i data-lucide="shield-check"></i>️</span> Aprobar Reimpresión
-          </button>
-        </div>
-        
-        <div id="tab-config" class="tab-content">
+            <button id="btn-load-orders" class="btn-action" onclick="openSubView('carga-ordenes')">
+              <div class="action-icon"><i data-lucide="inbox"></i></div>
+              <div class="action-text">
+                <span class="action-title">Solicitar Nueva Orden</span>
+                <span class="action-sub">Ingresar una orden de producci�n</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+
+            <button id="btn-upload-docs" class="btn-action" onclick="openSubView('subida-documentos')">
+              <div class="action-icon green"><i data-lucide="upload"></i></div>
+              <div class="action-text">
+                <span class="action-title">Subir Documentos</span>
+                <span class="action-sub">OA / COA adjuntos a la orden</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+
+            <div class="section-label">Impresi�n</div>
+
+            <button id="btn-print-order" class="btn-action" onclick="openSubView('imprimir-orden')">
+              <div class="action-icon purple"><i data-lucide="printer"></i></div>
+              <div class="action-text">
+                <span class="action-title">Imprimir Orden</span>
+                <span class="action-sub">Genera el PDF con firma electr�nica</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+
+            <button id="btn-request-reprint" class="btn-action" onclick="openSubView('imprimir-orden')">
+              <div class="action-icon amber"><i data-lucide="refresh-cw"></i></div>
+              <div class="action-text">
+                <span class="action-title">Solicitar Reimpresi�n</span>
+                <span class="action-sub">Requiere autorizaci�n de QA</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+
+            <div class="section-label">Piso / Entrega</div>
+
+            <button id="btn-register-novelty" class="btn-action" onclick="openSubView('registro-novedad')">
+              <div class="action-icon slate"><i data-lucide="file-edit"></i></div>
+              <div class="action-text">
+                <span class="action-title">Registrar Novedad</span>
+                <span class="action-sub">Devoluciones, diferencias o novedades</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+
+            <div class="section-label">Aprobaciones QA</div>
+
+            <button id="btn-auth-qa" class="btn-action" onclick="openSubView('qa-autorizar')">
+              <div class="action-icon green"><i data-lucide="check-circle-2"></i></div>
+              <div class="action-text">
+                <span class="action-title">Autorizar �rdenes</span>
+                <span class="action-sub">Revisi�n y liberaci�n de documentos</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+
+            <button id="btn-approve-print" class="btn-action" onclick="openSubView('qa-impresion')">
+              <div class="action-icon red"><i data-lucide="shield-check"></i></div>
+              <div class="action-text">
+                <span class="action-title">Aprobar Reimpresi�n</span>
+                <span class="action-sub">Validar solicitudes pendientes</span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
+            </button>
+          </div>
+          
+          <div id="tab-config" class="tab-content">
           <div class="section-title">Configuración del Sistema</div>
           <div id="config-content" style="font-size: 13px; color: #64748b; padding: 10px 0;">
             <p>Opciones de configuración exclusivas para administradores.</p>
             <button id="btn-init-system" class="btn-action" onclick="ejecutarInicializacion()">
-              <span class="icon"><i data-lucide="wrench"></i>️</span> Inicializar Sistema
+              <div class="action-icon amber"><i data-lucide="wrench"></i></div>
+              <div class="action-text">
+                <span class="action-title">Inicializar Sistema</span>
+                <span class="action-sub">Validar estructura de Google Sheets <span class="badge-admin">ADMIN</span></span>
+              </div>
+              <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
             </button>
 
             <!-- Diagnóstico de Matrices -->
@@ -178,7 +276,12 @@
               <div class="section-title" style="margin-top:0;">Diagnóstico de Sistemas</div>
               <p style="font-size:12px; margin-bottom:8px;">Verifica la salud de las Matrices K conectadas.</p>
               <button class="btn-action" onclick="cfg_diagnosticarMatrices()">
-                <span class="icon">🩺</span> Ejecutar Diagnóstico de Matrices
+                <div class="action-icon slate"><i data-lucide="activity"></i></div>
+                <div class="action-text">
+                  <span class="action-title">Diagnóstico de Matrices</span>
+                  <span class="action-sub">Verificar salud de conexiones externas</span>
+                </div>
+                <div class="action-arrow"><i data-lucide="chevron-right"></i></div>
               </button>
               <div id="diagnostics-results" style="margin-top:10px; font-size:12px; display:none; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;"></div>
             </div>
@@ -188,7 +291,12 @@
               <div class="section-title" style="margin-top:0;">Gestión de Matrices K</div>
               <p style="font-size:12px; margin-bottom:8px;">Crear, editar o eliminar Matrices K externas. Requiere PIN de administrador.</p>
               <button class="btn-action" onclick="mtz_abrirForm()">
-                <span class="icon"><i data-lucide="plus"></i></span> Nueva Matriz
+                <div class="action-icon green"><i data-lucide="network"></i></div>
+                <div class="action-text">
+                  <span class="action-title">Nueva Matriz K</span>
+                  <span class="action-sub">Crear conexión a base de datos</span>
+                </div>
+                <div class="action-arrow"><i data-lucide="plus"></i></div>
               </button>
 
               <div id="matrices-lista" style="margin-top:12px; font-size:12px;"></div>
@@ -201,7 +309,12 @@
               <div class="section-title" style="margin-top:0;">Gestión de Plantillas / Variables</div>
               <p style="font-size:12px; margin-bottom:8px;">Añadir nuevas configuraciones o plantillas.</p>
               <button class="btn-action" onclick="cfg_abrirModalPlantilla()">
-                <span class="icon"><i data-lucide="plus"></i></span> Añadir Nueva Plantilla
+                <div class="action-icon purple"><i data-lucide="file-plus"></i></div>
+                <div class="action-text">
+                  <span class="action-title">Añadir Plantilla</span>
+                  <span class="action-sub">Vincular documento o variable</span>
+                </div>
+                <div class="action-arrow"><i data-lucide="plus"></i></div>
               </button>
               
               <!-- Mini form embebido (oculto por defecto) -->
@@ -327,17 +440,7 @@
           </div>
         </div>
 
-        <!-- FOOTER: Identidad y Cerrar Sesión (Visible en todas las tabs principales) -->
-        <div style="margin-top: auto; position: sticky; bottom: 0; background: #fff; padding: 12px 20px; border-top: 1px solid #e2e8f0; z-index: 10; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -2px 4px rgba(0,0,0,0.02);">
-          <div id="sidebar-user-info" style="font-size: 11px; color: #475569; text-align: center; font-weight: 500;">
-            Cargando usuario...
-          </div>
-          <button class="btn-secondary-small" style="width: 100%; color: #c5221f; padding: 8px; display: flex; align-items: center; justify-content: center;" onclick="sp_cerrarSesion()">
-            <span class="icon" style="margin-right: 6px; font-size: 14px; width: auto;"><i data-lucide="lock"></i></span> Cerrar sesión
-          </button>
-        </div>
-
-      </div>
+        <!-- FOOTER removed — session controls are now in user-header -->
     </div>
 
     <!-- SUB VIEW: Secciones Dinámicas -->
@@ -792,7 +895,43 @@
 
       var userInfo = document.getElementById("sidebar-user-info");
       if (userInfo && data.currentUser) {
-        userInfo.innerHTML = '<i data-lucide="user"></i> ' + data.currentUser.userId + ' - <strong>' + (data.currentUser.nombreCorto || data.currentUser.nombreCompleto) + '</strong>';
+        // -- User Header (Stripe-style) ----------------------
+      const avatarEl = document.getElementById('user-avatar-el');
+      const nameEl = document.getElementById('user-name-el');
+      const roleEl = document.getElementById('user-role-el');
+      const sessionPill = document.getElementById('session-pill-el');
+      
+      if (avatarEl && data.currentUser) {
+        const displayName = data.currentUser.nombreCorto || data.currentUser.nombreCompleto || data.currentUser.userId;
+        const initials = displayName.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+        
+        // Avatar with initials (remove skeleton class)
+        avatarEl.classList.remove('skeleton-avatar');
+        avatarEl.textContent = initials;
+        
+        // Name
+        nameEl.classList.remove('skeleton');
+        nameEl.style.width = '';
+        nameEl.style.height = '';
+        nameEl.textContent = displayName;
+        
+        // Role badge
+        const rol = (data.currentUser.rol || '').toUpperCase();
+        roleEl.classList.remove('skeleton');
+        roleEl.style.width = '';
+        roleEl.style.height = '';
+        roleEl.textContent = data.currentUser.rol || 'Usuario';
+        if (rol === 'ADMIN' || rol === 'ADMINISTRADOR DE SISTEMA') roleEl.classList.add('admin');
+        else if (rol.includes('QA')) roleEl.classList.add('qa');
+        
+        // Session pill
+        if (sessionPill) {
+          sessionPill.classList.remove('hidden');
+          const timeEl = document.getElementById('session-time-el');
+          if (timeEl) timeEl.textContent = 'Sesi�n activa';
+        }
+      }
+      userInfo.innerHTML = '<i data-lucide="user"></i> ' + data.currentUser.userId + ' - <strong>' + (data.currentUser.nombreCorto || data.currentUser.nombreCompleto) + '</strong>';
       }
 
       // Inicializar checkbox de modo mantenimiento
