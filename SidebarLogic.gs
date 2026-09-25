@@ -274,3 +274,6 @@ function cambiarUsuarioDesdePanel() {
     
   ui.showModalDialog(html, ' ');
 }
+
+
+function rpcToWebApp(params) { return handlePrivilegedOperation_(params); }
