@@ -188,10 +188,10 @@
     toast.className = `toast toast-${type}`;
     
     // Icono según tipo
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    if (type === 'warning') icon = '⚠️';
+    let icon = '<i data-lucide="info"></i>️';
+    if (type === 'success') icon = '<i data-lucide="check-circle-2"></i>';
+    if (type === 'error') icon = '<i data-lucide="x"></i>';
+    if (type === 'warning') icon = '<i data-lucide="alert-triangle"></i>️';
 
     toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-message">${message}</span>`;
     
@@ -1023,3 +1023,6 @@
     });
   }
 </script>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>lucide.createIcons();</script>

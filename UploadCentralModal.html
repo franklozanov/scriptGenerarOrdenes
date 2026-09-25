@@ -393,7 +393,7 @@
     </div>
 
     <button class="btn-add" id="btnAdd" onclick="addRow()">+ Agregar Orden</button>
-    <button class="btn-upload" id="btnUpload" onclick="uploadAll()" disabled>📤 Subir Todo</button>
+    <button class="btn-upload" id="btnUpload" onclick="uploadAll()" disabled><i data-lucide="upload"></i> Subir Todo</button>
     <button class="btn-cancel" id="btnCancel" onclick="cancel()">Cancelar</button>
 
     <div class="progress-container" id="progressContainer">
@@ -404,7 +404,7 @@
     </div>
 
     <div class="summary" id="summary">
-      <h3>✅ Proceso Finalizado</h3>
+      <h3><i data-lucide="check-circle-2"></i> Proceso Finalizado</h3>
       <p id="summaryMessage">Todos los archivos han sido procesados.</p>
       <div class="stats">
         <div class="stat">
@@ -416,13 +416,13 @@
           <div class="stat-label">Con Errores</div>
         </div>
       </div>
-      <button class="btn-upload" onclick="resetForm()" style="margin-top: 12px;">🔄 Nueva Carga</button>
+      <button class="btn-upload" onclick="resetForm()" style="margin-top: 12px;"><i data-lucide="refresh-cw"></i> Nueva Carga</button>
     </div>
   </div>
 
   <!-- Mensaje cuando no hay órdenes pendientes -->
   <div class="container no-orders" id="noOrdersMessage" style="display: none;">
-    <div class="no-orders-icon">📋</div>
+    <div class="no-orders-icon"><i data-lucide="clipboard-list"></i></div>
     <div class="no-orders-text">No hay documentos en el sistema para gestionar (ni órdenes ni análisis).</div>
     <button class="btn-cancel" onclick="cancel()">Cerrar</button>
   </div>
@@ -522,7 +522,7 @@
             // Reemplazar input por badge
             var userContainer = uploadUserName.parentElement;
             userContainer.innerHTML = '<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">' +
-              '<span style="font-size: 1.2em;">👤</span>' +
+              '<span style="font-size: 1.2em;"><i data-lucide="user"></i></span>' +
               '<span>Ingresaste como: <strong>' + userObj.nombreCompleto + '</strong></span>' +
             '</div>';
             
@@ -544,7 +544,7 @@
               overlay.classList.remove('hidden');
               overlay.innerHTML = 
                 '<div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:\'Inter\',sans-serif; color:#0f172a;">' +
-                  '<div style="font-size:2rem; margin-bottom:12px;">👥</div>' +
+                  '<div style="font-size:2rem; margin-bottom:12px;"><i data-lucide="users"></i></div>' +
                   '<h3 style="margin:0 0 8px 0; font-size:1rem;">Selecciona tu perfil</h3>' +
                   '<p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>' +
                   '<select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white; color:#0f172a;">' + optionsHtml + '</select>' +
@@ -563,7 +563,7 @@
           } else {
              document.body.innerHTML = 
                '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: \'Inter\', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">' +
-                 '<div style="font-size: 48px; margin-bottom: 16px;">🚫</div>' +
+                 '<div style="font-size: 48px; margin-bottom: 16px;"><i data-lucide="ban"></i></div>' +
                  '<h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>' +
                  '<p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>' + (myEmail || 'Desconocido') + '</strong> no tiene un usuario asignado en el sistema.</p>' +
                  '<div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.</div>' +
@@ -599,13 +599,13 @@
           <div class="file-input-wrapper">
             <input type="file" accept="application/pdf" onchange="handleFileSelect(this, '${rowId}')">
             <div class="file-info">
-              <div>📄 Arrastra o selecciona PDF</div>
+              <div><i data-lucide="file-text"></i> Arrastra o selecciona PDF</div>
               <div class="file-name"></div>
               <div class="file-size"></div>
             </div>
           </div>
           <div class="status-indicator" id="${rowId}-status"></div>
-          <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>🗑️</button>
+          <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}><i data-lucide="trash-2"></i>️</button>
           <div class="error-message" id="${rowId}-error"></div>
         </div>
       `;
@@ -742,7 +742,7 @@
       // Validar tipo
       if (file.type !== 'application/pdf') {
         wrapper.classList.add('has-error');
-        statusIndicator.textContent = '❌ Solo PDF';
+        statusIndicator.textContent = '<i data-lucide="x"></i> Solo PDF';
         statusIndicator.className = 'status-indicator error';
         statusIndicator.style.display = 'block';
         validateForm();
@@ -753,7 +753,7 @@
       if (file.size > MAX_FILE_SIZE) {
         var sizeMB = (file.size / (1024 * 1024)).toFixed(2);
         wrapper.classList.add('has-error');
-        statusIndicator.textContent = '❌ >10MB';
+        statusIndicator.textContent = '<i data-lucide="x"></i> >10MB';
         statusIndicator.className = 'status-indicator error';
         statusIndicator.style.display = 'block';
         validateForm();
@@ -767,16 +767,16 @@
       fileSize.textContent = sizeKB + ' KB';
       
       // PRE-CARGA: Leer archivo a base64 inmediatamente
-      statusIndicator.textContent = '⏳ Preparando...';
+      statusIndicator.textContent = '<i data-lucide="loader"></i> Preparando...';
       statusIndicator.className = 'status-indicator loading';
       statusIndicator.style.display = 'block';
       
       preloadFileToCache(file, rowId, function(success) {
         if (success) {
-          statusIndicator.textContent = '✓ Listo';
+          statusIndicator.textContent = '<i data-lucide="check"></i> Listo';
           statusIndicator.className = 'status-indicator success';
         } else {
-          statusIndicator.textContent = '❌ Error lectura';
+          statusIndicator.textContent = '<i data-lucide="x"></i> Error lectura';
           statusIndicator.className = 'status-indicator error';
           wrapper.classList.add('has-error');
         }
@@ -808,12 +808,12 @@
           }
         };
         
-        console.log('✓ Archivo pre-cargado en cache:', rowId, file.name);
+        console.log('<i data-lucide="check"></i> Archivo pre-cargado en cache:', rowId, file.name);
         callback(true);
       };
       
       reader.onerror = function() {
-        console.error('✗ Error al pre-cargar archivo:', rowId);
+        console.error('<i data-lucide="x"></i> Error al pre-cargar archivo:', rowId);
         callback(false);
       };
       
@@ -880,7 +880,7 @@
       summary.classList.remove('active');
 
       // CARGA PARALELA: Procesar archivos en lotes
-      console.log('🚀 Iniciando carga paralela de', totalRows, 'archivos (límite:', PARALLEL_UPLOAD_LIMIT, 'simultáneos)');
+      console.log('<i data-lucide="rocket"></i> Iniciando carga paralela de', totalRows, 'archivos (límite:', PARALLEL_UPLOAD_LIMIT, 'simultáneos)');
       
       for (var i = 0; i < rows.length; i += PARALLEL_UPLOAD_LIMIT) {
         var batch = rows.slice(i, i + PARALLEL_UPLOAD_LIMIT);
@@ -946,7 +946,7 @@
       var selectedUser = getSelectedUploadUser();
       
       if (!selectedUser) {
-        statusIndicator.textContent = '❌ Usuario';
+        statusIndicator.textContent = '<i data-lucide="x"></i> Usuario';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
           errorContainer.textContent = 'Seleccione un usuario válido desde el listado.';
@@ -958,7 +958,7 @@
       
       // Validar que exista en cache para cargar y reemplazar
       if (action !== 'eliminar' && !fileCache[rowId]) {
-        statusIndicator.textContent = '❌ No cargado';
+        statusIndicator.textContent = '<i data-lucide="x"></i> No cargado';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
           errorContainer.textContent = 'El archivo no fue pre-cargado correctamente. Intente seleccionarlo de nuevo.';
@@ -975,7 +975,7 @@
       }
       
       // Mostrar estado de carga
-      statusIndicator.textContent = action === 'eliminar' ? '⏳ Eliminando...' : '⏳ Procesando...';
+      statusIndicator.textContent = action === 'eliminar' ? '<i data-lucide="loader"></i> Eliminando...' : '<i data-lucide="loader"></i> Procesando...';
       statusIndicator.className = 'status-indicator loading';
       
       try {
@@ -983,7 +983,7 @@
         if (action === 'eliminar') {
           // Confirmar eliminación
           if (!confirm('¿Está seguro que desea eliminar el ' + docType + ' de la referencia ' + referenceNo + '? Esta acción moverá el archivo a la papelera.')) {
-            statusIndicator.textContent = '❌ Cancelado';
+            statusIndicator.textContent = '<i data-lucide="x"></i> Cancelado';
             statusIndicator.className = 'status-indicator error';
             callback(false);
             return;
@@ -1010,17 +1010,17 @@
         
         if (result.status === 'success' || result.status === 'skipped') {
           if (action === 'eliminar') {
-             statusIndicator.textContent = '✅ Eliminado';
+             statusIndicator.textContent = '<i data-lucide="check-circle-2"></i> Eliminado';
           } else if (result.status === 'skipped') {
-             statusIndicator.textContent = '✅ Ya existe';
+             statusIndicator.textContent = '<i data-lucide="check-circle-2"></i> Ya existe';
              statusIndicator.title = 'Archivo ya existe, estado actualizado sin reemplazar';
           } else {
-             statusIndicator.textContent = '✅ Completado';
+             statusIndicator.textContent = '<i data-lucide="check-circle-2"></i> Completado';
           }
           statusIndicator.className = 'status-indicator success';
           callback(true);
         } else {
-          statusIndicator.textContent = '❌ Error';
+          statusIndicator.textContent = '<i data-lucide="x"></i> Error';
           statusIndicator.className = 'status-indicator error';
           if (errorContainer) {
             errorContainer.textContent = result.message || 'Error desconocido';
@@ -1030,7 +1030,7 @@
         }
       } catch (error) {
         console.error('Error en fila', index + 1, ':', error);
-        statusIndicator.textContent = '❌ Error';
+        statusIndicator.textContent = '<i data-lucide="x"></i> Error';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
           errorContainer.textContent = error.message || 'Error desconocido';

@@ -110,14 +110,14 @@
       <div class="toolbar-group">
         <button class="tool-btn" id="prev-page">⬅ Anterior</button>
         <span class="page-info">Pág. <span id="page-num">0</span> de <span id="page-count">0</span></span>
-        <button class="tool-btn" id="next-page">Siguiente ➡</button>
+        <button class="tool-btn" id="next-page">Siguiente <i data-lucide="arrow-right"></i></button>
       </div>
       <div class="toolbar-group">
-        <button class="tool-btn" id="zoom-out">➖ Zoom</button>
-        <button class="tool-btn" id="zoom-in">➕ Zoom</button>
+        <button class="tool-btn" id="zoom-out"><i data-lucide="minus"></i> Zoom</button>
+        <button class="tool-btn" id="zoom-in"><i data-lucide="plus"></i> Zoom</button>
         <!-- Solo impresión permitida, descarga omitida intencionalmente.
              En modo 'pending' arranca deshabilitado hasta confirmar el guardado oficial. -->
-        <button class="tool-btn btn-print-secure" id="print-doc" <?!= typeof mode !== "undefined" && mode === "pending" ? "disabled" : "" ?>>🖨️ Imprimir</button>
+        <button class="tool-btn btn-print-secure" id="print-doc" <?!= typeof mode !== "undefined" && mode === "pending" ? "disabled" : "" ?>><i data-lucide="printer"></i>️ Imprimir</button>
       </div>
     </div>
 
@@ -212,19 +212,19 @@
     function initPendingViewer() {
       if (!window.opener) {
         hideLoading();
-        vpSetBanner('error', '❌ No se pudo conectar con la ventana de origen. Cierre esta pestaña e intente de nuevo.');
+        vpSetBanner('error', '<i data-lucide="x"></i> No se pudo conectar con la ventana de origen. Cierre esta pestaña e intente de nuevo.');
         return;
       }
 
       showLoading('Esperando documento...');
-      vpSetBanner('info', '⏳ Esperando datos del documento...');
+      vpSetBanner('info', '<i data-lucide="loader"></i> Esperando datos del documento...');
 
       // Si por algún motivo el opener nunca responde (ventana cerrada, error silencioso),
       // no dejar la vista colgada indefinidamente.
       var timeoutId = setTimeout(function() {
         if (!pendingRendered) {
           hideLoading();
-          vpSetBanner('error', '❌ Tiempo de espera agotado esperando el documento. Cierre esta pestaña e intente de nuevo.');
+          vpSetBanner('error', '<i data-lucide="x"></i> Tiempo de espera agotado esperando el documento. Cierre esta pestaña e intente de nuevo.');
         }
       }, 25000);
 
@@ -243,7 +243,7 @@
           pendingRendered = true;
           TARGET_ORDER_NO = data.orderNo || TARGET_ORDER_NO;
           rawPdfBase64 = data.base64;
-          vpSetBanner('info', '👁️ Vista previa — guardando documento oficial en segundo plano...');
+          vpSetBanner('info', '<i data-lucide="eye"></i>️ Vista previa — guardando documento oficial en segundo plano...');
           renderPdfFromBase64(data.base64);
           if (pendingConfirmed) vpApplyConfirmed();
         } else if (data.type === 'vp-confirmed') {
@@ -252,7 +252,7 @@
         } else if (data.type === 'vp-failed') {
           clearTimeout(timeoutId);
           hideLoading();
-          vpSetBanner('error', '❌ ' + (data.message || 'No se pudo guardar el documento oficial.'));
+          vpSetBanner('error', '<i data-lucide="x"></i> ' + (data.message || 'No se pudo guardar el documento oficial.'));
         }
       });
 
@@ -262,7 +262,7 @@
 
     function vpApplyConfirmed() {
       document.getElementById('print-doc').disabled = false;
-      vpSetBanner('success', '✅ Documento oficial guardado. Ya puede imprimir.');
+      vpSetBanner('success', '<i data-lucide="check-circle-2"></i> Documento oficial guardado. Ya puede imprimir.');
     }
 
     function vpSetBanner(type, message) {
@@ -299,7 +299,7 @@
             hideLoading();
             document.querySelector('.canvas-wrapper').innerHTML = `
               <div style="text-align:center; padding:40px; color:#dc2626;">
-                <h3>⚠️ Fallo de Procesamiento de PDF</h3>
+                <h3><i data-lucide="alert-triangle"></i>️ Fallo de Procesamiento de PDF</h3>
                 <p><b>${res.message}</b></p>
               </div>`;
             showError(res.message);

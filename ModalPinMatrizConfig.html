@@ -123,7 +123,7 @@
 </head>
 <body>
   <div class="mp-container">
-    <h3>🔒 Edición Protegida</h3>
+    <h3><i data-lucide="lock"></i> Edición Protegida</h3>
     <div class="mp-context-box" id="mp-context-box"></div>
     <p id="mp-subtitle">Verificando identidad...</p>
     <div id="mp-body"></div>
@@ -215,7 +215,7 @@
 
       if (candidato.estado === 'Bloqueado') {
         setSubtitle('Hola, ' + nombre + '.');
-        setBody('<p style="color:#dc2626; font-size:13px;">⛔ Su usuario está bloqueado por intentos fallidos de PIN.</p>');
+        setBody('<p style="color:#dc2626; font-size:13px;"><i data-lucide="ban"></i> Su usuario está bloqueado por intentos fallidos de PIN.</p>');
         return;
       }
 
@@ -286,7 +286,7 @@
         .then(function (data) {
           if (data.status !== 'success') {
             if (data.message && data.message.indexOf('bloqueado') !== -1) {
-              setBody('<p style="color:#dc2626; font-size:13px;">⛔ ' + escapeHtml(data.message) + '</p>');
+              setBody('<p style="color:#dc2626; font-size:13px;"><i data-lucide="ban"></i> ' + escapeHtml(data.message) + '</p>');
               return;
             }
             showPinError(data.message || 'PIN incorrecto.');
@@ -318,16 +318,16 @@
         .then(function (data) {
           if (data.status === 'success') {
             var r = data.resultado || {};
-            setSubtitle(r.ok ? '✅ Cambio aplicado y validado.' : '⚠️ Cambio aplicado, pero la validación encontró un problema.');
+            setSubtitle(r.ok ? '<i data-lucide="check-circle-2"></i> Cambio aplicado y validado.' : '<i data-lucide="alert-triangle"></i>️ Cambio aplicado, pero la validación encontró un problema.');
             setBody('<p style="font-size:13px;">' + escapeHtml(r.mensaje || '') + '</p>');
           } else {
-            setSubtitle('❌ No se pudo aplicar el cambio.');
+            setSubtitle('<i data-lucide="x"></i> No se pudo aplicar el cambio.');
             setBody('<p style="color:#dc2626; font-size:13px;">' + escapeHtml(data.message || 'Error desconocido.') + '</p>');
           }
           document.getElementById('mp-cancel-btn').textContent = 'Cerrar';
         })
         .catch(function (err) {
-          setSubtitle('❌ Error de conexión.');
+          setSubtitle('<i data-lucide="x"></i> Error de conexión.');
           setBody('<p style="color:#dc2626; font-size:13px;">' + escapeHtml(err && err.message ? err.message : String(err)) + '</p>');
           document.getElementById('mp-cancel-btn').textContent = 'Cerrar';
         });

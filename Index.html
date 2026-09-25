@@ -402,7 +402,7 @@
       <div id="panelSolicitudExtra" style="display: none;" data-requires-permission="SOLICITAR_REIMPRESION">
         <div class="field">
           <div id="solicitudAviso" class="info-text" style="padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;">
-            ⚠️ Esta orden ya fue impresa. Para generar copias adicionales o reimpresiones, debe enviar una solicitud a QA detallando las plantillas requeridas arriba.
+            <i data-lucide="alert-triangle"></i>️ Esta orden ya fue impresa. Para generar copias adicionales o reimpresiones, debe enviar una solicitud a QA detallando las plantillas requeridas arriba.
           </div>
         </div>
         <div class="field">
@@ -416,7 +416,7 @@
           <label>Motivo <span style="color: #dc2626;">*</span></label>
           <textarea id="solicitudMotivo" rows="3" style="width: 100%; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit;" placeholder="Describa el motivo de la solicitud..."></textarea>
         </div>
-        <button id="btnSolicitarExtra" onclick="enviarSolicitudExtraordinaria()" style="width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; margin-top: 12px; font-size: 15px; letter-spacing: 0.3px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">📨 Enviar Solicitud a QA</button>
+        <button id="btnSolicitarExtra" onclick="enviarSolicitudExtraordinaria()" style="width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; margin-top: 12px; font-size: 15px; letter-spacing: 0.3px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);"><i data-lucide="mail"></i> Enviar Solicitud a QA</button>
       </div>
 
       <button id="goBtn" onclick="run()" disabled>Generar PDF Combinado</button>
@@ -468,12 +468,12 @@
 
       function renderPreloadResult(response) {
         if (response.ready) {
-          setPreloadBanner('success', '✅ DOC_ORDENES listo.<br>✅ DOC_ANALISIS listo.<br>✅ Documentos listos para impresión.');
+          setPreloadBanner('success', '<i data-lucide="check-circle-2"></i> DOC_ORDENES listo.<br><i data-lucide="check-circle-2"></i> DOC_ANALISIS listo.<br><i data-lucide="check-circle-2"></i> Documentos listos para impresión.');
           updateGoButtonState();
           return;
         }
-        const messages = (response.errors || []).map(err => '⚠️ ' + err.message);
-        setPreloadBanner('error', messages.join('<br>') || '⚠️ No fue posible preparar los documentos dinámicos.');
+        const messages = (response.errors || []).map(err => '<i data-lucide="alert-triangle"></i>️ ' + err.message);
+        setPreloadBanner('error', messages.join('<br>') || '<i data-lucide="alert-triangle"></i>️ No fue posible preparar los documentos dinámicos.');
         updateGoButtonState();
       }
 
@@ -508,15 +508,15 @@
         // Feedback visual si el orden está listo pero el botón sigue bloqueado
         if (isOrderReady && !isEnabled && !status.innerText.includes("Impresión registrada")) {
           if (!isUserValid) {
-            status.innerText = "⚠️ Seleccione un usuario válido de la lista";
+            status.innerText = "<i data-lucide="alert-triangle"></i>️ Seleccione un usuario válido de la lista";
             status.className = "error-text";
           } else if (!hasCopies) {
-            status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
+            status.innerText = "<i data-lucide="alert-triangle"></i>️ Seleccione al menos 1 copia para imprimir";
             status.className = "error-text";
           }
-        } else if (isOrderReady && isEnabled && status.innerText.includes("⚠️")) {
+        } else if (isOrderReady && isEnabled && status.innerText.includes("<i data-lucide="alert-triangle"></i>️")) {
           // Limpiar aviso si ya todo está correcto
-          status.innerText = "✅ Documentos listos para impresión";
+          status.innerText = "<i data-lucide="check-circle-2"></i> Documentos listos para impresión";
           status.className = "success-text";
         }
       }
@@ -550,9 +550,9 @@
         
         // Show subtle status message
         const status = document.getElementById('status');
-        setPreloadBanner('info', '🔍 Buscando documentos de la orden...');
+        setPreloadBanner('info', '<i data-lucide="search"></i> Buscando documentos de la orden...');
         if (status && !status.innerText.includes("Impresión registrada")) {
-          status.innerText = "🔍 Buscando datos de la orden...";
+          status.innerText = "<i data-lucide="search"></i> Buscando datos de la orden...";
           status.className = "info-text";
         }
         
@@ -561,7 +561,7 @@
             // Race condition control: only accept response if it matches current orderNo
             const currentInput = document.getElementById('orderNo').value.trim();
             if (currentInput !== currentOrderNo) {
-              console.log(`⚠️ Descartando respuesta obsoleta para orden ${currentOrderNo} (actual: ${currentInput})`);
+              console.log(`<i data-lucide="alert-triangle"></i>️ Descartando respuesta obsoleta para orden ${currentOrderNo} (actual: ${currentInput})`);
               return;
             }
 
@@ -570,7 +570,7 @@
             preloadState.pdfsByKey = buildPdfsByKey(response.pdfs);
             preloadState.errors = response.errors || [];
 
-            console.log(`✓ Datos precargados para orden ${currentOrderNo}, STATUS: ${response.orderStatus}`);
+            console.log(`<i data-lucide="check"></i> Datos precargados para orden ${currentOrderNo}, STATUS: ${response.orderStatus}`);
             renderPreloadResult(response);
 
             // --- LÓGICA DE BLOQUEO DE IMPRESIÓN SEGÚN STATUS ---
@@ -583,7 +583,7 @@
               goBtn.style.display = 'block';
               goBtn.disabled = false;
               panelSolicitudExtra.style.display = 'none';
-              setPreloadBanner('success', '✅ Solicitud ' + response.approvedRequest.id + ' Aprobada. Proceda con la impresión autorizada.');
+              setPreloadBanner('success', '<i data-lucide="check-circle-2"></i> Solicitud ' + response.approvedRequest.id + ' Aprobada. Proceda con la impresión autorizada.');
 
               // Parsear JSON de plantillas aprobadas
               let plantillasAprobadas = [];
@@ -613,23 +613,23 @@
                 const input = document.getElementById('val_' + t.key);
                 if (input && t.copies > 0) {
                   input.value = t.copies;
-                  console.log(`✓ Plantilla ${t.key} autorizada con ${t.copies} copia(s)`);
+                  console.log(`<i data-lucide="check"></i> Plantilla ${t.key} autorizada con ${t.copies} copia(s)`);
                 }
               });
 
-              console.log(`✓ Orden ${currentOrderNo} con solicitud aprobada ${response.approvedRequest.id} - Desbloqueo condicional activado`);
+              console.log(`<i data-lucide="check"></i> Orden ${currentOrderNo} con solicitud aprobada ${response.approvedRequest.id} - Desbloqueo condicional activado`);
               updateGoButtonState();
             } else if (response.orderStatus === 'Impreso' || response.orderStatus === 'Reimpreso') {
               // Orden ya impresa sin aprobación: bloquear impresión normal, mostrar solicitud extraordinaria
               goBtn.style.display = 'none';
               goBtn.disabled = true;
               panelSolicitudExtra.style.display = 'block';
-              console.log(`🔒 Orden ${currentOrderNo} con STATUS '${response.orderStatus}' - Bloqueando impresión libre`);
+              console.log(`<i data-lucide="lock"></i> Orden ${currentOrderNo} con STATUS '${response.orderStatus}' - Bloqueando impresión libre`);
             } else if (response.orderStatus === 'Autorizada') {
               // Orden autorizada: permitir impresión normal
               goBtn.style.display = 'block';
               panelSolicitudExtra.style.display = 'none';
-              console.log(`✓ Orden ${currentOrderNo} con STATUS 'Autorizada' - Permitiendo impresión`);
+              console.log(`<i data-lucide="check"></i> Orden ${currentOrderNo} con STATUS 'Autorizada' - Permitiendo impresión`);
             } else {
               // Otros estados: mantener comportamiento por defecto
               goBtn.style.display = 'block';
@@ -638,7 +638,7 @@
 
             // Update status to show data is ready
             if (status && !status.innerText.includes("Impresión registrada")) {
-              status.innerText = response.ready ? "✅ Documentos listos para impresión" : "⚠️ Faltan documentos requeridos";
+              status.innerText = response.ready ? "<i data-lucide="check-circle-2"></i> Documentos listos para impresión" : "<i data-lucide="alert-triangle"></i>️ Faltan documentos requeridos";
               status.className = response.ready ? "success-text" : "error-text";
             }
           })
@@ -646,7 +646,7 @@
             // Race condition control: only accept error if it matches current orderNo
             const currentInput = document.getElementById('orderNo').value.trim();
             if (currentInput !== currentOrderNo) {
-              console.log(`⚠️ Descartando error obsoleto para orden ${currentOrderNo} (actual: ${currentInput})`);
+              console.log(`<i data-lucide="alert-triangle"></i>️ Descartando error obsoleto para orden ${currentOrderNo} (actual: ${currentInput})`);
               return;
             }
             
@@ -657,11 +657,11 @@
             updateGoButtonState();
             
             console.error(`Error precargando orden ${currentOrderNo}:`, error.message);
-            setPreloadBanner('error', `⚠️ Error: ${error.message}`);
+            setPreloadBanner('error', `<i data-lucide="alert-triangle"></i>️ Error: ${error.message}`);
             
             // Show error in status
             if (status) {
-              status.innerText = `⚠️ Error: ${error.message}`;
+              status.innerText = `<i data-lucide="alert-triangle"></i>️ Error: ${error.message}`;
               status.className = "error-text";
             }
           })
@@ -806,14 +806,14 @@
         <? } catch(e) {} ?>
 
         function processInitialData(data) {
-          console.log('🚀 Inicializando modal - data recibida:', data);
+          console.log('<i data-lucide="rocket"></i> Inicializando modal - data recibida:', data);
           globalTemplates = data.templates;
 
           // Store preloaded static template base64 strings in memory
           data.templates.forEach(t => {
             if (t.base64) {
               preloadedStaticPdfs[t.key] = t.base64;
-              console.log(`✓ Precargada en memoria: ${t.key}`);
+              console.log(`<i data-lucide="check"></i> Precargada en memoria: ${t.key}`);
             }
           });
 
@@ -856,7 +856,7 @@
           const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
           if (noAccessCount > 0) {
             const status = document.getElementById('status');
-            status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
+            status.innerHTML = `<i data-lucide="alert-triangle"></i>️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
             status.className = "error-text";
           }
 
@@ -938,13 +938,13 @@
           datalist.appendChild(option);
         });
 
-        console.log(`✓ Datalist poblado con ${ordenes.length} órdenes válidas`);
+        console.log(`<i data-lucide="check"></i> Datalist poblado con ${ordenes.length} órdenes válidas`);
       }
 
       // PDF generation processing function (extracted for reuse)
       async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status) {
         try {
-          status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
+          status.innerText = "<i data-lucide="loader"></i> Paso 2/4: Preparando motor PDF...";
 
           // Merge dynamic templates from payload with preloaded static templates
           // Respect the original order and copies from config
@@ -961,10 +961,10 @@
                   base64: preloadedStaticPdfs[cfg.key],
                   copies: cfg.copies
                 });
-                console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
+                console.log(`<i data-lucide="check"></i> Usando plantilla estática precargada: ${cfg.key}`);
               } else if (cfg.key === 'DOC_COMPLETO') {
                 // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
-                console.log(`✓ Omitiendo DOC_COMPLETO (carpeta de destino)`);
+                console.log(`<i data-lucide="check"></i> Omitiendo DOC_COMPLETO (carpeta de destino)`);
               } else {
                 throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
               }
@@ -977,7 +977,7 @@
                   base64: dynamicPdf.base64,
                   copies: cfg.copies
                 });
-                console.log(`✓ Usando plantilla dinámica del servidor: ${cfg.key}`);
+                console.log(`<i data-lucide="check"></i> Usando plantilla dinámica del servidor: ${cfg.key}`);
               } else {
                 throw new Error(`Falta el archivo para ${cfg.key}. Verifique que el PDF de la orden exista en la carpeta de Drive o que la orden tenga asignado un NoAnalisis válido.`);
               }
@@ -1013,7 +1013,7 @@
             const item = payload.pdfs[itemIdx];
             let progressPct = 20 + (50 * (itemIdx / payload.pdfs.length));
             showPdfProgress('Combinando Plantillas', `Paso 2: Procesando ${item.key} (${itemIdx + 1}/${payload.pdfs.length})...`, progressPct);
-            status.innerText = `⏳ Procesando ${item.key}...`;
+            status.innerText = `<i data-lucide="loader"></i> Procesando ${item.key}...`;
             await yieldToMain();
 
             const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
@@ -1080,7 +1080,7 @@
                   opacity: 1.0
                 });
                 totalPages += 1;
-                console.log(`✓ Página en blanco añadida después de ${item.key}`);
+                console.log(`<i data-lucide="check"></i> Página en blanco añadida después de ${item.key}`);
               }
             }
           }
@@ -1089,7 +1089,7 @@
           const allPages = finalPdf.getPages();
 
           showPdfProgress('Añadiendo Detalles', 'Paso 3: Añadiendo pie de página...', 75);
-          status.innerText = "⏳ Añadiendo pie de página...";
+          status.innerText = "<i data-lucide="loader"></i> Añadiendo pie de página...";
           await yieldToMain();
 
           for (let pIdx = 0; pIdx < allPages.length; pIdx++) {
@@ -1138,14 +1138,14 @@
           } // End for loop for pages
 
           showPdfProgress('Optimizando', 'Paso 4: Optimizando PDF para impresión...', 85);
-          status.innerText = "⏳ Optimizando PDF para impresión...";
+          status.innerText = "<i data-lucide="loader"></i> Optimizando PDF para impresión...";
           await yieldToMain();
 
           // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
           try {
             const finalForm = finalPdf.getForm();
             if (finalForm.getFields().length > 0) {
-              console.log(`✓ Aplanando ${finalForm.getFields().length} campos de formulario en documento final`);
+              console.log(`<i data-lucide="check"></i> Aplanando ${finalForm.getFields().length} campos de formulario en documento final`);
               finalForm.flatten();
             }
           } catch(e) {
@@ -1155,13 +1155,13 @@
           // Purgar el diccionario AcroForm para evitar saturación de memoria en impresoras
           try {
             finalPdf.catalog.delete(PDFLib.PDFName.of('AcroForm'));
-            console.log('✓ Diccionario AcroForm purgado del catálogo maestro');
+            console.log('<i data-lucide="check"></i> Diccionario AcroForm purgado del catálogo maestro');
           } catch(e) {
             console.log('No se pudo purgar AcroForm:', e);
           }
 
           console.time('pdf-save');
-          console.log('✓ Guardando PDF con configuración optimizada para impresión');
+          console.log('<i data-lucide="check"></i> Guardando PDF con configuración optimizada para impresión');
           const pdfData = await finalPdf.save({
             useObjectStreams: true,         // Activa compresión de objetos (FlateDecode)
             addDefaultPage: false,          // No agregar páginas adicionales
@@ -1169,13 +1169,13 @@
             updateFieldAppearances: false   // No actualizar apariencias (ya están aplanadas)
           });
           console.timeEnd('pdf-save');
-          console.log(`✓ PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
+          console.log(`<i data-lucide="check"></i> PDF generado: ${(pdfData.length / 1024 / 1024).toFixed(2)} MB, ${totalPages} páginas`);
           
           const base64Data = uint8ArrayToBase64(new Uint8Array(pdfData));
           console.timeEnd('base64-conversion');
 
           showPdfProgress('Guardando', 'Guardando en Drive y registrando...', 95);
-          status.innerText = "🔄 Guardando en Drive y registrando impresión...";
+          status.innerText = "<i data-lucide="refresh-cw"></i> Guardando en Drive y registrando impresión...";
           await yieldToMain();
 
           // Paso 1: Transacción atómica en el servidor (genera PDF, avanza contador y registra
@@ -1189,7 +1189,7 @@
             console.timeEnd('drive-save');
             console.error('Error en processPrintForUser:', saveErr.message);
             hidePdfProgress();
-            status.innerText = "⚠️ Error al registrar la impresión: " + saveErr.message;
+            status.innerText = "<i data-lucide="alert-triangle"></i>️ Error al registrar la impresión: " + saveErr.message;
             status.className = "error-text";
             btn.disabled = false;
             return;
@@ -1206,7 +1206,7 @@
           } catch (previewErr) {
             const url = previewErr.message.replace('POPUP_BLOCKED:', '');
             hidePdfProgress();
-            status.innerHTML = '✅ Impresión registrada. Las ventanas emergentes están bloqueadas: '
+            status.innerHTML = '<i data-lucide="check-circle-2"></i> Impresión registrada. Las ventanas emergentes están bloqueadas: '
               + '<a href="' + url + '" target="_blank">Abrir PDF</a>';
             status.className = "success-text";
             btn.disabled = false;
@@ -1216,7 +1216,7 @@
           }
 
           hidePdfProgress();
-          status.innerText = "✅ PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
+          status.innerText = "<i data-lucide="check-circle-2"></i> PDF guardado en Drive e impresión registrada. Listo para la siguiente orden.";
           status.className = "success-text";
           document.getElementById('orderNo').value = '';
           resetPreloadState();
@@ -1231,7 +1231,7 @@
         } catch (pdfError) {
           hidePdfProgress();
           showToast("Error generando PDF: " + pdfError.message, 'error');
-          status.innerText = "❌ Error: " + pdfError.message;
+          status.innerText = "<i data-lucide="x"></i> Error: " + pdfError.message;
           status.className = "error-text";
           btn.disabled = false;
         }
@@ -1272,16 +1272,16 @@
         if (config.length === 0) { showToast("Error: Seleccione al menos 1 copia de alguna plantilla.", 'error'); return; }
 
         if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
-          setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca "Documentos listos para impresión".');
-          status.innerText = "⏳ Esperando documentos dinámicos...";
+          setPreloadBanner('info', '<i data-lucide="loader"></i> Aún se están preparando los documentos. Espere a que aparezca "Documentos listos para impresión".');
+          status.innerText = "<i data-lucide="loader"></i> Esperando documentos dinámicos...";
           status.className = "info-text";
           return;
         }
 
         if (!isPreloadReadyForOrder(orderNo)) {
           const messages = (preloadState.orderNo === orderNo && preloadState.errors.length)
-            ? preloadState.errors.map(err => '⚠️ ' + err.message).join('<br>')
-            : '⚠️ Ingrese un No. de Orden válido y espere a que DOC_ORDENES y DOC_ANALISIS estén listos.';
+            ? preloadState.errors.map(err => '<i data-lucide="alert-triangle"></i>️ ' + err.message).join('<br>')
+            : '<i data-lucide="alert-triangle"></i>️ Ingrese un No. de Orden válido y espere a que DOC_ORDENES y DOC_ANALISIS estén listos.';
           setPreloadBanner('error', messages);
           status.innerText = "Proceso bloqueado: faltan documentos requeridos.";
           status.className = "error-text";
@@ -1290,9 +1290,9 @@
 
         btn.disabled = true;
 
-        status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
+        status.innerText = "<i data-lucide="loader"></i> Paso 2/4: Preparando motor PDF (datos precargados)...";
         status.className = "info-text";
-        console.log(`✓ Usando documentos dinámicos precargados para orden ${orderNo}`);
+        console.log(`<i data-lucide="check"></i> Usando documentos dinámicos precargados para orden ${orderNo}`);
         const payload = buildPayloadFromPreload(config);
         processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
       }
@@ -1339,8 +1339,8 @@
 
         // Mostrar loading
         btn.disabled = true;
-        btn.innerText = "⏳ Enviando...";
-        status.innerText = "📨 Enviando solicitud a QA...";
+        btn.innerText = "<i data-lucide="loader"></i> Enviando...";
+        status.innerText = "<i data-lucide="mail"></i> Enviando solicitud a QA...";
         status.className = "info-text";
 
         // Solicitar PIN de firma si no está predefinido en el contexto
@@ -1368,23 +1368,23 @@
             panelSolicitudExtra.style.display = 'none';
             document.getElementById('solicitudMotivo').value = '';
             document.getElementById('solicitudTipo').value = 'Reimpresión';
-            status.innerText = "✅ " + result.message;
+            status.innerText = "<i data-lucide="check-circle-2"></i> " + result.message;
             status.className = "success-text";
-            console.log(`✓ Solicitud enviada exitosamente: ${result.idSolicitud}`);
+            console.log(`<i data-lucide="check"></i> Solicitud enviada exitosamente: ${result.idSolicitud}`);
           } else {
             // Error: mostrar alerta
             showToast("Error al enviar solicitud: " + result.message, 'error');
-            status.innerText = "❌ Error: " + result.message;
+            status.innerText = "<i data-lucide="x"></i> Error: " + result.message;
             status.className = "error-text";
           }
         } catch (error) {
           showToast("Error de comunicación: " + error.message, 'error');
-          status.innerText = "❌ Error de comunicación: " + error.message;
+          status.innerText = "<i data-lucide="x"></i> Error de comunicación: " + error.message;
           status.className = "error-text";
           console.error("Error en enviarSolicitudExtraordinaria:", error);
         } finally {
           btn.disabled = false;
-          btn.innerText = "📨 Enviar Solicitud a QA";
+          btn.innerText = "<i data-lucide="mail"></i> Enviar Solicitud a QA";
         }
       }
 

@@ -241,14 +241,14 @@
       if (candidato.estado === 'Bloqueado') {
         setTitle('Usuario Bloqueado', '#dc2626');
         setSubtitle('Acceso restringido para ' + nombre + '.');
-        setBody('<p style="color:#dc2626; font-size:13px; background:#fef2f2; padding:12px; border-radius:8px; border:1px solid #f87171;">⛔ Su usuario ha sido bloqueado por superar el límite de intentos fallidos de firma. Contacte al administrador.</p>');
+        setBody('<p style="color:#dc2626; font-size:13px; background:#fef2f2; padding:12px; border-radius:8px; border:1px solid #f87171;"><i data-lucide="ban"></i> Su usuario ha sido bloqueado por superar el límite de intentos fallidos de firma. Contacte al administrador.</p>');
         return;
       }
 
       if (candidato.estado === 'Pendiente') {
         setTitle('Acceso Pendiente', '#d97706');
         setSubtitle('Hola, ' + nombre + '.');
-        setBody('<p style="color:#d97706; font-size:13px; background:#fffbeb; padding:12px; border-radius:8px; border:1px solid #fcd34d;">⏳ Su solicitud de acceso aún está pendiente de aprobación por el administrador.</p>');
+        setBody('<p style="color:#d97706; font-size:13px; background:#fffbeb; padding:12px; border-radius:8px; border:1px solid #fcd34d;"><i data-lucide="loader"></i> Su solicitud de acceso aún está pendiente de aprobación por el administrador.</p>');
         return;
       }
 
@@ -419,7 +419,7 @@
             return;
           }
           if (data.message && data.message.indexOf('bloqueado') !== -1) {
-            setBody('<p style="color:#dc2626; font-size:13px;">⛔ ' + escapeHtml(data.message) + '</p>');
+            setBody('<p style="color:#dc2626; font-size:13px;"><i data-lucide="ban"></i> ' + escapeHtml(data.message) + '</p>');
             return;
           }
           showPinError(data.message || 'PIN incorrecto.');
@@ -477,7 +477,7 @@
     function finalizarLogin(userId) {
       setTitle('¡Bienvenido!', '#166534');
       setSubtitle('Su identidad ha sido verificada correctamente.');
-      setBody('<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 0;"><div style="width:48px; height:48px; border-radius:50%; background:#dcfce7; color:#166534; display:flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:12px;">✅</div><p style="color:#166534; font-size:13px; font-weight:500;">Iniciando el sistema QMS...</p></div>');
+      setBody('<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 0;"><div style="width:48px; height:48px; border-radius:50%; background:#dcfce7; color:#166534; display:flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:12px;"><i data-lucide="check-circle-2"></i></div><p style="color:#166534; font-size:13px; font-weight:500;">Iniciando el sistema QMS...</p></div>');
       document.getElementById('lp-cancel-btn').disabled = true;
 
       google.script.run

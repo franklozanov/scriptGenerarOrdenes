@@ -132,7 +132,7 @@
     
     <div class="authorization-section">
       <button id="btnAutorizar" class="btn btn-primary" onclick="autorizarOrdenes()">
-        ✅ Firmar y Autorizar Seleccionadas
+        <i data-lucide="check-circle-2"></i> Firmar y Autorizar Seleccionadas
       </button>
     </div>
   </div>
@@ -250,7 +250,7 @@
         );
         
         // Clase para el badge de estado
-        var estadoClass = (estadoCarga === 'Cargados' || estadoCarga === '✅ Cargados') ? 'estado-cargados' : 'estado-pendiente';
+        var estadoClass = (estadoCarga === 'Cargados' || estadoCarga === '<i data-lucide="check-circle-2"></i> Cargados') ? 'estado-cargados' : 'estado-pendiente';
         var estadoDisplay = estadoCarga || 'Desconocido';
         
         row.innerHTML = `
