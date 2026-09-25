@@ -1,16 +1,16 @@
-뿯붿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gesti├│n Masiva de Documentos</title>
+  <title>Gestión Masiva de Documentos</title>
   
   <!-- FASE 6: Design System Centralizado -->
   <?!= HtmlService.createHtmlOutputFromFile('Theme').getContent(); ?>
   
   <style>
-    /* Estilos espec├뿯½ficos de UploadCentralModal.html */
+    /* Estilos específicos de UploadCentralModal.html */
     .container {
       max-width: 100%;
     }
@@ -106,7 +106,7 @@
 
     .upload-row .file-input-wrapper {
       flex: 1 1 auto;  /* Tomar espacio restante */
-      min-width: 200px;  /* Ancho m├뿯½nimo */
+      min-width: 200px;  /* Ancho mínimo */
       position: relative;
       border: 2px dashed #ccc;
       border-radius: 4px;
@@ -173,7 +173,7 @@
       border-radius: 4px;
       text-align: center;
       display: none;
-      white-space: nowrap;  /* Evitar salto de l├뿯½nea */
+      white-space: nowrap;  /* Evitar salto de línea */
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -374,12 +374,12 @@
   <!-- Spinner de carga inicial -->
   <div class="loading-overlay hidden" id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text" id="loading-text">Cargando ├│rdenes pendientes...</div>
+    <div class="loading-text" id="loading-text">Cargando órdenes pendientes...</div>
   </div>
 
   <div class="container" id="mainContent" style="display: none;">
     <div class="info">
-      <strong>Instrucciones:</strong> Agrega las filas necesarias, selecciona el n├║mero de orden y el archivo PDF correspondiente. Los archivos se subir├뿯½n secuencialmente uno por uno.
+      <strong>Instrucciones:</strong> Agrega las filas necesarias, selecciona el número de orden y el archivo PDF correspondiente. Los archivos se subirán secuencialmente uno por uno.
     </div>
 
     <div class="user-selector">
@@ -389,11 +389,11 @@
     </div>
 
     <div class="rows-container" id="rowsContainer">
-      <!-- Las filas se generar├뿯½n din├뿯½micamente aqu├뿯½ -->
+      <!-- Las filas se generarán dinámicamente aquí -->
     </div>
 
     <button class="btn-add" id="btnAdd" onclick="addRow()">+ Agregar Orden</button>
-    <button class="btn-upload" id="btnUpload" onclick="uploadAll()" disabled>뿯½뿯ƽ뿯½뿯½ Subir Todo</button>
+    <button class="btn-upload" id="btnUpload" onclick="uploadAll()" disabled>📤 Subir Todo</button>
     <button class="btn-cancel" id="btnCancel" onclick="cancel()">Cancelar</button>
 
     <div class="progress-container" id="progressContainer">
@@ -404,7 +404,7 @@
     </div>
 
     <div class="summary" id="summary">
-      <h3>뿯½뿯½뿯½ Proceso Finalizado</h3>
+      <h3>✅ Proceso Finalizado</h3>
       <p id="summaryMessage">Todos los archivos han sido procesados.</p>
       <div class="stats">
         <div class="stat">
@@ -416,14 +416,14 @@
           <div class="stat-label">Con Errores</div>
         </div>
       </div>
-      <button class="btn-upload" onclick="resetForm()" style="margin-top: 12px;">뿯½뿯ƽ뿯½뿯½ Nueva Carga</button>
+      <button class="btn-upload" onclick="resetForm()" style="margin-top: 12px;">🔄 Nueva Carga</button>
     </div>
   </div>
 
-  <!-- Mensaje cuando no hay ├│rdenes pendientes -->
+  <!-- Mensaje cuando no hay órdenes pendientes -->
   <div class="container no-orders" id="noOrdersMessage" style="display: none;">
-    <div class="no-orders-icon">뿯½뿯ƽ뿯½뿯½</div>
-    <div class="no-orders-text">No hay documentos en el sistema para gestionar (ni ├│rdenes ni an├뿯½lisis).</div>
+    <div class="no-orders-icon">📋</div>
+    <div class="no-orders-text">No hay documentos en el sistema para gestionar (ni órdenes ni análisis).</div>
     <button class="btn-cancel" onclick="cancel()">Cerrar</button>
   </div>
 
@@ -437,7 +437,7 @@
     var rowCounter = 0;
     var globalWebAppUrl = '';
     var fileCache = {}; // Cache de archivos pre-cargados: { rowId: { file, base64Content, metadata } }
-    var PARALLEL_UPLOAD_LIMIT = 3; // N├║mero de archivos a subir simult├뿯½neamente
+    var PARALLEL_UPLOAD_LIMIT = 3; // Número de archivos a subir simultáneamente
 
     var mainContent = document.getElementById('mainContent');
     var noOrdersMessage = document.getElementById('noOrdersMessage');
@@ -486,16 +486,16 @@
         })
         .withFailureHandler(function(error) {
           hideLoading();
-          showError('Error al cargar datos de ├│rdenes: ' + error.message);
+          showError('Error al cargar datos de órdenes: ' + error.message);
         })
         .getOrdersData();
     }
 
-    // Cargar lista de ├│rdenes pendientes al abrir el modal
+    // Cargar lista de órdenes pendientes al abrir el modal
     window.onload = function() {
-      // Inicializar drag y resize (el drag handle azul est├뿯½ oculto en Theme.html)
+      // Inicializar drag y resize (el drag handle azul está oculto en Theme.html)
       initializeModalDragResize({
-        title: 'Gesti├│n Masiva de Documentos',  // No se mostrar├뿯½ - drag handle oculto
+        title: 'Gestión Masiva de Documentos',  // No se mostrará - drag handle oculto
         enableDrag: true,
         enableResize: true,
         minWidth: 600,
@@ -522,7 +522,7 @@
             // Reemplazar input por badge
             var userContainer = uploadUserName.parentElement;
             userContainer.innerHTML = '<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">' +
-              '<span style="font-size: 1.2em;">뿯½뿯ƽ뿯½뿯½</span>' +
+              '<span style="font-size: 1.2em;">👤</span>' +
               '<span>Ingresaste como: <strong>' + userObj.nombreCompleto + '</strong></span>' +
             '</div>';
             
@@ -544,9 +544,9 @@
               overlay.classList.remove('hidden');
               overlay.innerHTML = 
                 '<div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:\'Inter\',sans-serif; color:#0f172a;">' +
-                  '<div style="font-size:2rem; margin-bottom:12px;">뿯½뿯ƽ뿯½뿯½</div>' +
+                  '<div style="font-size:2rem; margin-bottom:12px;">👥</div>' +
                   '<h3 style="margin:0 0 8px 0; font-size:1rem;">Selecciona tu perfil</h3>' +
-                  '<p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene m├║ltiples perfiles. ┬┐Con cu├뿯½l deseas ingresar?</p>' +
+                  '<p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>' +
                   '<select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white; color:#0f172a;">' + optionsHtml + '</select>' +
                   '<button id="profileConfirmBtn" style="width:100%; padding:10px; background:#1976d2; color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer;">Ingresar</button>' +
                 '</div>';
@@ -563,7 +563,7 @@
           } else {
              document.body.innerHTML = 
                '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: \'Inter\', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">' +
-                 '<div style="font-size: 48px; margin-bottom: 16px;">뿯½뿯ƽ뿯½뿯½</div>' +
+                 '<div style="font-size: 48px; margin-bottom: 16px;">🚫</div>' +
                  '<h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>' +
                  '<p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>' + (myEmail || 'Desconocido') + '</strong> no tiene un usuario asignado en el sistema.</p>' +
                  '<div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.</div>' +
@@ -573,7 +573,7 @@
         })
         .withFailureHandler(function(error) {
           hideLoading();
-          showError('Error al obtener configuraci├│n inicial: ' + error.message);
+          showError('Error al obtener configuración inicial: ' + error.message);
         })
         .getInitialData();
     };
@@ -586,7 +586,7 @@
         <div class="upload-row" id="${rowId}">
           <select class="doc-type-select doc-type-select-input" onchange="handleDocTypeChange(this, '${rowId}')">
             <option value="Orden de Acondicionamiento">Orden Acond.</option>
-            <option value="Certificado de Analisis">Certificado An├뿯½lisis</option>
+            <option value="Certificado de Analisis">Certificado Análisis</option>
           </select>
           <select class="action-select action-select-input" onchange="handleActionChange(this, '${rowId}')">
             <option value="cargar">Cargar</option>
@@ -599,13 +599,13 @@
           <div class="file-input-wrapper">
             <input type="file" accept="application/pdf" onchange="handleFileSelect(this, '${rowId}')">
             <div class="file-info">
-              <div>뿯½뿯ƽ뿯½뿯½ Arrastra o selecciona PDF</div>
+              <div>📄 Arrastra o selecciona PDF</div>
               <div class="file-name"></div>
               <div class="file-size"></div>
             </div>
           </div>
           <div class="status-indicator" id="${rowId}-status"></div>
-          <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>뿯½뿯ƽ뿯½뿯½뿯½뿯½뿯½</button>
+          <button class="delete-btn" onclick="removeRow('${rowId}')" ${rowCounter === 1 ? 'disabled' : ''}>🗑️</button>
           <div class="error-message" id="${rowId}-error"></div>
         </div>
       `;
@@ -616,7 +616,7 @@
       var actionSelect = newRow.querySelector('.action-select-input');
       var referenceSelect = newRow.querySelector('.reference-select');
       
-      // Inicializar con lista de ├│rdenes por defecto
+      // Inicializar con lista de órdenes por defecto
       populateReferenceSelect(referenceSelect, 'Orden de Acondicionamiento', 'cargar');
       
       validateForm();
@@ -631,19 +631,19 @@
       if (action === 'cargar') {
         if (docType === 'Orden de Acondicionamiento') {
           list = globalPendingOrders.ordenesPendientesOA || [];
-          emptyMessage = 'No hay ├│rdenes con OA pendiente';
+          emptyMessage = 'No hay órdenes con OA pendiente';
         } else if (docType === 'Certificado de Analisis') {
           list = globalPendingOrders.ordenesPendientesCOA || [];
-          emptyMessage = 'No hay ├│rdenes con COA pendiente';
+          emptyMessage = 'No hay órdenes con COA pendiente';
         }
       } else {
         // Para reemplazar o eliminar, mostrar las que YA tienen el documento
         if (docType === 'Orden de Acondicionamiento') {
           list = globalPendingOrders.cargadasOA || [];
-          emptyMessage = 'No hay ├│rdenes con OA cargado';
+          emptyMessage = 'No hay órdenes con OA cargado';
         } else if (docType === 'Certificado de Analisis') {
           list = globalPendingOrders.cargadasCOA || [];
-          emptyMessage = 'No hay ├│rdenes con COA cargado';
+          emptyMessage = 'No hay órdenes con COA cargado';
         }
       }
       
@@ -667,7 +667,7 @@
       var docType = docTypeSelect.value;
       var action = actionSelect.value;
       
-      // Limpiar selecci├│n actual
+      // Limpiar selección actual
       referenceSelect.value = '';
       
       // Poblar con la lista correspondiente
@@ -686,10 +686,10 @@
       var docType = docTypeSelect.value;
       var action = actionSelect.value;
       
-      // Limpiar selecci├│n actual
+      // Limpiar selección actual
       referenceSelect.value = '';
       
-      // Si la acci├│n es eliminar, ocultar/deshabilitar el input de archivo
+      // Si la acción es eliminar, ocultar/deshabilitar el input de archivo
       if (action === 'eliminar') {
         fileInputWrapper.style.display = 'none';
         fileInput.value = ''; // limpiar
@@ -742,41 +742,41 @@
       // Validar tipo
       if (file.type !== 'application/pdf') {
         wrapper.classList.add('has-error');
-        statusIndicator.textContent = '뿯½뿯½뿯½ Solo PDF';
+        statusIndicator.textContent = '❌ Solo PDF';
         statusIndicator.className = 'status-indicator error';
         statusIndicator.style.display = 'block';
         validateForm();
         return;
       }
 
-      // Validar tama├뿯▽o
+      // Validar tamaño
       if (file.size > MAX_FILE_SIZE) {
         var sizeMB = (file.size / (1024 * 1024)).toFixed(2);
         wrapper.classList.add('has-error');
-        statusIndicator.textContent = '뿯½뿯½뿯½ >10MB';
+        statusIndicator.textContent = '❌ >10MB';
         statusIndicator.className = 'status-indicator error';
         statusIndicator.style.display = 'block';
         validateForm();
         return;
       }
 
-      // Archivo v├뿯½lido - mostrar info
+      // Archivo válido - mostrar info
       wrapper.classList.add('has-file');
       fileName.textContent = file.name;
       var sizeKB = (file.size / 1024).toFixed(2);
       fileSize.textContent = sizeKB + ' KB';
       
       // PRE-CARGA: Leer archivo a base64 inmediatamente
-      statusIndicator.textContent = '뿯½뿯½│ Preparando...';
+      statusIndicator.textContent = '⏳ Preparando...';
       statusIndicator.className = 'status-indicator loading';
       statusIndicator.style.display = 'block';
       
       preloadFileToCache(file, rowId, function(success) {
         if (success) {
-          statusIndicator.textContent = '뿯½뿯½뿯½ Listo';
+          statusIndicator.textContent = '✓ Listo';
           statusIndicator.className = 'status-indicator success';
         } else {
-          statusIndicator.textContent = '뿯½뿯½뿯½ Error lectura';
+          statusIndicator.textContent = '❌ Error lectura';
           statusIndicator.className = 'status-indicator error';
           wrapper.classList.add('has-error');
         }
@@ -808,12 +808,12 @@
           }
         };
         
-        console.log('뿯½뿯½뿯½ Archivo pre-cargado en cache:', rowId, file.name);
+        console.log('✓ Archivo pre-cargado en cache:', rowId, file.name);
         callback(true);
       };
       
       reader.onerror = function() {
-        console.error('뿯½뿯½뿯½ Error al pre-cargar archivo:', rowId);
+        console.error('✗ Error al pre-cargar archivo:', rowId);
         callback(false);
       };
       
@@ -880,7 +880,7 @@
       summary.classList.remove('active');
 
       // CARGA PARALELA: Procesar archivos en lotes
-      console.log('뿯½뿯ƽ뿯½뿯½ Iniciando carga paralela de', totalRows, 'archivos (l├뿯½mite:', PARALLEL_UPLOAD_LIMIT, 'simult├뿯½neos)');
+      console.log('🚀 Iniciando carga paralela de', totalRows, 'archivos (límite:', PARALLEL_UPLOAD_LIMIT, 'simultáneos)');
       
       for (var i = 0; i < rows.length; i += PARALLEL_UPLOAD_LIMIT) {
         var batch = rows.slice(i, i + PARALLEL_UPLOAD_LIMIT);
@@ -915,7 +915,7 @@
       if (errorCounter === 0) {
         summaryMessage.textContent = 'Todos los archivos han sido subidos exitosamente.';
       } else if (successCounter === 0) {
-        summaryMessage.textContent = 'Ning├║n archivo pudo ser subido. Revise los errores indicados.';
+        summaryMessage.textContent = 'Ningún archivo pudo ser subido. Revise los errores indicados.';
       } else {
         summaryMessage.textContent = successCounter + ' archivo(s) subido(s) exitosamente, ' + errorCounter + ' con error(es).';
       }
@@ -927,7 +927,7 @@
     /**
      * Sube un solo archivo (fila) usando el cache pre-cargado.
      * @param {HTMLElement} row - Elemento de la fila
-     * @param {number} index - ├뿯½ndice de la fila
+     * @param {number} index - Índice de la fila
      * @param {number} total - Total de filas
      * @param {Function} callback - Callback(success)
      * @returns {Promise}
@@ -946,10 +946,10 @@
       var selectedUser = getSelectedUploadUser();
       
       if (!selectedUser) {
-        statusIndicator.textContent = '뿯½뿯½뿯½ Usuario';
+        statusIndicator.textContent = '❌ Usuario';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
-          errorContainer.textContent = 'Seleccione un usuario v├뿯½lido desde el listado.';
+          errorContainer.textContent = 'Seleccione un usuario válido desde el listado.';
           errorContainer.classList.add('active');
         }
         callback(false);
@@ -958,7 +958,7 @@
       
       // Validar que exista en cache para cargar y reemplazar
       if (action !== 'eliminar' && !fileCache[rowId]) {
-        statusIndicator.textContent = '뿯½뿯½뿯½ No cargado';
+        statusIndicator.textContent = '❌ No cargado';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
           errorContainer.textContent = 'El archivo no fue pre-cargado correctamente. Intente seleccionarlo de nuevo.';
@@ -975,15 +975,15 @@
       }
       
       // Mostrar estado de carga
-      statusIndicator.textContent = action === 'eliminar' ? '뿯½뿯½│ Eliminando...' : '뿯½뿯½│ Procesando...';
+      statusIndicator.textContent = action === 'eliminar' ? '⏳ Eliminando...' : '⏳ Procesando...';
       statusIndicator.className = 'status-indicator loading';
       
       try {
         var result;
         if (action === 'eliminar') {
-          // Confirmar eliminaci├│n
-          if (!confirm('┬┐Est├뿯½ seguro que desea eliminar el ' + docType + ' de la referencia ' + referenceNo + '? Esta acci├│n mover├뿯½ el archivo a la papelera.')) {
-            statusIndicator.textContent = '뿯½뿯½뿯½ Cancelado';
+          // Confirmar eliminación
+          if (!confirm('¿Está seguro que desea eliminar el ' + docType + ' de la referencia ' + referenceNo + '? Esta acción moverá el archivo a la papelera.')) {
+            statusIndicator.textContent = '❌ Cancelado';
             statusIndicator.className = 'status-indicator error';
             callback(false);
             return;
@@ -996,8 +996,8 @@
           result = await uploadFileFromCache(cached, referenceNo, docType, overwriteConfirmed, selectedUser.userId);
           
           if (result.status === 'exists' && action === 'cargar') {
-            // Archivo existe, y quer├뿯½an cargarlo. Preguntar
-            var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ┬┐Desea sobreescribirlo?');
+            // Archivo existe, y querían cargarlo. Preguntar
+            var confirmOverwrite = confirm('El archivo ' + result.fileName + ' ya existe en la carpeta. ¿Desea sobreescribirlo?');
             if (confirmOverwrite) {
               result = await uploadFileFromCache(cached, referenceNo, docType, true, selectedUser.userId);
             } else {
@@ -1010,17 +1010,17 @@
         
         if (result.status === 'success' || result.status === 'skipped') {
           if (action === 'eliminar') {
-             statusIndicator.textContent = '뿯½뿯½뿯½ Eliminado';
+             statusIndicator.textContent = '✅ Eliminado';
           } else if (result.status === 'skipped') {
-             statusIndicator.textContent = '뿯½뿯½뿯½ Ya existe';
+             statusIndicator.textContent = '✅ Ya existe';
              statusIndicator.title = 'Archivo ya existe, estado actualizado sin reemplazar';
           } else {
-             statusIndicator.textContent = '뿯½뿯½뿯½ Completado';
+             statusIndicator.textContent = '✅ Completado';
           }
           statusIndicator.className = 'status-indicator success';
           callback(true);
         } else {
-          statusIndicator.textContent = '뿯½뿯½뿯½ Error';
+          statusIndicator.textContent = '❌ Error';
           statusIndicator.className = 'status-indicator error';
           if (errorContainer) {
             errorContainer.textContent = result.message || 'Error desconocido';
@@ -1030,7 +1030,7 @@
         }
       } catch (error) {
         console.error('Error en fila', index + 1, ':', error);
-        statusIndicator.textContent = '뿯½뿯½뿯½ Error';
+        statusIndicator.textContent = '❌ Error';
         statusIndicator.className = 'status-indicator error';
         if (errorContainer) {
           errorContainer.textContent = error.message || 'Error desconocido';
@@ -1043,9 +1043,9 @@
     /**
      * Sube un archivo usando datos del cache (sin leer de nuevo).
      * @param {Object} cached - Datos del cache { file, base64Content, metadata }
-     * @param {string} referenceNo - N├║mero de referencia
+     * @param {string} referenceNo - Número de referencia
      * @param {string} docType - Tipo de documento
-     * @param {boolean} overwriteConfirmed - Si se confirm├│ sobrescritura
+     * @param {boolean} overwriteConfirmed - Si se confirmó sobrescritura
      * @param {string} userId - ID del usuario
      * @returns {Promise<Object>}
      */
@@ -1087,7 +1087,7 @@
     }
 
     /**
-     * Elimina un archivo a trav├뿯½s de la Web App.
+     * Elimina un archivo a través de la Web App.
      */
     function eliminarDocumentoCentralAsync(referenceNo, docType, userId) {
       return new Promise(function(resolve, reject) {

@@ -1,426 +1,425 @@
-⨯朠潬慢⁬湉楤散潄獣‬硥牴捡䑴楲敶摉‬敧䍴汯浵䥮摮硥祂慎敭慃敳湉敳獮瑩癩ⱥ朠瑥潃畬湭湉敤䉸乹浡ⱥ嘠䱁剏卅䑟䍏䵕久佔‬捡畴污穩牡獅慴潤慃杲⁡⼪쌊슯슿쎽슯슿⾽⨀⨀ഀ
-਍ ⨀ 唀瀀氀漀愀搀䰀漀最椀挀⸀最猀ഀ
-਍ ⨀ ഀ
-਍ ⨀ 䴀ᰀȥ搥甀氀漀 搀攀 氀ᰀȥ朥椀挀愀 搀攀 猀甀戀椀搀愀 搀攀 搀漀挀甀洀攀渀琀漀猀⸀ഀ
-਍ ⨀ 䌀漀渀琀椀攀渀攀 昀甀渀挀椀漀渀攀猀 瀀愀爀愀㨀ഀ
-਍ ⨀ ⴀ 䄀瀀攀爀琀甀爀愀 搀攀 洀漀搀愀氀 搀攀 猀甀戀椀搀愀 洀愀猀椀瘀愀ഀ
-਍ ⨀ ⴀ 伀戀琀攀渀挀椀ᰀȥ渥 搀攀 氀椀猀琀愀猀 搀攀 ᰀȥ爥搀攀渀攀猀 瀀攀渀搀椀攀渀琀攀猀ഀ
-਍ ⨀ ⴀ 倀爀漀挀攀猀愀洀椀攀渀琀漀 搀攀 猀甀戀椀搀愀 搀攀 搀漀挀甀洀攀渀琀漀猀 ⠀ᰀ쌥슯슿½rdenes y An├꿃뿂뷂氀椀猀椀猀⤀ഀ
-਍ ⨀ ⴀ 嘀愀氀椀搀愀挀椀ᰀȥ渥 礀 愀挀琀甀愀氀椀稀愀挀椀ᰀȥ渥 搀攀 攀猀琀愀搀漀 搀攀 搀漀挀甀洀攀渀琀漀猀ഀ
-਍ ⨀ ഀ
-਍ ⨀ 䘀䄀匀䔀 㐀 ⴀ 䈀愀琀挀栀 㐀⸀㈀㨀 唀瀀氀漀愀搀 䰀漀最椀挀ഀ
-਍ ⨀⼀ഀ
-਍ഀ
-਍⼀⼀ ⴀⴀⴀ 唀䤀㨀 䄀倀䔀刀吀唀刀䄀 䐀䔀 䴀伀䐀䄀䰀 ⴀⴀⴀഀ
-਍ഀ
-਍⼀⨀⨀ഀ
-਍ ⨀ 䄀戀爀攀 攀氀 洀漀搀愀氀 挀攀渀琀爀愀氀椀稀愀搀漀 搀攀 猀甀戀椀搀愀 搀攀 愀爀挀栀椀瘀漀猀⸀ഀ
-਍ ⨀ 䴀甀攀猀琀爀愀 唀瀀氀漀愀搀䌀攀渀琀爀愀氀䴀漀搀愀氀⸀栀琀洀氀 瀀愀爀愀 猀甀戀椀搀愀 洀愀猀椀瘀愀 搀攀 搀漀挀甀洀攀渀琀漀猀⸀ഀ
-਍ ⨀⼀ഀ
-਍昀甀渀挀琀椀漀渀 愀戀爀椀爀䴀漀搀愀氀匀甀戀椀搀愀䜀攀渀攀爀愀氀⠀⤀ 笀ഀ
-਍  ⼀⼀ 䰀愀 瘀愀氀椀搀愀挀椀ᰀȥ渥 搀攀 椀搀攀渀琀椀搀愀搀 猀攀 爀攀愀氀椀稀愀 椀渀氀椀渀攀 搀攀渀琀爀漀 搀攀 唀瀀氀漀愀搀䌀攀渀琀爀愀氀䴀漀搀愀氀⸀栀琀洀氀 愀氀 挀愀爀最愀爀ഀ
-਍  ⼀⼀ ⠀瘀ᰀ쌥슯슿½a getInitialData() 꿃뿂뷂쌀슯슿½꿃뿂뷂 愀挀琀椀瘀攀䔀洀愀椀氀 쌀슯슿½꿃뿂뷂쌀슯슿½ match con hoja Usuarios)਍ഀ
-  try {਍ഀ
-    var template = HtmlService.createTemplateFromFile('UploadCentralModal');਍ഀ
-    var html = template.evaluate()਍ഀ
-      .setWidth(700)਍ഀ
-      .setHeight(600);਍ഀ
-    SpreadsheetApp.getUi().showModelessDialog(html, 'Subida Masiva de Documentos');਍ഀ
-  } catch (e) {਍ഀ
-    SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);਍ഀ
-  }਍ഀ
-}਍ഀ
-਍ഀ
-// --- OBTENCI├꿃뿂뷂一 䐀䔀 䰀䤀匀吀䄀匀 倀䔀一䐀䤀䔀一吀䔀匀 ⴀⴀⴀഀ
-਍ഀ
-਍⼀⨀⨀ഀ
-਍ ⨀ 伀戀琀椀攀渀攀 氀愀猀 氀椀猀琀愀猀 搀攀 ᰀȥ爥搀攀渀攀猀 礀 愀渀ᰀ쌥슯슿½lisis pendientes de carga.਍ഀ
- * Retorna arrays con los NoOrden seg├║n el estado de carga de COA y OA.਍ഀ
- * ਍ഀ
- * @returns {Object} Objeto con arrays de ├│rdenes pendientes por tipo de documento਍ഀ
- * @property {Array<string>} ordenesPendientesOA - N├║meros de orden con OA pendiente਍ഀ
- * @property {Array<string>} ordenesPendientesCOA - N├║meros de orden con COA pendiente਍ഀ
- */਍ഀ
-function getOrdersData() {਍ഀ
-  try {਍ഀ
-    var ss = SpreadsheetApp.getActiveSpreadsheet();਍ഀ
-    var sheet = ss.getSheetByName('Ordenes');਍ഀ
-    ਍ഀ
-    if (!sheet) {਍ഀ
-      throw new Error("La hoja 'Ordenes' no existe.");਍ഀ
-    }਍ഀ
-    ਍ഀ
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];਍ഀ
-    var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);਍ഀ
-    var colEstadoDocumentosCol = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);਍ഀ
-    var colNoAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);਍ഀ
-    ਍ഀ
-    var lastRow = sheet.getLastRow();਍ഀ
-    if (lastRow < 2) {਍ഀ
-      return { ordenesPendientesOA: [], ordenesPendientesCOA: [], cargadasOA: [], cargadasCOA: [] };਍ഀ
-    }਍ഀ
-    ਍ഀ
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());਍ഀ
-    var data = dataRange.getValues();਍ഀ
-    ਍ഀ
-    var ordenesPendientesOA = [];਍ഀ
-    var ordenesPendientesCOA = [];਍ഀ
-    var cargadasOA = [];਍ഀ
-    var cargadasCOA = [];਍ഀ
-    ਍ഀ
-    for (var i = 0; i < data.length; i++) {਍ഀ
-      var noOrden = data[i][colNoOrdenCol - 1];਍ഀ
-      var estadoDoc = colEstadoDocumentosCol ? data[i][colEstadoDocumentosCol - 1] : "꿃뿂뷂쌀슯슿ƽ꿃뿂뷂␀‥䘀愀氀琀愀渀 䄀洀戀漀猀∀㬀ഀ
-਍      瘀愀爀 渀漀䄀渀愀氀椀猀椀猀 㴀 挀漀氀一漀䄀渀愀氀椀猀椀猀䌀漀氀 㼀 搀愀琀愀嬀椀崀嬀挀漀氀一漀䄀渀愀氀椀猀椀猀䌀漀氀 ⴀ ㄀崀 㨀 渀甀氀氀㬀ഀ
-਍      ഀ
-਍      瘀愀爀 渀漀伀爀搀攀渀匀琀爀 㴀 渀漀伀爀搀攀渀 㼀 渀漀伀爀搀攀渀⸀琀漀匀琀爀椀渀最⠀⤀⸀琀爀椀洀⠀⤀ 㨀 ∀∀㬀ഀ
-਍      瘀愀爀 攀猀琀愀搀漀䐀漀挀匀琀爀 㴀 攀猀琀愀搀漀䐀漀挀 㼀 攀猀琀愀搀漀䐀漀挀⸀琀漀匀琀爀椀渀最⠀⤀⸀琀爀椀洀⠀⤀ 㨀 ∀쌀슯슿½꿃뿂뷂쌁슯슿½┤ Faltan Ambos";਍ഀ
-      var noAnalisisStr = noAnalisis ? noAnalisis.toString().trim() : "";਍ഀ
-      ਍ഀ
-      if (!noOrdenStr) continue;਍ഀ
-      ਍ഀ
-      // L├│gica para OA਍ഀ
-      if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta OA") !== -1) {਍ഀ
-        if (ordenesPendientesOA.indexOf(noOrdenStr) === -1) {਍ഀ
-          ordenesPendientesOA.push(noOrdenStr);਍ഀ
-        }਍ഀ
-      } else if (estadoDocStr.indexOf("Falta COA") !== -1 || estadoDocStr.indexOf("Listos para Imprimir") !== -1) {਍ഀ
-        if (cargadasOA.indexOf(noOrdenStr) === -1) {਍ഀ
-          cargadasOA.push(noOrdenStr);਍ഀ
-        }਍ഀ
-      }਍ഀ
-      ਍ഀ
-      // L├│gica para COA਍ഀ
-      if (noAnalisisStr) {਍ഀ
-        if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta COA") !== -1) {਍ഀ
-          if (ordenesPendientesCOA.indexOf(noAnalisisStr) === -1) {਍ഀ
-            ordenesPendientesCOA.push(noAnalisisStr);਍ഀ
-          }਍ഀ
-        } else if (estadoDocStr.indexOf("Falta OA") !== -1 || estadoDocStr.indexOf("Listos para Imprimir") !== -1) {਍ഀ
-          if (cargadasCOA.indexOf(noAnalisisStr) === -1) {਍ഀ
-            cargadasCOA.push(noAnalisisStr);਍ഀ
-          }਍ഀ
-        }਍ഀ
-      }਍ഀ
-    }਍ഀ
-    ਍ഀ
-    Logger.log("꿃뿂뷂쌀슯슿½꿃뿂뷂 ᰀ쌥슯슿½rdenes con OA pendiente: " + ordenesPendientesOA.length + " | Cargadas: " + cargadasOA.length);਍ഀ
-    Logger.log("꿃뿂뷂쌀슯슿½꿃뿂뷂 ᰀ쌥슯슿½rdenes con COA pendiente: " + ordenesPendientesCOA.length + " | Cargadas: " + cargadasCOA.length);਍ഀ
-    return { ਍ഀ
-      ordenesPendientesOA: ordenesPendientesOA, ਍ഀ
-      ordenesPendientesCOA: ordenesPendientesCOA,਍ഀ
-      cargadasOA: cargadasOA,਍ഀ
-      cargadasCOA: cargadasCOA਍ഀ
-    };਍ഀ
-    ਍ഀ
-  } catch (e) {਍ഀ
-    Logger.log("Error en getOrdersData: " + e.message);਍ഀ
-    throw new Error("Error al obtener datos de ├│rdenes: " + e.message);਍ഀ
-  }਍ഀ
-}਍ഀ
-਍ഀ
-// --- PROCESAMIENTO DE SUBIDA DE DOCUMENTOS ---਍ഀ
-਍ഀ
-/**਍ഀ
- * Procesa la subida de un documento (Orden o An├꿃뿂뷂氀椀猀椀猀⤀ 愀氀 猀椀猀琀攀洀愀⸀ഀ
-਍ ⨀ 嘀愀氀椀搀愀 琀椀瀀漀 搀攀 愀爀挀栀椀瘀漀Ⰰ 戀甀猀挀愀 氀愀 爀攀昀攀爀攀渀挀椀愀 攀渀 氀愀 栀漀樀愀Ⰰ 洀愀渀攀樀愀 猀漀戀爀攀猀挀爀椀琀甀爀愀Ⰰഀ
-਍ ⨀ 最甀愀爀搀愀 攀渀 䐀爀椀瘀攀 礀 愀挀琀甀愀氀椀稀愀 攀猀琀愀搀漀 攀渀 氀愀 栀漀樀愀⸀ഀ
-਍ ⨀ ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 戀愀猀攀㘀㐀䐀愀琀愀 ⴀ 䐀愀琀漀猀 搀攀氀 愀爀挀栀椀瘀漀 攀渀 戀愀猀攀㘀㐀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 洀椀洀攀吀礀瀀攀 ⴀ 吀椀瀀漀 䴀䤀䴀䔀 搀攀氀 愀爀挀栀椀瘀漀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 昀椀氀攀一愀洀攀 ⴀ 一漀洀戀爀攀 搀攀氀 愀爀挀栀椀瘀漀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 爀攀昀攀爀攀渀挀攀一漀 ⴀ 一ᰀ儥津攀爀漀 搀攀 爀攀昀攀爀攀渀挀椀愀 ⠀一漀伀爀搀攀渀 漀 一漀䄀渀愀氀椀猀椀猀⤀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 搀漀挀吀礀瀀攀 ⴀ 吀椀瀀漀 搀攀 搀漀挀甀洀攀渀琀漀 ⠀∀伀爀搀攀渀 搀攀 䄀挀漀渀搀椀挀椀漀渀愀洀椀攀渀琀漀∀ 漀 ∀刀攀最椀猀琀爀漀 搀攀 䤀渀猀瀀攀挀挀椀漀渀 䈀愀猀攀∀⤀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀戀漀漀氀攀愀渀紀 漀瘀攀爀眀爀椀琀攀䌀漀渀昀椀爀洀攀搀 ⴀ 䤀渀搀椀挀愀 猀椀 攀氀 甀猀甀愀爀椀漀 挀漀渀昀椀爀洀ᰀȥ‥氀愀 猀漀戀爀攀猀挀爀椀琀甀爀愀 搀攀氀 愀爀挀栀椀瘀漀 攀砀椀猀琀攀渀琀攀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 愀挀琀椀渀最唀猀攀爀䤀搀 ⴀ 唀猀攀爀䤀䐀 搀攀氀 甀猀甀愀爀椀漀 焀甀攀 攀樀攀挀甀琀愀 氀愀 愀挀挀椀ᰀȥ渥ഀ
-਍ ⨀ 䀀爀攀琀甀爀渀猀 笀伀戀樀攀挀琀紀 刀攀猀甀氀琀愀搀漀 搀攀 氀愀 漀瀀攀爀愀挀椀ᰀȥ渥 挀漀渀 猀琀愀琀甀猀 礀 洀攀渀猀愀樀攀ഀ
-਍ ⨀⼀ഀ
-਍昀甀渀挀琀椀漀渀 瀀爀漀挀攀猀愀爀匀甀戀椀搀愀䐀漀挀甀洀攀渀琀漀䌀攀渀琀爀愀氀⠀戀愀猀攀㘀㐀䐀愀琀愀Ⰰ 洀椀洀攀吀礀瀀攀Ⰰ 昀椀氀攀一愀洀攀Ⰰ 爀攀昀攀爀攀渀挀攀一漀Ⰰ 搀漀挀吀礀瀀攀Ⰰ 漀瘀攀爀眀爀椀琀攀䌀漀渀昀椀爀洀攀搀Ⰰ 愀挀琀椀渀最唀猀攀爀䤀搀⤀ 笀ഀ
-਍  琀爀礀 笀ഀ
-਍    ⼀⼀ 嘀愀氀椀搀愀挀椀ᰀȥ渥 搀攀 猀攀最甀爀椀搀愀搀㨀 猀漀氀漀 瀀攀爀洀椀琀椀爀 倀䐀䘀ഀ
-਍    椀昀 ⠀洀椀洀攀吀礀瀀攀 ℀㴀㴀 ✀愀瀀瀀氀椀挀愀琀椀漀渀⼀瀀搀昀✀⤀ 笀ഀ
-਍      爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀攀爀爀漀爀✀Ⰰ 洀攀猀猀愀最攀㨀 ✀匀漀氀漀 猀攀 瀀攀爀洀椀琀攀渀 愀爀挀栀椀瘀漀猀 倀䐀䘀⸀✀ 紀㬀ഀ
-਍    紀ഀ
-਍ഀ
-਍    瘀愀爀 猀猀 㴀 匀瀀爀攀愀搀猀栀攀攀琀䄀瀀瀀⸀最攀琀䄀挀琀椀瘀攀匀瀀爀攀愀搀猀栀攀攀琀⠀⤀㬀ഀ
-਍    瘀愀爀 猀栀攀攀琀伀爀搀攀渀攀猀 㴀 猀猀⸀最攀琀匀栀攀攀琀䈀礀一愀洀攀⠀✀伀爀搀攀渀攀猀✀⤀㬀ഀ
-਍    ഀ
-਍    椀昀 ⠀℀猀栀攀攀琀伀爀搀攀渀攀猀⤀ 笀ഀ
-਍      琀栀爀漀眀 渀攀眀 䔀爀爀漀爀⠀∀䰀愀 栀漀樀愀 ✀伀爀搀攀渀攀猀✀ 渀漀 攀砀椀猀琀攀⸀∀⤀㬀ഀ
-਍    紀ഀ
-਍ഀ
-਍    ⼀⼀ 䰀攀攀爀 琀漀搀愀 氀愀 搀愀琀愀 椀渀挀氀甀礀攀渀搀漀 攀渀挀愀戀攀稀愀搀漀猀ഀ
-਍    瘀愀爀 搀愀琀愀 㴀 猀栀攀攀琀伀爀搀攀渀攀猀⸀最攀琀䐀愀琀愀刀愀渀最攀⠀⤀⸀最攀琀嘀愀氀甀攀猀⠀⤀㬀ഀ
-਍    瘀愀爀 栀攀愀搀攀爀猀 㴀 搀愀琀愀嬀　崀㬀 ⼀⼀ 䰀愀 瀀爀椀洀攀爀愀 昀椀氀愀 猀漀渀 氀漀猀 攀渀挀愀戀攀稀愀搀漀猀ഀ
-਍    ഀ
-਍    ⼀⼀ 䴀愀瀀攀漀 搀攀 挀漀氀甀洀渀愀猀 瀀漀爀 渀漀洀戀爀攀 搀攀 攀渀挀愀戀攀稀愀搀漀 ⠀戀愀猀攀ⴀ㄀ 瀀愀爀愀 最攀琀刀愀渀最攀⤀ഀ
-਍    瘀愀爀 挀漀氀䔀猀琀愀搀漀䐀漀挀甀洀攀渀琀漀猀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀⠀栀攀愀搀攀爀猀Ⰰ ✀䔀猀琀愀搀漀䐀漀挀甀洀攀渀琀漀猀✀Ⰰ 昀愀氀猀攀⤀㬀ഀ
-਍    瘀愀爀 挀漀氀一漀伀爀搀攀渀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀⠀栀攀愀搀攀爀猀Ⰰ ✀一漀伀爀搀攀渀✀Ⰰ 琀爀甀攀⤀㬀ഀ
-਍    瘀愀爀 挀漀氀一漀䄀渀愀氀椀猀椀猀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀⠀栀攀愀搀攀爀猀Ⰰ ✀一漀䄀渀愀氀椀猀椀猀✀Ⰰ 昀愀氀猀攀⤀㬀ഀ
-਍    ഀ
-਍    ⼀⼀ 䐀攀琀攀爀洀椀渀愀爀 氀愀 挀漀氀甀洀渀愀 漀戀樀攀琀椀瘀漀 猀攀最ᰀ儥渥 搀漀挀吀礀瀀攀 ⠀瀀愀爀愀 戀ᰀ儥猥焀甀攀搀愀 攀渀 愀爀爀愀礀 搀愀琀愀⤀ഀ
-਍    瘀愀爀 琀愀爀最攀琀䌀漀氀一愀洀攀 㴀 ∀∀㬀ഀ
-਍    瘀愀爀 昀漀氀搀攀爀䬀攀礀 㴀 ∀∀㬀ഀ
-਍    ഀ
-਍    椀昀 ⠀搀漀挀吀礀瀀攀 㴀㴀㴀 ∀伀爀搀攀渀 搀攀 䄀挀漀渀搀椀挀椀漀渀愀洀椀攀渀琀漀∀⤀ 笀ഀ
-਍      琀愀爀最攀琀䌀漀氀一愀洀攀 㴀 ∀一漀伀爀搀攀渀∀㬀ഀ
-਍      昀漀氀搀攀爀䬀攀礀 㴀 ∀䐀伀䌀开伀刀䐀䔀一䔀匀∀㬀ഀ
-਍    紀 攀氀猀攀 椀昀 ⠀搀漀挀吀礀瀀攀 㴀㴀㴀 ∀䌀攀爀琀椀昀椀挀愀搀漀 搀攀 䄀渀愀氀椀猀椀猀∀⤀ 笀ഀ
-਍      琀愀爀最攀琀䌀漀氀一愀洀攀 㴀 ∀一漀䄀渀愀氀椀猀椀猀∀㬀ഀ
-਍      昀漀氀搀攀爀䬀攀礀 㴀 ∀䐀伀䌀开䄀一䄀䰀䤀匀䤀匀∀㬀ഀ
-਍    紀ഀ
-਍    ഀ
-਍    ⼀⼀ 嘀愀氀椀搀愀挀椀ᰀȥ渥 搀攀 猀攀最甀爀椀搀愀搀 瀀愀爀愀 昀漀氀搀攀爀䬀攀礀ഀ
-਍    椀昀 ⠀昀漀氀搀攀爀䬀攀礀 㴀㴀㴀 ∀∀⤀ 笀ഀ
-਍      爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀攀爀爀漀爀✀Ⰰ 洀攀猀猀愀最攀㨀 ∀吀椀瀀漀 搀攀 搀漀挀甀洀攀渀琀漀 渀漀 爀攀挀漀渀漀挀椀搀漀 漀 挀漀氀甀洀渀愀猀 渀漀 挀漀渀昀椀最甀爀愀搀愀猀㨀 ∀ ⬀ 搀漀挀吀礀瀀攀 紀㬀ഀ
-਍    紀ഀ
-਍    ഀ
-਍    ⼀⼀ 伀戀琀攀渀攀爀 ᰀ쌥슯슿½ndice de columna objetivo para b├║squeda en array (base-0)਍ഀ
-    var targetColIdx = getColumnIndexByName(headers, targetColName, true) - 1;਍ഀ
-    ਍ഀ
-    // Logs de auditor├꿃뿂뷂愀 挀爀ᰀ쌥슯슿½ticos਍ഀ
-    Logger.log("--- AUDITORIA DE BUSQUEDA ---");਍ഀ
-    Logger.log("DocType: " + docType);਍ഀ
-    Logger.log("Indice de Columna Objetivo (0-based): " + targetColIdx);਍ഀ
-    Logger.log("Referencia a buscar: " + String(referenceNo).trim().toLowerCase());਍ഀ
-    ਍ഀ
-    // Bucle de b├║squeda para TODAS las filas que coincidan਍ഀ
-    var targetRowIndices = [];਍ഀ
-    var referenceNoStr = String(referenceNo).trim().toLowerCase();਍ഀ
-    ਍ഀ
-    for (var i = 1; i < data.length; i++) {਍ഀ
-      var cellValue = data[i][targetColIdx];਍ഀ
-      var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";਍ഀ
-      ਍ഀ
-      if (cellValueStr === referenceNoStr) {਍ഀ
-        targetRowIndices.push(i + 1); // +1 porque el array es base 0, y las filas de la hoja son base 1਍ഀ
-      }਍ഀ
-    }਍ഀ
-਍ഀ
-    if (targetRowIndices.length === 0) {਍ഀ
-      return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja. Puede haber sido eliminada mientras el modal estaba abierto.' };਍ഀ
-    }਍ഀ
-਍ഀ
-    // Obtener carpeta desde templates਍ഀ
-    var tplSheet = ss.getSheetByName('templates');਍ഀ
-    if (!tplSheet) {਍ഀ
-      throw new Error("La hoja 'templates' no existe.");਍ഀ
-    }਍ഀ
-਍ഀ
-    var tplData = tplSheet.getDataRange().getValues();਍ഀ
-    var tplHeaders = tplData[0];਍ഀ
-    var folderId = "";਍ഀ
-    ਍ഀ
-    // Obtener ├꿃뿂뷂渀搀椀挀攀猀 搀攀 挀漀氀甀洀渀愀猀 瀀漀爀 渀漀洀戀爀攀 瀀愀爀愀 琀攀洀瀀氀愀琀攀猀ഀ
-਍    瘀愀爀 挀漀氀䌀氀愀瘀攀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀䌀愀猀攀䤀渀猀攀渀猀椀琀椀瘀攀⠀琀瀀氀䠀攀愀搀攀爀猀Ⰰ ✀䌀氀愀瘀攀✀Ⰰ 昀愀氀猀攀⤀㬀ഀ
-਍    瘀愀爀 挀漀氀嘀愀氀漀爀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀䌀愀猀攀䤀渀猀攀渀猀椀琀椀瘀攀⠀琀瀀氀䠀攀愀搀攀爀猀Ⰰ ✀嘀愀氀漀爀✀Ⰰ 昀愀氀猀攀⤀㬀ഀ
-਍    ഀ
-਍    ⼀⼀ 匀椀 愀氀最甀渀愀 挀漀氀甀洀渀愀 渀漀 攀砀椀猀琀攀Ⰰ 甀猀愀爀 ᰀ쌥슯슿½ndices por defecto਍ഀ
-    if (!colClaveIdx) colClaveIdx = 1;਍ഀ
-    if (!colValorIdx) colValorIdx = 2;਍ഀ
-    ਍ഀ
-    // Convertir a base-0 para acceso a array਍ഀ
-    colClaveIdx = colClaveIdx - 1;਍ഀ
-    colValorIdx = colValorIdx - 1;਍ഀ
-਍ഀ
-    for (var i = 1; i < tplData.length; i++) {਍ഀ
-      var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";਍ഀ
-      if (key === folderKey) {਍ഀ
-        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";਍ഀ
-        break;਍ഀ
-      }਍ഀ
-    }਍ഀ
-਍ഀ
-    if (!folderId) {਍ഀ
-      throw new Error("No se encontr├│ la clave " + folderKey + " en la hoja 'templates'. Configure el ID de la carpeta correspondiente.");਍ഀ
-    }਍ഀ
-਍ഀ
-    // Obtener la carpeta destino਍ഀ
-    var folder;਍ഀ
-    try {਍ഀ
-      folder = DriveApp.getFolderById(folderId);਍ഀ
-      Logger.log("Carpeta destino obtenida correctamente.");਍ഀ
-    } catch (e) {਍ഀ
-      throw new Error("No se puede acceder a la carpeta (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");਍ഀ
-    }਍ഀ
-਍ഀ
-    // Manejo de Hist├│ricos (Sobreescritura segura)਍ഀ
-    var targetFileName = referenceNo + ".pdf";਍ഀ
-    var existingFiles = folder.getFilesByName(targetFileName);਍ഀ
-    var archivoReemplazado = false;਍ഀ
-    var skipUpload = false;਍ഀ
-    var fileUrl = "";਍ഀ
-    var docFileId = "";਍ഀ
-    ਍ഀ
-    // Verificar si el archivo ya existe਍ഀ
-    if (existingFiles.hasNext()) {਍ഀ
-      Logger.log("Archivo ya existe: " + targetFileName);਍ഀ
-      ਍ഀ
-      if (overwriteConfirmed === 'skipUpload') {਍ഀ
-        // Usuario cancel├│ reemplazo - solo actualizar estado sin tocar archivo਍ഀ
-        Logger.log("Usuario cancel├│ reemplazo. Actualizando estado sin modificar archivo.");਍ഀ
-        var existingFile = existingFiles.next();਍ഀ
-        fileUrl = existingFile.getUrl();਍ഀ
-        docFileId = existingFile.getId();਍ഀ
-        skipUpload = true;਍ഀ
-      } else if (!overwriteConfirmed) {਍ഀ
-        // Retornar status 'exists' para que el frontend pida confirmaci├│n਍ഀ
-        Logger.log("Retornando status 'exists' para pedir confirmaci├│n al usuario");਍ഀ
-        return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndices[0] };਍ഀ
-      } else {਍ഀ
-        // Si overwriteConfirmed es true, proceder con el reemplazo਍ഀ
-        while (existingFiles.hasNext()) {਍ഀ
-          var oldFile = existingFiles.next();਍ഀ
-          Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());਍ഀ
-          oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditor├꿃뿂뷂愀ഀ
-਍          愀爀挀栀椀瘀漀刀攀攀洀瀀氀愀稀愀搀漀 㴀 琀爀甀攀㬀ഀ
-਍        紀ഀ
-਍      紀ഀ
-਍    紀ഀ
-਍ഀ
-਍    ⼀⼀ 匀甀戀椀爀 愀爀挀栀椀瘀漀 猀漀氀漀 猀椀 渀漀 猀攀 猀愀氀琀ᰀȥ‥氀愀 猀甀戀椀搀愀ഀ
-਍    椀昀 ⠀℀猀欀椀瀀唀瀀氀漀愀搀⤀ 笀ഀ
-਍      ⼀⼀ 䐀攀挀漀搀椀昀椀挀愀爀 戀愀猀攀㘀㐀 礀 挀爀攀愀爀 攀氀 愀爀挀栀椀瘀漀ഀ
-਍      瘀愀爀 搀攀挀漀搀攀搀䐀愀琀愀 㴀 唀琀椀氀椀琀椀攀猀⸀戀愀猀攀㘀㐀䐀攀挀漀搀攀⠀戀愀猀攀㘀㐀䐀愀琀愀⤀㬀ഀ
-਍      瘀愀爀 戀氀漀戀 㴀 唀琀椀氀椀琀椀攀猀⸀渀攀眀䈀氀漀戀⠀搀攀挀漀搀攀搀䐀愀琀愀Ⰰ 洀椀洀攀吀礀瀀攀Ⰰ 琀愀爀最攀琀䘀椀氀攀一愀洀攀⤀㬀ഀ
-਍      瘀愀爀 渀攀眀䘀椀氀攀 㴀 昀漀氀搀攀爀⸀挀爀攀愀琀攀䘀椀氀攀⠀戀氀漀戀⤀㬀ഀ
-਍      昀椀氀攀唀爀氀 㴀 渀攀眀䘀椀氀攀⸀最攀琀唀爀氀⠀⤀㬀ഀ
-਍      搀漀挀䘀椀氀攀䤀搀 㴀 渀攀眀䘀椀氀攀⸀最攀琀䤀搀⠀⤀㬀ഀ
-਍    紀ഀ
-਍ഀ
-਍    ⼀⼀ 嬀ᰀ쌥슯슿½NDICE] Reflejar el doc en el ├꿃뿂뷂渀搀椀挀攀 䄀一吀䔀匀 搀攀 爀攀瘀愀氀椀搀愀爀Ⰰ 瀀愀爀愀 焀甀攀ഀ
-਍    ⼀⼀ 愀挀琀甀愀氀椀稀愀爀䔀猀琀愀搀漀䐀漀挀甀洀攀渀琀漀猀䔀渀䠀漀樀愀 氀漀 瘀攀愀 搀攀 椀渀洀攀搀椀愀琀漀 ⠀挀椀攀爀爀愀 氀愀 瘀攀渀琀愀渀愀 搀攀 猀琀愀氀攀渀攀猀猀⤀⸀ഀ
-਍    琀爀礀 笀ഀ
-਍      瘀愀爀 琀椀瀀漀䤀搀砀 㴀 ⠀昀漀氀搀攀爀䬀攀礀 㴀㴀㴀 ✀䐀伀䌀开伀刀䐀䔀一䔀匀✀⤀ 㼀 ✀伀䄀✀ 㨀 ✀䌀伀䄀✀㬀ഀ
-਍      椀昀 ⠀搀漀挀䘀椀氀攀䤀搀⤀ 䤀渀搀椀挀攀䐀漀挀猀⸀愀最爀攀最愀爀⠀琀椀瀀漀䤀搀砀Ⰰ 搀漀挀䘀椀氀攀䤀搀Ⰰ 琀愀爀最攀琀䘀椀氀攀一愀洀攀⤀㬀ഀ
-਍    紀 挀愀琀挀栀 ⠀椀搀砀䔀爀爀⤀ 笀ഀ
-਍      䰀漀最最攀爀⸀氀漀最⠀✀䤀渀搀椀挀攀䐀漀挀猀⸀愀最爀攀最愀爀 昀愀氀氀ᰀȥ‥⠀渀漀 挀爀ᰀ쌥슯슿½tico): ' + idxErr.message);਍ഀ
-    }਍ഀ
-਍ഀ
-    // Actualizar estado consolidado para TODAS las filas afectadas਍ഀ
-    for (var j = 0; j < targetRowIndices.length; j++) {਍ഀ
-      actualizarEstadoDocumentosEnHoja(sheetOrdenes, targetRowIndices[j], headers);਍ഀ
-    }਍ഀ
-਍ഀ
-    // Auditor├꿃뿂뷂愀 漀戀氀椀最愀琀漀爀椀愀ഀ
-਍    瘀愀爀 甀猀攀爀䤀搀攀渀琀椀琀礀 㴀 最攀琀唀猀攀爀䤀搀攀渀琀椀琀礀匀琀爀椀渀最䈀礀唀猀攀爀䤀搀开⠀愀挀琀椀渀最唀猀攀爀䤀搀⤀㬀ഀ
-਍    瘀愀爀 氀漀最䴀攀猀猀愀最攀 㴀 ∀∀㬀ഀ
-਍    ഀ
-਍    椀昀 ⠀猀欀椀瀀唀瀀氀漀愀搀⤀ 笀ഀ
-਍      氀漀最䴀攀猀猀愀最攀 㴀 ∀匀攀 愀挀琀甀愀氀椀稀ᰀȥ‥攀氀 攀猀琀愀搀漀 愀 ✀䌀愀爀最愀搀漀✀ 瀀愀爀愀 ✀∀ ⬀ 搀漀挀吀礀瀀攀 ⬀ ∀✀ ⠀爀攀昀㨀 ∀ ⬀ 爀攀昀攀爀攀渀挀攀一漀 ⬀ ∀⤀ 猀椀渀 洀漀搀椀昀椀挀愀爀 攀氀 愀爀挀栀椀瘀漀 攀砀椀猀琀攀渀琀攀∀㬀ഀ
-਍    紀 攀氀猀攀 椀昀 ⠀愀爀挀栀椀瘀漀刀攀攀洀瀀氀愀稀愀搀漀⤀ 笀ഀ
-਍      氀漀最䴀攀猀猀愀最攀 㴀 ∀匀攀 刀䔀䔀䴀倀䰀䄀娀ᰀ쌥슯슿½ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";਍ഀ
-    } else {਍ഀ
-      logMessage = "Se subi├│ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";਍ഀ
-    }਍ഀ
-    ਍ഀ
-    logChange('CARGA_DOCUMENTO', logMessage, userIdentity);਍ഀ
-    ਍ഀ
-    return { status: 'success', message: 'Documento procesado exitosamente para ' + docType + ' ' + referenceNo + '.' };਍ഀ
-    ਍ഀ
-  } catch (e) {਍ഀ
-    Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);਍ഀ
-    return { status: 'error', message: "Error interno del servidor: " + e.message };਍ഀ
-  }਍ഀ
-}਍ഀ
-਍ഀ
-/**਍ഀ
- * Elimina un documento (Orden o An├꿃뿂뷂氀椀猀椀猀⤀ 搀攀氀 猀椀猀琀攀洀愀⸀ഀ
-਍ ⨀ ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 爀攀昀攀爀攀渀挀攀一漀 ⴀ 一ᰀ儥津攀爀漀 搀攀 爀攀昀攀爀攀渀挀椀愀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 搀漀挀吀礀瀀攀 ⴀ 吀椀瀀漀 搀攀 搀漀挀甀洀攀渀琀漀ഀ
-਍ ⨀ 䀀瀀愀爀愀洀 笀猀琀爀椀渀最紀 愀挀琀椀渀最唀猀攀爀䤀搀 ⴀ 唀猀攀爀䤀䐀ഀ
-਍ ⨀ 䀀爀攀琀甀爀渀猀 笀伀戀樀攀挀琀紀 刀攀猀甀氀琀愀搀漀ഀ
-਍ ⨀⼀ഀ
-਍昀甀渀挀琀椀漀渀 攀氀椀洀椀渀愀爀䐀漀挀甀洀攀渀琀漀䌀攀渀琀爀愀氀⠀爀攀昀攀爀攀渀挀攀一漀Ⰰ 搀漀挀吀礀瀀攀Ⰰ 愀挀琀椀渀最唀猀攀爀䤀搀⤀ 笀ഀ
-਍  琀爀礀 笀ഀ
-਍    瘀愀爀 猀猀 㴀 匀瀀爀攀愀搀猀栀攀攀琀䄀瀀瀀⸀最攀琀䄀挀琀椀瘀攀匀瀀爀攀愀搀猀栀攀攀琀⠀⤀㬀ഀ
-਍    瘀愀爀 猀栀攀攀琀伀爀搀攀渀攀猀 㴀 猀猀⸀最攀琀匀栀攀攀琀䈀礀一愀洀攀⠀✀伀爀搀攀渀攀猀✀⤀㬀ഀ
-਍    椀昀 ⠀℀猀栀攀攀琀伀爀搀攀渀攀猀⤀ 琀栀爀漀眀 渀攀眀 䔀爀爀漀爀⠀∀䰀愀 栀漀樀愀 ✀伀爀搀攀渀攀猀✀ 渀漀 攀砀椀猀琀攀⸀∀⤀㬀ഀ
-਍ഀ
-਍    瘀愀爀 搀愀琀愀 㴀 猀栀攀攀琀伀爀搀攀渀攀猀⸀最攀琀䐀愀琀愀刀愀渀最攀⠀⤀⸀最攀琀嘀愀氀甀攀猀⠀⤀㬀ഀ
-਍    瘀愀爀 栀攀愀搀攀爀猀 㴀 搀愀琀愀嬀　崀㬀ഀ
-਍    ഀ
-਍    瘀愀爀 琀愀爀最攀琀䌀漀氀一愀洀攀 㴀 ∀∀㬀ഀ
-਍    瘀愀爀 昀漀氀搀攀爀䬀攀礀 㴀 ∀∀㬀ഀ
-਍    椀昀 ⠀搀漀挀吀礀瀀攀 㴀㴀㴀 ∀伀爀搀攀渀 搀攀 䄀挀漀渀搀椀挀椀漀渀愀洀椀攀渀琀漀∀⤀ 笀ഀ
-਍      琀愀爀最攀琀䌀漀氀一愀洀攀 㴀 ∀一漀伀爀搀攀渀∀㬀ഀ
-਍      昀漀氀搀攀爀䬀攀礀 㴀 ∀䐀伀䌀开伀刀䐀䔀一䔀匀∀㬀ഀ
-਍    紀 攀氀猀攀 椀昀 ⠀搀漀挀吀礀瀀攀 㴀㴀㴀 ∀䌀攀爀琀椀昀椀挀愀搀漀 搀攀 䄀渀愀氀椀猀椀猀∀⤀ 笀ഀ
-਍      琀愀爀最攀琀䌀漀氀一愀洀攀 㴀 ∀一漀䄀渀愀氀椀猀椀猀∀㬀ഀ
-਍      昀漀氀搀攀爀䬀攀礀 㴀 ∀䐀伀䌀开䄀一䄀䰀䤀匀䤀匀∀㬀ഀ
-਍    紀ഀ
-਍    ഀ
-਍    椀昀 ⠀昀漀氀搀攀爀䬀攀礀 㴀㴀㴀 ∀∀⤀ 笀ഀ
-਍      爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀攀爀爀漀爀✀Ⰰ 洀攀猀猀愀最攀㨀 ∀吀椀瀀漀 搀攀 搀漀挀甀洀攀渀琀漀 渀漀 爀攀挀漀渀漀挀椀搀漀⸀∀ 紀㬀ഀ
-਍    紀ഀ
-਍    ഀ
-਍    瘀愀爀 琀愀爀最攀琀䌀漀氀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀⠀栀攀愀搀攀爀猀Ⰰ 琀愀爀最攀琀䌀漀氀一愀洀攀Ⰰ 琀爀甀攀⤀ ⴀ ㄀㬀ഀ
-਍    瘀愀爀 琀愀爀最攀琀刀漀眀䤀渀搀椀挀攀猀 㴀 嬀崀㬀ഀ
-਍    瘀愀爀 爀攀昀攀爀攀渀挀攀一漀匀琀爀 㴀 匀琀爀椀渀最⠀爀攀昀攀爀攀渀挀攀一漀⤀⸀琀爀椀洀⠀⤀⸀琀漀䰀漀眀攀爀䌀愀猀攀⠀⤀㬀ഀ
-਍    ഀ
-਍    昀漀爀 ⠀瘀愀爀 椀 㴀 ㄀㬀 椀 㰀 搀愀琀愀⸀氀攀渀最琀栀㬀 椀⬀⬀⤀ 笀ഀ
-਍      瘀愀爀 挀攀氀氀嘀愀氀甀攀 㴀 搀愀琀愀嬀椀崀嬀琀愀爀最攀琀䌀漀氀䤀搀砀崀㬀ഀ
-਍      瘀愀爀 挀攀氀氀嘀愀氀甀攀匀琀爀 㴀 挀攀氀氀嘀愀氀甀攀 ℀㴀 渀甀氀氀 㼀 匀琀爀椀渀最⠀挀攀氀氀嘀愀氀甀攀⤀⸀琀爀椀洀⠀⤀⸀琀漀䰀漀眀攀爀䌀愀猀攀⠀⤀ 㨀 ∀∀㬀ഀ
-਍      椀昀 ⠀挀攀氀氀嘀愀氀甀攀匀琀爀 㴀㴀㴀 爀攀昀攀爀攀渀挀攀一漀匀琀爀⤀ 笀ഀ
-਍        琀愀爀最攀琀刀漀眀䤀渀搀椀挀攀猀⸀瀀甀猀栀⠀椀 ⬀ ㄀⤀㬀ഀ
-਍      紀ഀ
-਍    紀ഀ
-਍ഀ
-਍    椀昀 ⠀琀愀爀最攀琀刀漀眀䤀渀搀椀挀攀猀⸀氀攀渀最琀栀 㴀㴀㴀 　⤀ 笀ഀ
-਍      爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀攀爀爀漀爀✀Ⰰ 洀攀猀猀愀最攀㨀 ✀䰀愀 爀攀昀攀爀攀渀挀椀愀 ∀✀ ⬀ 爀攀昀攀爀攀渀挀攀一漀 ⬀ ✀∀ 渀漀 攀砀椀猀琀攀 攀渀 氀愀 栀漀樀愀⸀✀ 紀㬀ഀ
-਍    紀ഀ
-਍ഀ
-਍    瘀愀爀 琀瀀氀匀栀攀攀琀 㴀 猀猀⸀最攀琀匀栀攀攀琀䈀礀一愀洀攀⠀✀琀攀洀瀀氀愀琀攀猀✀⤀㬀ഀ
-਍    瘀愀爀 琀瀀氀䐀愀琀愀 㴀 琀瀀氀匀栀攀攀琀⸀最攀琀䐀愀琀愀刀愀渀最攀⠀⤀⸀最攀琀嘀愀氀甀攀猀⠀⤀㬀ഀ
-਍    瘀愀爀 琀瀀氀䠀攀愀搀攀爀猀 㴀 琀瀀氀䐀愀琀愀嬀　崀㬀ഀ
-਍    瘀愀爀 昀漀氀搀攀爀䤀搀 㴀 ∀∀㬀ഀ
-਍    瘀愀爀 挀漀氀䌀氀愀瘀攀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀䌀愀猀攀䤀渀猀攀渀猀椀琀椀瘀攀⠀琀瀀氀䠀攀愀搀攀爀猀Ⰰ ✀䌀氀愀瘀攀✀Ⰰ 昀愀氀猀攀⤀ 簀簀 ㄀㬀ഀ
-਍    瘀愀爀 挀漀氀嘀愀氀漀爀䤀搀砀 㴀 最攀琀䌀漀氀甀洀渀䤀渀搀攀砀䈀礀一愀洀攀䌀愀猀攀䤀渀猀攀渀猀椀琀椀瘀攀⠀琀瀀氀䠀攀愀搀攀爀猀Ⰰ ✀嘀愀氀漀爀✀Ⰰ 昀愀氀猀攀⤀ 簀簀 ㈀㬀ഀ
-਍    挀漀氀䌀氀愀瘀攀䤀搀砀ⴀⴀ㬀 挀漀氀嘀愀氀漀爀䤀搀砀ⴀⴀ㬀ഀ
-਍ഀ
-਍    昀漀爀 ⠀瘀愀爀 椀 㴀 ㄀㬀 椀 㰀 琀瀀氀䐀愀琀愀⸀氀攀渀最琀栀㬀 椀⬀⬀⤀ 笀ഀ
-਍      瘀愀爀 欀攀礀 㴀 琀瀀氀䐀愀琀愀嬀椀崀嬀挀漀氀䌀氀愀瘀攀䤀搀砀崀 㼀 琀瀀氀䐀愀琀愀嬀椀崀嬀挀漀氀䌀氀愀瘀攀䤀搀砀崀⸀琀漀匀琀爀椀渀最⠀⤀⸀琀爀椀洀⠀⤀ 㨀 ∀∀㬀ഀ
-਍      椀昀 ⠀欀攀礀 㴀㴀㴀 昀漀氀搀攀爀䬀攀礀⤀ 笀ഀ
-਍        昀漀氀搀攀爀䤀搀 㴀 琀瀀氀䐀愀琀愀嬀椀崀嬀挀漀氀嘀愀氀漀爀䤀搀砀崀 㼀 琀瀀氀䐀愀琀愀嬀椀崀嬀挀漀氀嘀愀氀漀爀䤀搀砀崀⸀琀漀匀琀爀椀渀最⠀⤀⸀琀爀椀洀⠀⤀ 㨀 ∀∀㬀ഀ
-਍        戀爀攀愀欀㬀ഀ
-਍      紀ഀ
-਍    紀ഀ
-਍ഀ
-਍    瘀愀爀 昀漀氀搀攀爀 㴀 䐀爀椀瘀攀䄀瀀瀀⸀最攀琀䘀漀氀搀攀爀䈀礀䤀搀⠀昀漀氀搀攀爀䤀搀⤀㬀ഀ
-਍    瘀愀爀 琀愀爀最攀琀䘀椀氀攀一愀洀攀 㴀 爀攀昀攀爀攀渀挀攀一漀 ⬀ ∀⸀瀀搀昀∀㬀ഀ
-਍    瘀愀爀 攀砀椀猀琀椀渀最䘀椀氀攀猀 㴀 昀漀氀搀攀爀⸀最攀琀䘀椀氀攀猀䈀礀一愀洀攀⠀琀愀爀最攀琀䘀椀氀攀一愀洀攀⤀㬀ഀ
-਍    瘀愀爀 攀氀椀洀椀渀愀搀漀 㴀 昀愀氀猀攀㬀ഀ
-਍    ഀ
-਍    眀栀椀氀攀 ⠀攀砀椀猀琀椀渀最䘀椀氀攀猀⸀栀愀猀一攀砀琀⠀⤀⤀ 笀ഀ
-਍      瘀愀爀 昀椀氀攀 㴀 攀砀椀猀琀椀渀最䘀椀氀攀猀⸀渀攀砀琀⠀⤀㬀ഀ
-਍      昀椀氀攀⸀猀攀琀吀爀愀猀栀攀搀⠀琀爀甀攀⤀㬀ഀ
-਍      攀氀椀洀椀渀愀搀漀 㴀 琀爀甀攀㬀ഀ
-਍    紀ഀ
-਍ഀ
-਍    椀昀 ⠀攀氀椀洀椀渀愀搀漀⤀ 笀ഀ
-਍      瘀愀爀 琀椀瀀漀䤀搀砀 㴀 ⠀昀漀氀搀攀爀䬀攀礀 㴀㴀㴀 ✀䐀伀䌀开伀刀䐀䔀一䔀匀✀⤀ 㼀 ✀伀䄀✀ 㨀 ✀䌀伀䄀✀㬀ഀ
-਍      琀爀礀 笀ഀ
-਍        椀昀 ⠀琀礀瀀攀漀昀 䤀渀搀椀挀攀䐀漀挀猀 ℀㴀㴀 ✀甀渀搀攀昀椀渀攀搀✀ ☀☀ 琀礀瀀攀漀昀 䤀渀搀椀挀攀䐀漀挀猀⸀攀氀椀洀椀渀愀爀 㴀㴀㴀 ✀昀甀渀挀琀椀漀渀✀⤀ 笀ഀ
-਍          䤀渀搀椀挀攀䐀漀挀猀⸀攀氀椀洀椀渀愀爀⠀琀椀瀀漀䤀搀砀Ⰰ 琀愀爀最攀琀䘀椀氀攀一愀洀攀⤀㬀ഀ
-਍        紀ഀ
-਍      紀 挀愀琀挀栀 ⠀椀搀砀䔀爀爀⤀ 笀ഀ
-਍        䰀漀最最攀爀⸀氀漀最⠀✀䤀渀搀椀挀攀䐀漀挀猀⸀攀氀椀洀椀渀愀爀 昀愀氀氀ᰀȥ㨥 ✀ ⬀ 椀搀砀䔀爀爀⸀洀攀猀猀愀最攀⤀㬀ഀ
-਍      紀ഀ
-਍ഀ
-਍      昀漀爀 ⠀瘀愀爀 樀 㴀 　㬀 樀 㰀 琀愀爀最攀琀刀漀眀䤀渀搀椀挀攀猀⸀氀攀渀最琀栀㬀 樀⬀⬀⤀ 笀ഀ
-਍        愀挀琀甀愀氀椀稀愀爀䔀猀琀愀搀漀䐀漀挀甀洀攀渀琀漀猀䔀渀䠀漀樀愀⠀猀栀攀攀琀伀爀搀攀渀攀猀Ⰰ 琀愀爀最攀琀刀漀眀䤀渀搀椀挀攀猀嬀樀崀Ⰰ 栀攀愀搀攀爀猀⤀㬀ഀ
-਍      紀ഀ
-਍ഀ
-਍      瘀愀爀 甀猀攀爀䤀搀攀渀琀椀琀礀 㴀 最攀琀唀猀攀爀䤀搀攀渀琀椀琀礀匀琀爀椀渀最䈀礀唀猀攀爀䤀搀开⠀愀挀琀椀渀最唀猀攀爀䤀搀⤀㬀ഀ
-਍      氀漀最䌀栀愀渀最攀⠀✀䔀䰀䤀䴀䤀一䄀开䐀伀䌀唀䴀䔀一吀伀✀Ⰰ ∀匀攀 攀氀椀洀椀渀ᰀȥ‥攀氀 搀漀挀甀洀攀渀琀漀 琀椀瀀漀 ✀∀ ⬀ 搀漀挀吀礀瀀攀 ⬀ ∀✀ 瀀愀爀愀 氀愀 爀攀昀攀爀攀渀挀椀愀 ∀ ⬀ 爀攀昀攀爀攀渀挀攀一漀 ⬀ ∀ 搀攀猀搀攀 攀氀 洀漀搀愀氀 挀攀渀琀爀愀氀椀稀愀搀漀∀Ⰰ 甀猀攀爀䤀搀攀渀琀椀琀礀⤀㬀ഀ
-਍      ഀ
-਍      爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀猀甀挀挀攀猀猀✀Ⰰ 洀攀猀猀愀最攀㨀 ✀䐀漀挀甀洀攀渀琀漀 攀氀椀洀椀渀愀搀漀 攀砀椀琀漀猀愀洀攀渀琀攀⸀✀ 紀㬀ഀ
-਍    紀 攀氀猀攀 笀ഀ
-਍      爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀攀爀爀漀爀✀Ⰰ 洀攀猀猀愀最攀㨀 ✀䔀氀 搀漀挀甀洀攀渀琀漀 渀漀 猀攀 攀渀挀漀渀琀爀ᰀȥ‥攀渀 䐀爀椀瘀攀⸀✀ 紀㬀ഀ
-਍    紀ഀ
-਍  紀 挀愀琀挀栀 ⠀攀⤀ 笀ഀ
-਍    爀攀琀甀爀渀 笀 猀琀愀琀甀猀㨀 ✀攀爀爀漀爀✀Ⰰ 洀攀猀猀愀最攀㨀 攀⸀洀攀猀猀愀最攀 紀㬀ഀ
-਍  紀ഀ
-਍紀ഀ
-਍ഀഊ昊湵瑣潩⁮汥浩湩牡潄畣敭瑮䍯湥牴污爨晥牥湥散潎‬潤呣灹ⱥ愠瑣湩啧敳䥲⥤笠਍†牴⁹ൻ †瘠牡猠⁳‽灓敲摡桳敥䅴灰朮瑥捁楴敶灓敲摡桳敥⡴㬩਍††慶⁲桳敥佴摲湥獥㴠猠⹳敧却敨瑥祂慎敭✨牏敤敮❳㬩਍††晩⠠猡敨瑥牏敤敮⥳琠牨睯渠睥䔠牲牯∨慌栠橯⁡伧摲湥獥‧潮攠楸瑳⹥⤢഻ഊ †瘠牡搠瑡⁡‽桳敥佴摲湥獥朮瑥慄慴慒杮⡥⸩敧噴污敵⡳㬩਍††慶⁲敨摡牥⁳‽慤慴せ㭝਍††਍††慶⁲慴杲瑥潃乬浡⁥‽∢഻ †瘠牡映汯敤䭲祥㴠∠㬢਍††晩⠠潤呣灹⁥㴽‽伢摲湥搠⁥捁湯楤楣湯浡敩瑮≯ ൻ ††琠牡敧䍴汯慎敭㴠∠潎牏敤≮഻ ††映汯敤䭲祥㴠∠佄彃剏䕄䕎≓഻ †素攠獬⁥晩⠠潤呣灹⁥㴽‽䌢牥楴楦慣潤搠⁥湁污獩獩⤢笠਍†††慴杲瑥潃乬浡⁥‽丢䅯慮楬楳≳഻ ††映汯敤䭲祥㴠∠佄彃乁䱁卉卉㬢਍††ൽ †ഠ †椠⁦昨汯敤䭲祥㴠㴽∠⤢笠਍†††敲畴湲笠猠慴畴㩳✠牥潲❲‬敭獳条㩥∠楔潰搠⁥潤畣敭瑮⁯潮爠捥湯捯摩⹯•㭽਍††ൽ †ഠ †瘠牡琠牡敧䍴汯摉⁸‽敧䍴汯浵䥮摮硥祂慎敭栨慥敤獲‬慴杲瑥潃乬浡ⱥ琠畲⥥ⴠㄠ഻ †瘠牡琠牡敧剴睯湉楤散⁳‽嵛഻ †瘠牡爠晥牥湥散潎瑓⁲‽瑓楲杮爨晥牥湥散潎⸩牴浩⤨琮䱯睯牥慃敳⤨഻ †ഠ †映牯⠠慶⁲⁩‽㬱椠㰠搠瑡⹡敬杮桴※⭩⤫笠਍†††慶⁲散汬慖畬⁥‽慤慴楛孝慴杲瑥潃䥬硤㭝਍†††慶⁲散汬慖畬卥牴㴠挠汥噬污敵℠‽畮汬㼠匠牴湩⡧散汬慖畬⥥琮楲⡭⸩潴潌敷䍲獡⡥ ›∢഻ ††椠⁦挨汥噬污敵瑓⁲㴽‽敲敦敲据乥卯牴 ൻ †††琠牡敧剴睯湉楤散⹳異桳椨⬠ㄠ㬩਍†††ൽ †素਍਍††晩⠠慴杲瑥潒䥷摮捩獥氮湥瑧⁨㴽‽⤰笠਍†††敲畴湲笠猠慴畴㩳✠牥潲❲‬敭獳条㩥✠慌爠晥牥湥楣⁡✢⬠爠晥牥湥散潎⬠✠•潮攠楸瑳⁥湥氠⁡潨慪✮素഻ †素਍਍††慶⁲灴卬敨瑥㴠猠⹳敧却敨瑥祂慎敭✨整灭慬整❳㬩਍††慶⁲灴䑬瑡⁡‽灴卬敨瑥朮瑥慄慴慒杮⡥⸩敧噴污敵⡳㬩਍††慶⁲灴䡬慥敤獲㴠琠汰慄慴せ㭝਍††慶⁲潦摬牥摉㴠∠㬢਍††慶⁲潣䍬慬敶摉⁸‽敧䍴汯浵䥮摮硥祂慎敭慃敳湉敳獮瑩癩⡥灴䡬慥敤獲‬䌧慬敶Ⱗ映污敳 籼ㄠ഻ †瘠牡挠汯慖潬䥲硤㴠朠瑥潃畬湭湉敤䉸乹浡䍥獡䥥獮湥楳楴敶琨汰效摡牥ⱳ✠慖潬❲‬慦獬⥥簠⁼㬲਍††潣䍬慬敶摉⵸㬭挠汯慖潬䥲硤ⴭ഻ഊ †映牯⠠慶⁲⁩‽㬱椠㰠琠汰慄慴氮湥瑧㭨椠⬫ ൻ ††瘠牡欠祥㴠琠汰慄慴楛孝潣䍬慬敶摉嵸㼠琠汰慄慴楛孝潣䍬慬敶摉嵸琮卯牴湩⡧⸩牴浩⤨㨠∠㬢਍†††晩⠠敫⁹㴽‽潦摬牥敋⥹笠਍††††潦摬牥摉㴠琠汰慄慴楛孝潣噬污牯摉嵸㼠琠汰慄慴楛孝潣噬污牯摉嵸琮卯牴湩⡧⸩牴浩⤨㨠∠㬢਍††††牢慥㭫਍†††ൽ †素਍਍††慶⁲潦摬牥㴠䐠楲敶灁⹰敧䙴汯敤䉲䥹⡤潦摬牥摉㬩਍††慶⁲慴杲瑥楆敬慎敭㴠爠晥牥湥散潎⬠∠瀮晤㬢਍††慶⁲硥獩楴杮楆敬⁳‽潦摬牥朮瑥楆敬䉳乹浡⡥慴杲瑥楆敬慎敭㬩਍††慶⁲汥浩湩摡⁯‽慦獬㭥਍††਍††桷汩⁥攨楸瑳湩䙧汩獥栮獡敎瑸⤨ ൻ ††瘠牡映汩⁥‽硥獩楴杮楆敬⹳敮瑸⤨഻ ††映汩⹥敳呴慲桳摥琨畲⥥഻ ††攠楬業慮潤㴠琠畲㭥਍††ൽഊ †椠⁦攨楬業慮潤 ൻ ††瘠牡琠灩䥯硤㴠⠠潦摬牥敋⁹㴽‽䐧䍏佟䑒久卅⤧㼠✠䅏‧›䌧䅏㬧਍†††牴⁹ൻ †††椠⁦琨灹潥⁦湉楤散潄獣℠㴽✠湵敤楦敮❤☠…祴数景䤠摮捩䑥捯⹳汥浩湩牡㴠㴽✠畦据楴湯⤧笠਍†††††湉楤散潄獣攮楬業慮⡲楴潰摉ⱸ琠牡敧䙴汩乥浡⥥഻ †††素਍†††⁽慣捴⁨椨硤牅⥲笠਍††††潌杧牥氮杯✨湉楤散潄獣攮楬業慮⁲慦汬ꋃ胢얝쎓鶀胢㪚✠⬠椠硤牅⹲敭獳条⥥഻ ††素਍਍†††潦⁲瘨牡樠㴠〠※⁪‼慴杲瑥潒䥷摮捩獥氮湥瑧㭨樠⬫ ൻ †††愠瑣慵楬慺䕲瑳摡䍯牡慧猨敨瑥牏敤敮ⱳ琠牡敧剴睯湉楤散孳嵪‬敨摡牥⥳഻ ††素਍਍†††慶⁲獵牥摉湥楴祴㴠朠瑥獕牥摉湥楴祴瑓楲杮祂獕牥摉⡟捡楴杮獕牥摉㬩਍†††潬䍧慨杮⡥䔧䥌䥍䅎䑟䍏䵕久佔Ⱗ∠敓攠楬業썮鶀鏅ꋃ胢骀攠⁬潤畣敭瑮⁯楴潰✠•‫潤呣灹⁥‫✢瀠牡⁡慬爠晥牥湥楣⁡•‫敲敦敲据乥⁯‫•敤摳⁥汥洠摯污挠湥牴污穩摡≯‬獵牥摉湥楴祴㬩਍†††਍†††敲畴湲笠猠慴畴㩳✠畳捣獥❳‬敭獳条㩥✠潄畣敭瑮⁯汥浩湩摡⁯硥瑩獯浡湥整✮素഻ †素攠獬⁥ൻ ††爠瑥牵⁮⁻瑳瑡獵›攧牲牯Ⱗ洠獥慳敧›䔧⁬潤畣敭瑮⁯潮猠⁥湥潣瑮썲鶀鏅ꋃ胢骀攠⁮牄癩⹥‧㭽਍††ൽ 素挠瑡档⠠⥥笠਍††敲畴湲笠猠慴畴㩳✠牥潲❲‬敭獳条㩥攠洮獥慳敧素഻ 素਍ൽ
+/**
+ * UploadLogic.gs
+ * 
+ * Módulo de lógica de subida de documentos.
+ * Contiene funciones para:
+ * - Apertura de modal de subida masiva
+ * - Obtención de listas de órdenes pendientes
+ * - Procesamiento de subida de documentos (Órdenes y Análisis)
+ * - Validación y actualización de estado de documentos
+ * 
+ * FASE 4 - Batch 4.2: Upload Logic
+ */
+
+// --- UI: APERTURA DE MODAL ---
+
+/**
+ * Abre el modal centralizado de subida de archivos.
+ * Muestra UploadCentralModal.html para subida masiva de documentos.
+ */
+function abrirModalSubidaGeneral() {
+  // La validación de identidad se realiza inline dentro de UploadCentralModal.html al cargar
+  // (vía getInitialData() → activeEmail → match con hoja Usuarios)
+  try {
+    var template = HtmlService.createTemplateFromFile('UploadCentralModal');
+    var html = template.evaluate()
+      .setWidth(700)
+      .setHeight(600);
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Subida Masiva de Documentos');
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error al abrir el modal: ' + e.message);
+  }
+}
+
+// --- OBTENCIÓN DE LISTAS PENDIENTES ---
+
+/**
+ * Obtiene las listas de órdenes y análisis pendientes de carga.
+ * Retorna arrays con los NoOrden según el estado de carga de COA y OA.
+ * 
+ * @returns {Object} Objeto con arrays de órdenes pendientes por tipo de documento
+ * @property {Array<string>} ordenesPendientesOA - Números de orden con OA pendiente
+ * @property {Array<string>} ordenesPendientesCOA - Números de orden con COA pendiente
+ */
+function getOrdersData() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ordenes');
+    
+    if (!sheet) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colNoOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+    var colEstadoDocumentosCol = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+    var colNoAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+    
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { ordenesPendientesOA: [], ordenesPendientesCOA: [], cargadasOA: [], cargadasCOA: [] };
+    }
+    
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    var data = dataRange.getValues();
+    
+    var ordenesPendientesOA = [];
+    var ordenesPendientesCOA = [];
+    var cargadasOA = [];
+    var cargadasCOA = [];
+    
+    for (var i = 0; i < data.length; i++) {
+      var noOrden = data[i][colNoOrdenCol - 1];
+      var estadoDoc = colEstadoDocumentosCol ? data[i][colEstadoDocumentosCol - 1] : "🔴 Faltan Ambos";
+      var noAnalisis = colNoAnalisisCol ? data[i][colNoAnalisisCol - 1] : null;
+      
+      var noOrdenStr = noOrden ? noOrden.toString().trim() : "";
+      var estadoDocStr = estadoDoc ? estadoDoc.toString().trim() : "🔴 Faltan Ambos";
+      var noAnalisisStr = noAnalisis ? noAnalisis.toString().trim() : "";
+      
+      if (!noOrdenStr) continue;
+      
+      // Lógica para OA
+      if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta OA") !== -1) {
+        if (ordenesPendientesOA.indexOf(noOrdenStr) === -1) {
+          ordenesPendientesOA.push(noOrdenStr);
+        }
+      } else if (estadoDocStr.indexOf("Falta COA") !== -1 || estadoDocStr.indexOf("Listos para Imprimir") !== -1) {
+        if (cargadasOA.indexOf(noOrdenStr) === -1) {
+          cargadasOA.push(noOrdenStr);
+        }
+      }
+      
+      // Lógica para COA
+      if (noAnalisisStr) {
+        if (estadoDocStr.indexOf("Faltan Ambos") !== -1 || estadoDocStr.indexOf("Falta COA") !== -1) {
+          if (ordenesPendientesCOA.indexOf(noAnalisisStr) === -1) {
+            ordenesPendientesCOA.push(noAnalisisStr);
+          }
+        } else if (estadoDocStr.indexOf("Falta OA") !== -1 || estadoDocStr.indexOf("Listos para Imprimir") !== -1) {
+          if (cargadasCOA.indexOf(noAnalisisStr) === -1) {
+            cargadasCOA.push(noAnalisisStr);
+          }
+        }
+      }
+    }
+    
+    Logger.log("✓ Órdenes con OA pendiente: " + ordenesPendientesOA.length + " | Cargadas: " + cargadasOA.length);
+    Logger.log("✓ Órdenes con COA pendiente: " + ordenesPendientesCOA.length + " | Cargadas: " + cargadasCOA.length);
+    return { 
+      ordenesPendientesOA: ordenesPendientesOA, 
+      ordenesPendientesCOA: ordenesPendientesCOA,
+      cargadasOA: cargadasOA,
+      cargadasCOA: cargadasCOA
+    };
+    
+  } catch (e) {
+    Logger.log("Error en getOrdersData: " + e.message);
+    throw new Error("Error al obtener datos de órdenes: " + e.message);
+  }
+}
+
+// --- PROCESAMIENTO DE SUBIDA DE DOCUMENTOS ---
+
+/**
+ * Procesa la subida de un documento (Orden o Análisis) al sistema.
+ * Valida tipo de archivo, busca la referencia en la hoja, maneja sobrescritura,
+ * guarda en Drive y actualiza estado en la hoja.
+ * 
+ * @param {string} base64Data - Datos del archivo en base64
+ * @param {string} mimeType - Tipo MIME del archivo
+ * @param {string} fileName - Nombre del archivo
+ * @param {string} referenceNo - Número de referencia (NoOrden o NoAnalisis)
+ * @param {string} docType - Tipo de documento ("Orden de Acondicionamiento" o "Registro de Inspeccion Base")
+ * @param {boolean} overwriteConfirmed - Indica si el usuario confirmó la sobrescritura del archivo existente
+ * @param {string} actingUserId - UserID del usuario que ejecuta la acción
+ * @returns {Object} Resultado de la operación con status y mensaje
+ */
+function procesarSubidaDocumentoCentral(base64Data, mimeType, fileName, referenceNo, docType, overwriteConfirmed, actingUserId) {
+  try {
+    // Validación de seguridad: solo permitir PDF
+    if (mimeType !== 'application/pdf') {
+      return { status: 'error', message: 'Solo se permiten archivos PDF.' };
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    
+    if (!sheetOrdenes) {
+      throw new Error("La hoja 'Ordenes' no existe.");
+    }
+
+    // Leer toda la data incluyendo encabezados
+    var data = sheetOrdenes.getDataRange().getValues();
+    var headers = data[0]; // La primera fila son los encabezados
+    
+    // Mapeo de columnas por nombre de encabezado (base-1 para getRange)
+    var colEstadoDocumentosIdx = getColumnIndexByName(headers, 'EstadoDocumentos', false);
+    var colNoOrdenIdx = getColumnIndexByName(headers, 'NoOrden', true);
+    var colNoAnalisisIdx = getColumnIndexByName(headers, 'NoAnalisis', false);
+    
+    // Determinar la columna objetivo según docType (para búsqueda en array data)
+    var targetColName = "";
+    var folderKey = "";
+    
+    if (docType === "Orden de Acondicionamiento") {
+      targetColName = "NoOrden";
+      folderKey = "DOC_ORDENES";
+    } else if (docType === "Certificado de Analisis") {
+      targetColName = "NoAnalisis";
+      folderKey = "DOC_ANALISIS";
+    }
+    
+    // Validación de seguridad para folderKey
+    if (folderKey === "") {
+      return { status: 'error', message: "Tipo de documento no reconocido o columnas no configuradas: " + docType };
+    }
+    
+    // Obtener índice de columna objetivo para búsqueda en array (base-0)
+    var targetColIdx = getColumnIndexByName(headers, targetColName, true) - 1;
+    
+    // Logs de auditoría críticos
+    Logger.log("--- AUDITORIA DE BUSQUEDA ---");
+    Logger.log("DocType: " + docType);
+    Logger.log("Indice de Columna Objetivo (0-based): " + targetColIdx);
+    Logger.log("Referencia a buscar: " + String(referenceNo).trim().toLowerCase());
+    
+    // Bucle de búsqueda para TODAS las filas que coincidan
+    var targetRowIndices = [];
+    var referenceNoStr = String(referenceNo).trim().toLowerCase();
+    
+    for (var i = 1; i < data.length; i++) {
+      var cellValue = data[i][targetColIdx];
+      var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
+      
+      if (cellValueStr === referenceNoStr) {
+        targetRowIndices.push(i + 1); // +1 porque el array es base 0, y las filas de la hoja son base 1
+      }
+    }
+
+    if (targetRowIndices.length === 0) {
+      return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja. Puede haber sido eliminada mientras el modal estaba abierto.' };
+    }
+
+    // Obtener carpeta desde templates
+    var tplSheet = ss.getSheetByName('templates');
+    if (!tplSheet) {
+      throw new Error("La hoja 'templates' no existe.");
+    }
+
+    var tplData = tplSheet.getDataRange().getValues();
+    var tplHeaders = tplData[0];
+    var folderId = "";
+    
+    // Obtener índices de columnas por nombre para templates
+    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false);
+    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false);
+    
+    // Si alguna columna no existe, usar índices por defecto
+    if (!colClaveIdx) colClaveIdx = 1;
+    if (!colValorIdx) colValorIdx = 2;
+    
+    // Convertir a base-0 para acceso a array
+    colClaveIdx = colClaveIdx - 1;
+    colValorIdx = colValorIdx - 1;
+
+    for (var i = 1; i < tplData.length; i++) {
+      var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+      if (key === folderKey) {
+        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+        break;
+      }
+    }
+
+    if (!folderId) {
+      throw new Error("No se encontró la clave " + folderKey + " en la hoja 'templates'. Configure el ID de la carpeta correspondiente.");
+    }
+
+    // Obtener la carpeta destino
+    var folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+      Logger.log("Carpeta destino obtenida correctamente.");
+    } catch (e) {
+      throw new Error("No se puede acceder a la carpeta (ID: " + folderId + "). Verifique que el ID es correcto y que el script tiene permisos de acceso.");
+    }
+
+    // Manejo de Históricos (Sobreescritura segura)
+    var targetFileName = referenceNo + ".pdf";
+    var existingFiles = folder.getFilesByName(targetFileName);
+    var archivoReemplazado = false;
+    var skipUpload = false;
+    var fileUrl = "";
+    var docFileId = "";
+    
+    // Verificar si el archivo ya existe
+    if (existingFiles.hasNext()) {
+      Logger.log("Archivo ya existe: " + targetFileName);
+      
+      if (overwriteConfirmed === 'skipUpload') {
+        // Usuario canceló reemplazo - solo actualizar estado sin tocar archivo
+        Logger.log("Usuario canceló reemplazo. Actualizando estado sin modificar archivo.");
+        var existingFile = existingFiles.next();
+        fileUrl = existingFile.getUrl();
+        docFileId = existingFile.getId();
+        skipUpload = true;
+      } else if (!overwriteConfirmed) {
+        // Retornar status 'exists' para que el frontend pida confirmación
+        Logger.log("Retornando status 'exists' para pedir confirmación al usuario");
+        return { status: 'exists', fileName: targetFileName, rowIdx: targetRowIndices[0] };
+      } else {
+        // Si overwriteConfirmed es true, proceder con el reemplazo
+        while (existingFiles.hasNext()) {
+          var oldFile = existingFiles.next();
+          Logger.log("Enviando a papelera el archivo existente: " + oldFile.getName());
+          oldFile.setTrashed(true); // Enviar a papelera para cumplimiento de auditoría
+          archivoReemplazado = true;
+        }
+      }
+    }
+
+    // Subir archivo solo si no se saltó la subida
+    if (!skipUpload) {
+      // Decodificar base64 y crear el archivo
+      var decodedData = Utilities.base64Decode(base64Data);
+      var blob = Utilities.newBlob(decodedData, mimeType, targetFileName);
+      var newFile = folder.createFile(blob);
+      fileUrl = newFile.getUrl();
+      docFileId = newFile.getId();
+    }
+
+    // [ÍNDICE] Reflejar el doc en el índice ANTES de revalidar, para que
+    // actualizarEstadoDocumentosEnHoja lo vea de inmediato (cierra la ventana de staleness).
+    try {
+      var tipoIdx = (folderKey === 'DOC_ORDENES') ? 'OA' : 'COA';
+      if (docFileId) IndiceDocs.agregar(tipoIdx, docFileId, targetFileName);
+    } catch (idxErr) {
+      Logger.log('IndiceDocs.agregar falló (no crítico): ' + idxErr.message);
+    }
+
+    // Actualizar estado consolidado para TODAS las filas afectadas
+    for (var j = 0; j < targetRowIndices.length; j++) {
+      actualizarEstadoDocumentosEnHoja(sheetOrdenes, targetRowIndices[j], headers);
+    }
+
+    // Auditoría obligatoria
+    var userIdentity = getUserIdentityStringByUserId_(actingUserId);
+    var logMessage = "";
+    
+    if (skipUpload) {
+      logMessage = "Se actualizó el estado a 'Cargado' para '" + docType + "' (ref: " + referenceNo + ") sin modificar el archivo existente";
+    } else if (archivoReemplazado) {
+      logMessage = "Se REEMPLAZÓ el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
+    } else {
+      logMessage = "Se subió el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado";
+    }
+    
+    logChange('CARGA_DOCUMENTO', logMessage, userIdentity);
+    
+    return { status: 'success', message: 'Documento procesado exitosamente para ' + docType + ' ' + referenceNo + '.' };
+    
+  } catch (e) {
+    Logger.log("Error en procesarSubidaDocumentoCentral: " + e.message);
+    return { status: 'error', message: "Error interno del servidor: " + e.message };
+  }
+}
+
+/**
+ * Elimina un documento (Orden o Análisis) del sistema.
+ * 
+ * @param {string} referenceNo - Número de referencia
+ * @param {string} docType - Tipo de documento
+ * @param {string} actingUserId - UserID
+ * @returns {Object} Resultado
+ */
+function eliminarDocumentoCentral(referenceNo, docType, actingUserId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetOrdenes = ss.getSheetByName('Ordenes');
+    if (!sheetOrdenes) throw new Error("La hoja 'Ordenes' no existe.");
+
+    var data = sheetOrdenes.getDataRange().getValues();
+    var headers = data[0];
+    
+    var targetColName = "";
+    var folderKey = "";
+    if (docType === "Orden de Acondicionamiento") {
+      targetColName = "NoOrden";
+      folderKey = "DOC_ORDENES";
+    } else if (docType === "Certificado de Analisis") {
+      targetColName = "NoAnalisis";
+      folderKey = "DOC_ANALISIS";
+    }
+    
+    if (folderKey === "") {
+      return { status: 'error', message: "Tipo de documento no reconocido." };
+    }
+    
+    var targetColIdx = getColumnIndexByName(headers, targetColName, true) - 1;
+    var targetRowIndices = [];
+    var referenceNoStr = String(referenceNo).trim().toLowerCase();
+    
+    for (var i = 1; i < data.length; i++) {
+      var cellValue = data[i][targetColIdx];
+      var cellValueStr = cellValue != null ? String(cellValue).trim().toLowerCase() : "";
+      if (cellValueStr === referenceNoStr) {
+        targetRowIndices.push(i + 1);
+      }
+    }
+
+    if (targetRowIndices.length === 0) {
+      return { status: 'error', message: 'La referencia "' + referenceNo + '" no existe en la hoja.' };
+    }
+
+    var tplSheet = ss.getSheetByName('templates');
+    var tplData = tplSheet.getDataRange().getValues();
+    var tplHeaders = tplData[0];
+    var folderId = "";
+    var colClaveIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Clave', false) || 1;
+    var colValorIdx = getColumnIndexByNameCaseInsensitive(tplHeaders, 'Valor', false) || 2;
+    colClaveIdx--; colValorIdx--;
+
+    for (var i = 1; i < tplData.length; i++) {
+      var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+      if (key === folderKey) {
+        folderId = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+        break;
+      }
+    }
+
+    var folder = DriveApp.getFolderById(folderId);
+    var targetFileName = referenceNo + ".pdf";
+    var existingFiles = folder.getFilesByName(targetFileName);
+    var eliminado = false;
+    
+    while (existingFiles.hasNext()) {
+      var file = existingFiles.next();
+      file.setTrashed(true);
+      eliminado = true;
+    }
+
+    if (eliminado) {
+      var tipoIdx = (folderKey === 'DOC_ORDENES') ? 'OA' : 'COA';
+      try {
+        if (typeof IndiceDocs !== 'undefined' && typeof IndiceDocs.eliminar === 'function') {
+          IndiceDocs.eliminar(tipoIdx, targetFileName);
+        }
+      } catch (idxErr) {
+        Logger.log('IndiceDocs.eliminar falló: ' + idxErr.message);
+      }
+
+      for (var j = 0; j < targetRowIndices.length; j++) {
+        actualizarEstadoDocumentosEnHoja(sheetOrdenes, targetRowIndices[j], headers);
+      }
+
+      var userIdentity = getUserIdentityStringByUserId_(actingUserId);
+      logChange('ELIMINA_DOCUMENTO', "Se eliminó el documento tipo '" + docType + "' para la referencia " + referenceNo + " desde el modal centralizado", userIdentity);
+      
+      return { status: 'success', message: 'Documento eliminado exitosamente.' };
+    } else {
+      return { status: 'error', message: 'El documento no se encontró en Drive.' };
+    }
+  } catch (e) {
+    return { status: 'error', message: e.message };
+  }
+}

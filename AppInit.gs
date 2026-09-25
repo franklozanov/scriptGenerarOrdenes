@@ -124,7 +124,7 @@ function initializeCompleteSystem(ui) {
   }
 
   try {
-    aplicarValidacionesEstadoCarga(true); // silent=true para evitar error de UI en inicializaciÃ³n
+    aplicarValidacionesEstadoDocumentos(true); // silent=true para evitar error de UI en inicializaciÃ³n
     summary.push("âœ“ Validaciones de estado de carga aplicadas");
   } catch (e) {
     summary.push("âš ï¸ Validaciones de estado: " + e.message);
@@ -475,7 +475,7 @@ function fixHeaders(ui) {
  * IMPORTANTE: Ejecutar despuÃ©s de agregar las columnas o cuando se necesite reforzar las validaciones.
  * @param {boolean} silent - Si es true, no muestra mensajes de UI (para uso en inicializaciÃ³n)
  */
-function aplicarValidacionesEstadoCarga(silent) {
+function aplicarValidacionesEstadoDocumentos(silent) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ordenes');
@@ -581,7 +581,7 @@ function aplicarValidacionesEstadoCarga(silent) {
  */
 function promptAplicarValidacionesEstadoCarga() {
   withAdminAuth('Aplicar Validaciones de Estado de Carga', function(ui) {
-    aplicarValidacionesEstadoCarga();
+    aplicarValidacionesEstadoDocumentos();
   });
 }
 

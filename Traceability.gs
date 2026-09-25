@@ -28,11 +28,6 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
   if (!userRecord) throw new Error("UserID no existe en la hoja Usuarios: " + userId);
   var nombreCorto = userRecord.nombreCorto || userRecord.userId;
 
-  // ID de correlación compartido entre los distintos artefactos que esta única acción de
-  // impresión puede generar (Logs del evento de impresión + cierre de solicitud asociada),
-  // para poder reconstruir en la hoja Logs que pertenecen a la misma operación.
-  var correlationId = Utilities.getUuid().substring(0, 8);
-
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
   var cols = {
@@ -52,230 +47,101 @@ function internalUpdateTraceability(orderNo, userId, pagesPrinted, printType) {
 
   if (rowIndex === -1) throw new Error("Row lost during update.");
 
-  // Una sola lectura de la fila completa (en vez de una llamada de servicio por celda) para
-  // minimizar el tiempo que esta operación permanece bajo el LockService de impresión.
-  var rowValues = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
-
-  var consecutivo = Number(rowValues[cols.ConsecutivoImp - 1]) || 0;
-
+  var consecutivo = Number(sheet.getRange(rowIndex, cols.ConsecutivoImp).getValue()) || 0;
+  
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
-
+  
   var newEntry = consecutivo + "-" + nombreCorto + " " + timestamp + " (" + pagesPrinted + ")";
 
-  // Capturar STATUS previo para distinguir impresión Inicial vs Adicional en el historial
-  var prevStatus = rowValues[cols.STATUS - 1];
-  prevStatus = prevStatus ? prevStatus.toString().trim() : "";
-
-  // Normalizar el tipo para tolerar variantes de acento/caso ('Reimpresión' vs 'Reimpresion')
-  var esReimpresion = isReimpresionType_(printType);
-
-  var etiquetaEvento;
-
-  if (esReimpresion) {
-    rowValues[cols.STATUS - 1] = VALORES_STATUS.REIMPRESO;
-
-    // La reimpresión se registra por separado y NO suma a TotalPags (copias válidas)
-    var currentReimpresion = Number(rowValues[cols.Reimpresion - 1]) || 0;
-    rowValues[cols.Reimpresion - 1] = currentReimpresion + pagesPrinted;
-
-    var currentReimpresoPor = rowValues[cols.ReimpresoPor - 1] || "";
-    rowValues[cols.ReimpresoPor - 1] = currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry;
-
-    etiquetaEvento = "REIMPRESIÓN";
-  } else {
-    rowValues[cols.STATUS - 1] = VALORES_STATUS.IMPRESO;
-
-    // Impresión inicial y adicional suman a NoPags (copias válidas)
-    var currentNoPags = Number(rowValues[cols.NoPags - 1]) || 0;
-    rowValues[cols.NoPags - 1] = currentNoPags + pagesPrinted;
-
-    var currentImpresoPor = rowValues[cols.ImpresoPor - 1] || "";
-    rowValues[cols.ImpresoPor - 1] = currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry;
-
-    // Si la orden ya estaba Impresa/Reimpresa, es una impresión ADICIONAL; si no, es la INICIAL
-    etiquetaEvento = (prevStatus === VALORES_STATUS.IMPRESO || prevStatus === VALORES_STATUS.REIMPRESO)
-      ? "IMPRESIÓN ADICIONAL"
-      : "IMPRESIÓN INICIAL";
-  }
-
-  // TotalPags = copias válidas (Inicial + Adicional). La reimpresión NO suma aquí.
-  var finalNoPags = Number(rowValues[cols.NoPags - 1]) || 0;
-  rowValues[cols.TotalPags - 1] = finalNoPags;
-
-  // Una sola escritura de toda la fila con los cambios aplicados (antes eran ~7 llamadas de
-  // servicio, una lectura y una escritura por cada celda individual).
-  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
-
-  // Registrar el evento en el historial consolidado legible (columna HistorialImpresion)
-  appendHistorialImpresion_(sheet, rowIndex, headers,
-    etiquetaEvento + " #" + consecutivo + " · " + pagesPrinted + " pág · " + nombreCorto + " · ref:" + correlationId);
-
-  // El evento de impresión en sí no quedaba en Logs (solo en HistorialImpresion, por orden) —
-  // se registra aquí también para que sea auditable de forma centralizada, con el mismo
-  // CorrelationId que el eventual cierre de solicitud más abajo.
-  logChange(TIPOS_CAMBIO.IMPRESION_ORDEN, etiquetaEvento + " de orden " + orderNo + " (" + pagesPrinted + " páginas)", nombreCorto, {
-    ordenRef: orderNo,
-    campo: 'STATUS',
-    valorAnterior: prevStatus,
-    valorNuevo: rowValues[cols.STATUS - 1],
-    correlationId: correlationId
-  });
-
-  // --- CERRAR SOLICITUD APROBADA SI EXISTE ---
-  try {
-    var solicitudesSheet = ss.getSheetByName('SolicitudesImpresion');
-    if (solicitudesSheet) {
-      var solHeaders = solicitudesSheet.getRange(1, 1, 1, solicitudesSheet.getLastColumn()).getValues()[0];
-      var solData = solicitudesSheet.getDataRange().getValues();
-
-      var colSolIdSolicitud = getColumnIndexByNameCaseInsensitive(solHeaders, 'ID_Solicitud', false);
-      var colSolNoOrden = getColumnIndexByNameCaseInsensitive(solHeaders, 'NoOrden', false);
-      var colSolEstado = getColumnIndexByNameCaseInsensitive(solHeaders, 'Estado', false);
-
-      if (colSolNoOrden && colSolEstado && colSolIdSolicitud) {
-        for (var i = 1; i < solData.length; i++) {
-          var solNoOrden = solData[i][colSolNoOrden - 1] ? solData[i][colSolNoOrden - 1].toString().trim() : "";
-          var solEstado = solData[i][colSolEstado - 1] ? solData[i][colSolEstado - 1].toString().trim() : "";
-
-          if (solNoOrden === orderNo && solEstado === 'Aprobada') {
-            var idSolicitud = colSolIdSolicitud ? (solData[i][colSolIdSolicitud - 1] || '').toString() : '';
-            solicitudesSheet.getRange(i + 1, colSolEstado).setValue('Completada');
-            logChange(TIPOS_CAMBIO.SOLICITUD_COMPLETADA, 'La solicitud ' + idSolicitud + ' fue consumida al imprimir orden ' + orderNo, nombreCorto, {
-              ordenRef: orderNo,
-              campo: 'Estado',
-              valorAnterior: 'Aprobada',
-              valorNuevo: 'Completada',
-              correlationId: correlationId
-            });
-            Logger.log("Solicitud " + idSolicitud + " marcada como Completada tras impresión de orden " + orderNo);
-            break;
-          }
-        }
-      }
+  function sumCsv(csvString) {
+    if (!csvString) return 0;
+    var parts = csvString.toString().split(",");
+    var sum = 0;
+    for (var p = 0; p < parts.length; p++) {
+      sum += Number(parts[p].trim()) || 0;
     }
-  } catch (e) {
-    Logger.log("Error cerrando solicitud aprobada: " + e.message);
+    return sum;
   }
-  // --- FIN CIERRE SOLICITUD APROBADA ---
+
+  if (printType === "Reimpresion") {
+    sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.REIMPRESO);
+    
+    var currentReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
+    sheet.getRange(rowIndex, cols.Reimpresion).setValue(currentReimpresion + pagesPrinted);
+    
+    var currentReimpresoPor = sheet.getRange(rowIndex, cols.ReimpresoPor).getValue() || "";
+    sheet.getRange(rowIndex, cols.ReimpresoPor).setValue(currentReimpresoPor ? currentReimpresoPor + ", " + newEntry : newEntry); 
+  } else {
+    sheet.getRange(rowIndex, cols.STATUS).setValue(VALORES_STATUS.IMPRESO);
+    
+    var currentNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
+    sheet.getRange(rowIndex, cols.NoPags).setValue(currentNoPags + pagesPrinted);
+    
+    var currentImpresoPor = sheet.getRange(rowIndex, cols.ImpresoPor).getValue() || "";
+    sheet.getRange(rowIndex, cols.ImpresoPor).setValue(currentImpresoPor ? currentImpresoPor + ", " + newEntry : newEntry); 
+  }
+
+  var finalNoPags = Number(sheet.getRange(rowIndex, cols.NoPags).getValue()) || 0;
+  var finalReimpresion = Number(sheet.getRange(rowIndex, cols.Reimpresion).getValue()) || 0;
+  sheet.getRange(rowIndex, cols.TotalPags).setValue(finalNoPags + finalReimpresion);
 
   return "Record updated successfully.";
 }
 
 /**
- * Configura los triggers instalables para auditoría: ediciones de celda (onEditInstalled)
- * y cambios estructurales (onChangeInstalled: inserción/eliminación de filas/columnas,
- * borrado de hojas, etc. — onEdit nunca dispara para estos casos). Idempotente: si un
- * trigger ya existe, no lo duplica.
+ * Configura el trigger instalable para auditoría de ediciones.
  */
 function setupAuditTrailTrigger() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-
+  
   var triggers = ScriptApp.getProjectTriggers();
-  var yaExisteOnEdit = false;
-  var yaExisteOnChange = false;
   for (var i = 0; i < triggers.length; i++) {
-    var handler = triggers[i].getHandlerFunction();
-    if (handler === 'onEditInstalled') yaExisteOnEdit = true;
-    if (handler === 'onChangeInstalled') yaExisteOnChange = true;
+    if (triggers[i].getHandlerFunction() === 'onEditInstalled') {
+      Logger.log("⚠️ Disparador onEditInstalled ya existe");
+      return;
+    }
   }
-
-  if (yaExisteOnEdit) {
-    Logger.log("⚠️ Disparador onEditInstalled ya existe");
-  } else {
-    ScriptApp.newTrigger('onEditInstalled')
-      .forSpreadsheet(ss)
-      .onEdit()
-      .create();
-    Logger.log("✓ Disparador onEditInstalled creado");
-  }
-
-  if (yaExisteOnChange) {
-    Logger.log("⚠️ Disparador onChangeInstalled ya existe");
-  } else {
-    ScriptApp.newTrigger('onChangeInstalled')
-      .forSpreadsheet(ss)
-      .onChange()
-      .create();
-    Logger.log("✓ Disparador onChangeInstalled creado");
-  }
+  
+  ScriptApp.newTrigger('onEditInstalled')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+  
+  Logger.log("✓ Disparador onEditInstalled creado");
 }
 
 /**
  * Trigger instalable que registra todas las ediciones en la hoja Logs.
  * Incluye validación de permisos y lógica especial para columnas específicas.
+ *
+ * [FASE 1 REFACTOR] Cuando USE_NEW_ROUTER === true, delega al Event Router modular.
+ * Para revertir al comportamiento legacy: cambiar USE_NEW_ROUTER = false en EventRouter.gs
  */
 function onEditInstalled(e) {
-  var lock = LockService.getScriptLock();
-  try {
-    // Bloqueo corto para ordenar ediciones simultáneas/rápidas
-    lock.tryLock(500); 
+  // === KILL SWITCH: Delegar al nuevo Event Router si está activado ===
+  if (typeof USE_NEW_ROUTER !== 'undefined' && USE_NEW_ROUTER === true) {
+    return runNewEventRouter(e);
+  }
 
+  try {
     if (!e || !e.range || !e.source) return;
+    
     if (e.source.getActiveSheet().getName() === 'Logs') return;
     
     var editedRange = e.range;
     var sheet = editedRange.getSheet();
     var sheetName = sheet.getName();
-    var eRow = editedRange.getRow();
-    var eCol = editedRange.getColumn();
-
-    // 1. DEFENSA EN PROFUNDIDAD (Salida Temprana / Early Exit)
-    // Evaluamos primero las restricciones del sistema antes de hacer llamadas pesadas a la API
-    var isUnlocked = null; // Se evalúa de manera perezosa (lazy)
-    var userIdentity = null; // Se evalúa de manera perezosa (y cacheada)
-    var SYS_MATRICES_SHEET_NAME_ = (typeof SYS_MATRICES_SHEET_NAME !== 'undefined') ? SYS_MATRICES_SHEET_NAME : 'Sys_MatricesConfig';
     
-    // CASO ESPECIAL: Sys_MatricesConfig
-    if (sheetName === SYS_MATRICES_SHEET_NAME_) {
-      isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
-      if (isUnlocked) {
-        userIdentity = resolveEditorIdentity_(e);
-        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, userIdentity);
-        return;
-      }
-      var valorPropuesto = (e.value !== undefined) ? e.value : '';
-      revertManualEdit_(editedRange, e, sheetName, 'hoja protegida: requiere PIN de administrador');
-      abrirModalPinMatrizConfig_(eRow, eCol, valorPropuesto, resolveEditorIdentity_(e));
-      return;
-    }
-
-    // HOJAS BLOQUEADAS
-    var HOJAS_BLOQUEADAS_ = ['PermisosRoles', 'SolicitudesImpresion', 'Usuarios', 'templates', 'Templates', 'RegistroNovedad'];
-    if (HOJAS_BLOQUEADAS_.indexOf(sheetName) !== -1) {
-      isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
-      if (isUnlocked) {
-        userIdentity = resolveEditorIdentity_(e);
-        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó manualmente ' + editedRange.getA1Notation() + ' en ' + sheetName, userIdentity);
-        return;
-      }
-      revertManualEdit_(editedRange, e, sheetName, 'hoja bloqueada');
-      return;
-    }
-
-    // COLUMNAS DE SISTEMA EN ORDENES
-    var headersGen = null;
-    if (sheetName === 'Ordenes') {
-      var ORDENES_COLS_SISTEMA_ = ['STATUS', 'NoPags', 'Reimpresion', 'TotalPags', 'ConsecutivoImp', 'ImpresoPor', 'Reimpreso', 'ReimpresoPor', 'HistorialImpresion', 'Decision', 'Fabricante'];
-      headersGen = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
-      var colEditadaNombre = headersGen[eCol - 1] ? headersGen[eCol - 1].toString().trim() : '';
-      if (ORDENES_COLS_SISTEMA_.indexOf(colEditadaNombre) !== -1) {
-        isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
-        if (isUnlocked) {
-          userIdentity = resolveEditorIdentity_(e);
-          logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó columna ' + colEditadaNombre + ' en Ordenes', userIdentity, { campo: colEditadaNombre });
-          return;
-        }
-        revertManualEdit_(editedRange, e, sheetName, 'columna de sistema: ' + colEditadaNombre);
-        return;
-      }
-    }
-    // --- FIN DEFENSA EN PROFUNDIDAD ---
-
-    // 2. VERIFICACIÓN DE PROTECCIONES NATIVAS DE SHEETS
-    // Llamadas pesadas a la API de protecciones solo si no se bloqueó en el paso anterior
     var sheetProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
     var allRangeProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
     var overlappingProtections = sheetProtections.slice();
+    
+    var eRow = editedRange.getRow();
+    var eCol = editedRange.getColumn();
+
+    // CORREGIDO: Solo ignorar si NO hay objeto evento (ediciones programáticas)
+    // Las ediciones manuales del propietario SÍ deben registrarse
+    if (!e || !e.range) return;
 
     for (var j = 0; j < allRangeProtections.length; j++) {
       var pRange = allRangeProtections[j].getRange();
@@ -297,384 +163,604 @@ function onEditInstalled(e) {
       }
     }
     
-    if (!hasPermission) {
-      if (isUnlocked === null) {
-        isUnlocked = PropertiesService.getScriptProperties().getProperty('SYS_UNLOCKED') === 'true';
+    var email = (e.user && e.user.getEmail()) ? e.user.getEmail() : Session.getActiveUser().getEmail();
+    var userIdentity = email || "Usuario no identificado (edición directa)";
+    var nombreCorto = email ? email.split('@')[0] : "Usuario";
+    
+    // Obtener NombreCorto desde la hoja Usuarios usando Auth.gs si está disponible
+    if (email && typeof getUserRecordsByEmail_ === 'function') {
+      var userRecords = getUserRecordsByEmail_(email);
+      if (userRecords && userRecords.length > 0) {
+        userIdentity = userRecords[0].userId + " - " + (userRecords[0].nombreCorto || userRecords[0].userId);
+        nombreCorto = userRecords[0].nombreCorto || userRecords[0].userId;
       }
-      if (isUnlocked) {
-        if (!userIdentity) userIdentity = resolveEditorIdentity_(e);
-        logChange(TIPOS_CAMBIO.EDICION_ADMIN_LIBRE, 'Admin modificó rango protegido en ' + sheetName + ' (' + protectionDesc + ')', userIdentity);
-        return;
-      }
-      revertManualEdit_(editedRange, e, sheetName, 'rango protegido: ' + protectionDesc);
-      return;
     }
     
-    // Si la edición es válida, obtenemos la identidad para continuar (si no la teníamos ya)
-    if (!userIdentity) userIdentity = resolveEditorIdentity_(e);
+    if (!hasPermission) {
+      editedRange.setValue(e.oldValue !== undefined ? e.oldValue : "");
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        "Este rango está protegido (" + protectionDesc + "). Cambio revertido.",
+        "⚠️ Edición no permitida",
+        5
+      );
+      var cellAddress = editedRange.getA1Notation();
+      var violationDesc = "Intento de edición denegado en la celda " + cellAddress + " de la hoja " + sheetName;
+      logChange('VIOLACION_PERMISO', violationDesc, userIdentity);
+      return;
+    }
     
     var numRows = editedRange.getNumRows();
     var numCols = editedRange.getNumColumns();
 
-    if (sheetName === 'Ordenes' && numRows === 1 && numCols === 1) {
-      var headers = headersGen || sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+    if (sheetName === 'templates') {
+      clearInitialDataCache();
+      logChange('ACTUALIZACION_PLANTILLAS', 'Se detectó modificación en la hoja de plantillas. Caché limpiado automáticamente.', userIdentity);
+      return;
+    }
 
-      var editedColName = headers[editedRange.getColumn() - 1];
+    if (sheetName === 'Ordenes') {
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
-      // MIGRADO A BACKEND (Fase 3 - MatrixValidation):
-      // El snapshot de CantDispAFecha ahora se captura en el momento exacto de la carga
-      // de la orden desde el motor validarNoAnalisisContraMatrices. Ya no se usa onEdit
-      // para este propósito (que de todas formas no funciona con fórmulas IMPORTRANGE).
+      var colProceso = getColumnIndexByNameCaseInsensitive(headers, 'Proceso', false);
+      var colCodigo = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', false);
+      var colDescripcion = getColumnIndexByNameCaseInsensitive(headers, 'Descripcion', false);
+      var cantDispAFechaCol = getColumnIndexByNameCaseInsensitive(headers, 'CantDispAFecha', false);
+      var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+      var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false) || getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
+      var verifCantCol = getColumnIndexByNameCaseInsensitive(headers, 'VerifCant. Disponible', false) || getColumnIndexByNameCaseInsensitive(headers, 'VerifCant.Disponible', false);
+      
+      var startRow = editedRange.getRow();
+      var processNumRows = numRows;
 
-      var colAdjuntoCOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-      var colAdjuntoOACol = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
+      // [FIX HOISTING] startCol/endCol deben calcularse ANTES del bloque de
+      // SolicitadoPor (que fue movido al inicio por rendimiento). Sin esto,
+      // por hoisting de ES5 valían undefined y SolicitadoPor nunca se firmaba.
+      var startCol = editedRange.getColumn();
+      var endCol = startCol + numCols - 1;
+
+      // Obtener índices de las 8 columnas clave para trazabilidad
+      var targetHeaders = ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden'];
+      var targetColIndices = [];
+      var maxColIndex = 0;
+      
+      for (var h = 0; h < targetHeaders.length; h++) {
+        var idx = getColumnIndexByNameCaseInsensitive(headers, targetHeaders[h], false);
+        if (idx) {
+          targetColIndices.push(idx);
+          if (idx > maxColIndex) maxColIndex = idx;
+        }
+      }
+
+      if (startRow > 1) { // Ignorar el encabezado
+        // ==========================================
+        // FASE 0: LIMPIEZA UNIFICADA DE FILAS
+        // ==========================================
+        var isClearedArray = []; 
+        var anyRowCleared = false;
+        
+        if (maxColIndex > 0) {
+          // Leer toda la fila hasta la última columna requerida (1 sola llamada API)
+          var rowData = sheet.getRange(startRow, 1, processNumRows, maxColIndex).getValues();
+          
+          for (var r = 0; r < processNumRows; r++) {
+            var rowIsEmpty = true;
+            // Revisar si las 8 columnas están vacías
+            for (var c = 0; c < targetColIndices.length; c++) {
+              var val = rowData[r][targetColIndices[c] - 1];
+              if (val !== undefined && val !== null && val.toString().trim() !== "") {
+                rowIsEmpty = false;
+                break;
+              }
+            }
+            isClearedArray.push(rowIsEmpty);
+            if (rowIsEmpty) anyRowCleared = true;
+          }
+        } else {
+          for (var r = 0; r < processNumRows; r++) isClearedArray.push(false);
+        }
+        
+        if (anyRowCleared) {
+          var colStatusFase0 = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+          var dispValues = cantDispAFechaCol ? sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1).getValues() : [];
+          var estValues = colEstadoIdx ? sheet.getRange(startRow, colEstadoIdx, processNumRows, 1).getValues() : [];
+          var solValues = colSolicitadoPor ? sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).getValues() : [];
+          var statValues = colStatusFase0 ? sheet.getRange(startRow, colStatusFase0, processNumRows, 1).getValues() : [];
+
+          var changedDisp = false, changedEst = false, changedSol = false, changedStat = false;
+
+          for (var r = 0; r < processNumRows; r++) {
+            if (isClearedArray[r]) {
+              if (cantDispAFechaCol && dispValues[r][0] !== "") { dispValues[r][0] = ""; changedDisp = true; }
+              if (colEstadoIdx && estValues[r][0] !== "") { estValues[r][0] = ""; changedEst = true; }
+              if (colSolicitadoPor && solValues[r][0] !== "") { solValues[r][0] = ""; changedSol = true; }
+              if (colStatusFase0 && statValues[r][0] !== "") { statValues[r][0] = ""; changedStat = true; }
+            }
+          }
+
+          if (changedDisp) sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1).setValues(dispValues);
+          if (changedEst) sheet.getRange(startRow, colEstadoIdx, processNumRows, 1).setValues(estValues);
+          if (changedSol) sheet.getRange(startRow, colSolicitadoPor, processNumRows, 1).setValues(solValues);
+          if (changedStat) sheet.getRange(startRow, colStatusFase0, processNumRows, 1).setValues(statValues);
+        }
+
+      // 1. Auto-tracking de "SolicitadoPor" (quién pegó/editó la fila) - [MOVIDO AL INICIO POR RENDIMIENTO]
+      var colSolicitadoPor = getColumnIndexByNameCaseInsensitive(headers, 'SolicitadoPor', false) || getColumnIndexByNameCaseInsensitive(headers, 'SolicitadaPor', false);
+      
+      if (colSolicitadoPor) {
+        var intersectsSolicitadoPor = (startCol <= colSolicitadoPor && endCol >= colSolicitadoPor);
+        
+        var tocaColumnasDatos = false;
+        for (var c = startCol; c <= endCol; c++) {
+          if (targetColIndices.indexOf(c) !== -1) {
+            tocaColumnasDatos = true;
+            break;
+          }
+        }
+        
+        if (tocaColumnasDatos && !(intersectsSolicitadoPor && numCols === 1)) {
+          var iterStartRow = editedRange.getRow();
+          var iterNumRows = numRows;
+          
+          if (iterStartRow === 1) {
+            iterStartRow = 2;
+            iterNumRows--;
+          }
+          
+          if (iterNumRows > 0) {
+            var targetRange = sheet.getRange(iterStartRow, colSolicitadoPor, iterNumRows, 1);
+            var currentValues = targetRange.getValues();
+            var updateNeeded = false;
+            
+            var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yy HH:mm");
+            var baseStamp = nombreCorto + " (" + timestamp + ")";
+            
+            for (var i = 0; i < iterNumRows; i++) {
+              var isClearedIdx = (iterStartRow === 2 && editedRange.getRow() === 1) ? i + 1 : i;
+              
+              // Si la fila está vacía en las columnas clave (Proceso, Codigo, Descripcion), saltar la firma
+              if (isClearedArray[isClearedIdx]) {
+                var currVal = currentValues[i][0] ? currentValues[i][0].toString() : "";
+                if (currVal !== "") {
+                  currentValues[i][0] = "";
+                  updateNeeded = true;
+                }
+                continue;
+              }
+              
+              var currVal = currentValues[i][0] ? currentValues[i][0].toString() : "";
+              
+              if (currVal === "" || intersectsSolicitadoPor) {
+                 currentValues[i][0] = "Crea: " + baseStamp;
+                 updateNeeded = true;
+              } else {
+                 var lines = currVal.split("\n");
+                 var lastLine = lines[lines.length - 1]; 
+                 
+                 // Validar tiempo desde la ÚLTIMA modificación o creación
+                 var timeMatch = lastLine.match(/.* \((.*?)\)/);
+                 var lastMs = 0;
+                 if (timeMatch) {
+                   var p = timeMatch[1].split(" ");
+                   if (p.length === 2) {
+                     var d = p[0].split("/");
+                     var t = p[1].split(":");
+                     if (d.length === 3 && t.length === 2) {
+                       lastMs = new Date(2000 + parseInt(d[2], 10), parseInt(d[1], 10) - 1, parseInt(d[0], 10), parseInt(t[0], 10), parseInt(t[1], 10)).getTime();
+                     }
+                   }
+                 }
+                 var nowMs = new Date().getTime();
+                 var elapsed = nowMs - lastMs;
+                 
+                 if (lines.length === 1) {
+                   // Solo existe "Crea:", agregamos "Mod:" preservando la creación
+                   lines.push("Mod: " + baseStamp);
+                 } else {
+                   // Ya existe al menos un "Mod:"
+                   if (elapsed <= 300000) { // 5 minutos (300,000 ms)
+                     // Dentro del periodo de gracia de 5 mins: sobrescribimos la última línea Mod:
+                     lines[lines.length - 1] = "Mod: " + baseStamp;
+                   } else {
+                     // Fuera del periodo de 5 mins: acumulamos nueva línea Mod:
+                     lines.push("Mod: " + baseStamp);
+                   }
+                 }
+                 
+                 var newLineStr = lines.join("\n");
+                 if (currVal !== newLineStr) {
+                   currentValues[i][0] = newLineStr;
+                   updateNeeded = true;
+                 }
+              }
+            }
+            if (updateNeeded) {
+              targetRange.setValues(currentValues);
+              SpreadsheetApp.flush(); // Fuerza la visualización de la firma inmediatamente
+            }
+          }
+        }
+      }
+
+      // 2. Manejo dinámico e histórico de CantDispAFecha
+      if (cantDispAFechaCol && verifCantCol) {
+          SpreadsheetApp.flush();
+          var targetRangeCantDisp = sheet.getRange(startRow, cantDispAFechaCol, processNumRows, 1);
+          var targetRangeVerif = sheet.getRange(startRow, verifCantCol, processNumRows, 1);
+          
+          var colLote = getColumnIndexByNameCaseInsensitive(headers, 'Lote', false);
+          var colCodigo = getColumnIndexByNameCaseInsensitive(headers, 'Codigo', false);
+          var lotes = colLote ? sheet.getRange(startRow, colLote, processNumRows, 1).getValues() : null;
+          var codigos = colCodigo ? sheet.getRange(startRow, colCodigo, processNumRows, 1).getValues() : null;
+          
+          var cantDispValues = targetRangeCantDisp.getValues();
+          var verifValues = targetRangeVerif.getValues();
+          var updateNeeded = false;
+          
+          for (var r = 0; r < processNumRows; r++) {
+            if (isClearedArray[r]) continue;
+            var actualVerif = verifValues[r][0];
+            var actualCantDisp = cantDispValues[r][0];
+            var hasLote = lotes ? (lotes[r][0] !== "") : true;
+            var hasCodigo = codigos ? (codigos[r][0] !== "") : true;
+            
+            if (actualCantDisp === "" && actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && hasLote && hasCodigo) {
+              cantDispValues[r][0] = actualVerif;
+              updateNeeded = true;
+              logChange('AUTO_COPY_VERIFCANT', 'Captura inicial: ' + actualVerif + ' a CantDispAFecha en fila ' + (startRow + r), userIdentity);
+            } 
+            else if (actualCantDisp !== "") {
+              if (numRows === 1 && numCols === 1) {
+                var editedColName = headers[editedRange.getColumn() - 1];
+                if (editedColName === 'Cantidad' || editedColName === 'NoAnalisis') {
+                   if (actualVerif !== "" && actualVerif !== "-" && !isNaN(actualVerif) && actualVerif !== actualCantDisp) {
+                     var ui = SpreadsheetApp.getUi();
+                     var response = ui.alert(
+                       'Actualización de Inventario',
+                       'Has modificado la columna "' + editedColName + '" en la fila ' + startRow + '.\n\n¿Deseas actualizar el registro histórico de "CantDispAFecha" con el valor de inventario actual disponible (' + actualVerif + ')?\n\n(Valor guardado actualmente: ' + actualCantDisp + ')',
+                       ui.ButtonSet.YES_NO
+                     );
+                     if (response === ui.Button.YES) {
+                       cantDispValues[r][0] = actualVerif;
+                       updateNeeded = true;
+                       logChange('ACTUALIZACION_CANT_DISP', 'Usuario actualizó CantDispAFecha de ' + actualCantDisp + ' a ' + actualVerif + ' tras modificar ' + editedColName + ' en fila ' + startRow, userIdentity);
+                     }
+                   }
+                }
+              }
+            }
+          }
+          if (updateNeeded) targetRangeCantDisp.setValues(cantDispValues);
+      }
+      
+      // 3. Manejo de cambios en cualquier columna de solicitud (Proceso hasta NoOrden) y STATUS
+      var colProceso = getColumnIndexByNameCaseInsensitive(headers, 'Proceso', false);
       var colOrdenCol = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
       var colAnalisisCol = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+      var colStatusTrackerIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
       
-      // NUEVO: Detectar cambios en AdjuntoCOA o AdjuntoOA y actualizar EstadoCarga automáticamente
-      if ((colAdjuntoCOACol && editedRange.getColumn() === colAdjuntoCOACol) || 
-          (colAdjuntoOACol && editedRange.getColumn() === colAdjuntoOACol)) {
-        var rowIdx = editedRange.getRow();
-        actualizarEstadoCarga(sheet, rowIdx, headers);
-        Logger.log("✓ EstadoCarga actualizado automáticamente en fila " + rowIdx + " después de editar " + editedColName);
-        return;
-      }
+      // startCol/endCol ya fueron calculados arriba (fix hoisting).
+      startCol = editedRange.getColumn();
+      endCol = startCol + numCols - 1;
 
-      // Manejo de cambios en NoOrden (resetea AdjuntoOA)
-      if (colOrdenCol && editedRange.getColumn() === colOrdenCol) {
-        var rowIdx = editedRange.getRow();
-        var estadoOA = colAdjuntoOACol ? sheet.getRange(rowIdx, colAdjuntoOACol).getValue() : "";
-        var estadoOAStr = estadoOA ? estadoOA.toString().trim() : "";
+      var isRequestEdit = false;
+      if (colProceso && colOrdenCol && startCol <= colOrdenCol && endCol >= colProceso) isRequestEdit = true;
+      
+      var isRefEdit = false;
+      if (colOrdenCol && startCol <= colOrdenCol && endCol >= colOrdenCol) isRefEdit = true;
+      if (colAnalisisCol && startCol <= colAnalisisCol && endCol >= colAnalisisCol) isRefEdit = true;
+      
+      var isStatusEdit = false;
+      if (colStatusTrackerIdx && startCol <= colStatusTrackerIdx && endCol >= colStatusTrackerIdx) isStatusEdit = true;
+      
+      var editIntersectsRefs = isRequestEdit || isStatusEdit;
+      
+      if (editIntersectsRefs) {
+        var startRow = editedRange.getRow();
+        var processNumRows = numRows;
         
-        // Si el documento OA está cargado, resetear al cambiar NoOrden
-        if (estadoOAStr === "✅ Cargado") {
-          var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
-          var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
-          
-          if (colAdjuntoOACol) {
-            sheet.getRange(rowIdx, colAdjuntoOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
-            sheet.getRange(rowIdx, colAdjuntoOACol).clearNote();
-          }
-          
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-
-          logChange(TIPOS_CAMBIO.RESET_CARGA_OA, 'NoOrden cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado de AdjuntoOA devuelto a Pendiente.', userIdentity,
-            { ordenRef: nuevoValor, campo: 'NoOrden', valorAnterior: valorAnterior, valorNuevo: nuevoValor });
-          SpreadsheetApp.getActiveSpreadsheet().toast("No. Orden modificado. El estado de la Orden de Acondicionamiento ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
-          return;
+        if (startRow === 1) {
+          startRow = 2;
+          processNumRows--;
         }
-
-        // Si NoOrden se asigna por primera vez y AdjuntoOA está vacío, inicializar
-        if (estadoOAStr === "" && e.value !== undefined && e.value !== "") {
-          if (colAdjuntoOACol) sheet.getRange(rowIdx, colAdjuntoOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-          logChange(TIPOS_CAMBIO.ASIGNACION_PENDIENTE_OA, 'NoOrden asignado. Estado de AdjuntoOA establecido a Pendiente.', userIdentity,
-            { ordenRef: e.value, campo: 'NoOrden', valorNuevo: e.value });
-          return;
-        }
-      }
-
-      // Manejo de cambios en NoAnalisis (resetea AdjuntoCOA)
-      if (colAnalisisCol && editedRange.getColumn() === colAnalisisCol) {
-        var rowIdx = editedRange.getRow();
-        var estadoCOA = colAdjuntoCOACol ? sheet.getRange(rowIdx, colAdjuntoCOACol).getValue() : "";
-        var estadoCOAStr = estadoCOA ? estadoCOA.toString().trim() : "";
         
-        // Si el documento COA está cargado, resetear al cambiar NoAnalisis
-        if (estadoCOAStr === "✅ Cargado") {
-          var nuevoValor = e.value !== undefined ? e.value : "(vacío)";
-          var valorAnterior = e.oldValue !== undefined ? e.oldValue : "(vacío)";
+        if (processNumRows > 0) {
+          var colStatusIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+          var colEstadoDocs = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
           
-          if (colAdjuntoCOACol) {
-            sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
-            sheet.getRange(rowIdx, colAdjuntoCOACol).clearNote();
+          var statusValues = colStatusIdx ? sheet.getRange(startRow, colStatusIdx, processNumRows, 1).getValues() : [];
+          var estadoDocsValues = colEstadoDocs ? sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).getValues() : [];
+          
+          // PEGADO MASIVO: No bloquear a los usuarios con validaciones lentas en Drive
+          if (processNumRows > 3) {
+            var changedMassive = false;
+            for (var r = 0; r < processNumRows; r++) {
+              var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
+              if (isClearedArray[isClearedIdx]) continue;
+              
+              var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              
+              // Si la fila es nueva y no tiene STATUS, asignarle Pendiente por defecto
+              if (currStatus === "") {
+                if (colStatusIdx) {
+                  statusValues[r][0] = "Pendiente";
+                  currStatus = "Pendiente";
+                  changedMassive = true;
+                }
+              }
+              
+              if (currStatus !== "Impreso" && currStatus !== "Reimpreso" && currStatus !== "Anulada") {
+                if (colEstadoDocs) {
+                  estadoDocsValues[r][0] = "⏳ Pendiente Validar";
+                  changedMassive = true;
+                }
+              } else if (currStatus === "Anulada") {
+                if (colEstadoDocs && estadoDocsValues[r][0] !== "🚫 Orden Anulada") {
+                  estadoDocsValues[r][0] = "🚫 Orden Anulada";
+                  changedMassive = true;
+                }
+              }
+            }
+            if (changedMassive) {
+              if (colEstadoDocs) sheet.getRange(startRow, colEstadoDocs, processNumRows, 1).setValues(estadoDocsValues);
+              if (colStatusIdx) sheet.getRange(startRow, colStatusIdx, processNumRows, 1).setValues(statusValues);
+            }
+            SpreadsheetApp.getActiveSpreadsheet().toast("Se pegaron varias filas. Usa 'Refrescar Estado de Documentos' del menú superior para validarlas todas juntas.", "Validación Diferida", 8);
+            logChange('CAMBIO_MASIVO', 'Pegado de ' + processNumRows + ' filas. Se marcó como Pendiente Validar para optimizar.', userIdentity);
+          } 
+          // EDICIÓN INDIVIDUAL O PEQUEÑA:
+          else {
+            for (var r = 0; r < processNumRows; r++) {
+              var isClearedIdx = (startRow === 2 && editedRange.getRow() === 1) ? r + 1 : r;
+              if (isClearedArray[isClearedIdx]) continue;
+              
+              var currStatus = (colStatusIdx && statusValues[r] && statusValues[r][0]) ? statusValues[r][0].toString().trim() : "";
+              var shouldValidate = isRefEdit || isStatusEdit; // Por defecto validar solo si se editó una ref o el STATUS
+              
+              // Si la fila es nueva y no tiene STATUS, asignarle Pendiente por defecto inmediatamente
+              if (currStatus === "") {
+                if (colStatusIdx) {
+                  sheet.getRange(startRow + r, colStatusIdx).setValue("Pendiente");
+                  currStatus = "Pendiente";
+                }
+              }
+              
+              if (currStatus === "Impreso" || currStatus === "Reimpreso" || currStatus === "Anulada") {
+                if (numRows === 1) { // Solo preguntar si es una sola edición
+                  var editedOnlyStatus = (numCols === 1 && startCol === colStatusIdx);
+                  
+                  if (editedOnlyStatus) {
+                    // Si el usuario acaba de cambiar la celda STATUS manualmente, respetamos su elección sin preguntar
+                    shouldValidate = true;
+                  } else {
+                    var ui = SpreadsheetApp.getUi();
+                    var statusStr = (currStatus === "Anulada") ? "anulada" : "impresa";
+                    var response = ui.alert(
+                      '⚠️ Orden ya procesada',
+                      'Estás modificando datos de una orden que ya fue ' + statusStr + ' (Fila ' + (startRow + r) + ').\n\n¿Deseas devolver el STATUS a "Pendiente" para reactivar su validación en Drive?',
+                      ui.ButtonSet.YES_NO
+                    );
+                    
+                    if (response === ui.Button.YES) {
+                      if (colStatusIdx) sheet.getRange(startRow + r, colStatusIdx).setValue("Pendiente");
+                      shouldValidate = true;
+                      logChange('ESTADO_REVERTIDO', 'Usuario modificó fila ' + statusStr + ' y aceptó regresar el STATUS a Pendiente', userIdentity);
+                    } else {
+                      shouldValidate = (currStatus === "Anulada"); // Si es Anulada y dicen NO, permitir que pase a actualizarEstadoDocumentosEnHoja para asegurar el '🚫 Orden Anulada'
+                    }
+                  }
+                } else {
+                  // Pegado múltiple sobre filas impresas/anuladas
+                  shouldValidate = (currStatus === "Anulada");
+                }
+              }
+              
+              if (shouldValidate) {
+                if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validando documentos en Drive...", "Sistema QMS", 3);
+                actualizarEstadoDocumentosEnHoja(sheet, startRow + r, headers);
+                if (processNumRows > 1) SpreadsheetApp.getActiveSpreadsheet().toast("Validación en Drive completada.", "Sistema QMS", 3);
+              }
+            }
           }
-          
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-
-          logChange(TIPOS_CAMBIO.RESET_CARGA_COA, 'NoAnalisis cambiado de ' + valorAnterior + ' a ' + nuevoValor + '. Estado de AdjuntoCOA devuelto a Pendiente.', userIdentity,
-            { campo: 'NoAnalisis', valorAnterior: valorAnterior, valorNuevo: nuevoValor });
-          SpreadsheetApp.getActiveSpreadsheet().toast("No. Análisis modificado. El estado del Certificado de Análisis ha vuelto a 'Pendiente'.", "Aviso del Sistema", 5);
-          return;
-        }
-
-        // Si NoAnalisis se asigna por primera vez y AdjuntoCOA está vacío, inicializar
-        if (estadoCOAStr === "" && e.value !== undefined && e.value !== "") {
-          if (colAdjuntoCOACol) sheet.getRange(rowIdx, colAdjuntoCOACol).setValue(VALORES_DOCUMENTO.PENDIENTE);
-          actualizarEstadoCarga(sheet, rowIdx, headers);
-          logChange(TIPOS_CAMBIO.ASIGNACION_PENDIENTE_COA, 'NoAnalisis asignado. Estado de AdjuntoCOA establecido a Pendiente.', userIdentity,
-            { campo: 'NoAnalisis', valorNuevo: e.value });
-          return;
         }
       }
+      }
+      // Si es edición simple en NoOrden/NoAnalisis, retornar temprano para no saturar Logs de celda
+      if (numRows === 1 && numCols === 1 && editIntersectsRefs) return;
     }
     
     if (numRows === 1 && numCols === 1) {
-      var headersGenLog = headersGen || sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
-      var campoEditado = headersGenLog[eCol - 1] ? headersGenLog[eCol - 1].toString().trim() : '';
       var oldValue = e.oldValue !== undefined ? e.oldValue : "(vacío)";
       var newValue = e.value !== undefined ? e.value : "(vacío)";
       var cellAddress = editedRange.getA1Notation();
-      var editDesc = "Cambió '" + oldValue + "' por '" + newValue + "' en la celda " + cellAddress + " de la hoja " + sheetName +
-        (campoEditado ? " (columna: " + campoEditado + ")" : "");
-      var logType = (sheetName === 'RegistroNovedad') ? TIPOS_CAMBIO.EDICION_MANUAL_NOVEDAD : TIPOS_CAMBIO.EDICION_CELDA;
-
-      var ordenRefSingle = '';
-      if (sheetName === 'Ordenes') {
-        var colNoOrdenGen = getColumnIndexByNameCaseInsensitive(headersGenLog, 'NoOrden', false);
-        if (colNoOrdenGen) {
-          var noOrdenValSingle = sheet.getRange(eRow, colNoOrdenGen).getValue();
-          ordenRefSingle = noOrdenValSingle ? noOrdenValSingle.toString().trim() : '';
+      
+      var editDesc = "📍 Hoja: " + sheetName + "\n" +
+                     "🎯 Celda: " + cellAddress + "\n" +
+                     "🔴 Antes: " + oldValue + "\n" +
+                     "🟢 Ahora: " + newValue;
+                     
+      var logType = (sheetName === 'RegistroNovedad') ? 'EDICION_MANUAL_NOVEDAD' : 'EDICION_CELDA';
+      logChange(logType, editDesc, userIdentity);
+    } else {
+      var rangeA1 = editedRange.getA1Notation();
+      var values = editedRange.getValues();
+      var summaryRows = [];
+      var maxRows = Math.min(10, values.length);
+      var allEmpty = true;
+      
+      for (var r = 0; r < maxRows; r++) {
+        var isRowEmpty = true;
+        var rowStr = values[r].map(function(v) { 
+          if (v !== "") { allEmpty = false; isRowEmpty = false; }
+          if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy");
+          return v === "" ? "(vacío)" : v; 
+        }).join(" | ");
+        
+        if (!isRowEmpty) {
+          summaryRows.push("▶ Fila " + (r + 1) + ": [" + rowStr + "]");
+        } else {
+          summaryRows.push("▶ Fila " + (r + 1) + ": [Borrada / Vacía]");
         }
       }
-
-      logChange(logType, editDesc, userIdentity, {
-        ordenRef: ordenRefSingle,
-        campo: campoEditado,
-        valorAnterior: oldValue,
-        valorNuevo: newValue
-      });
-    } else {
-      logMassEdit_(editedRange, sheet, sheetName, userIdentity);
+      
+      // Chequear todo el rango más allá de las maxRows para ver si fue un borrado total
+      for (var rr = maxRows; rr < values.length && allEmpty; rr++) {
+        for (var cc = 0; cc < values[rr].length; cc++) {
+          if (values[rr][cc] !== "") { allEmpty = false; break; }
+        }
+      }
+      
+      var valuesDesc = "";
+      var massEditDesc = "";
+      
+      if (allEmpty) {
+        massEditDesc = "📋 Borrado Masivo en: " + sheetName + "\n" +
+                       "📍 Rango: " + rangeA1 + " (" + (numRows * numCols) + " celdas)\n" +
+                       "🔴 Todas las celdas de este rango fueron borradas o vaciadas.";
+      } else {
+        valuesDesc = summaryRows.join("\n");
+        if (values.length > 10) valuesDesc += "\n... (y " + (values.length - 10) + " filas más)";
+        
+        massEditDesc = "📋 Edición Masiva en: " + sheetName + "\n" +
+                       "📍 Rango: " + rangeA1 + " (" + (numRows * numCols) + " celdas)\n" +
+                       "Nuevos Valores ingresados:\n" + valuesDesc;
+      }
+                         
+      var logTypeMass = (sheetName === 'RegistroNovedad') ? 'EDICION_MASIVA_NOVEDAD' : 'EDICION_MASIVA';
+      logChange(logTypeMass, massEditDesc, userIdentity);
     }
-
+    
   } catch (error) {
     Logger.log("ERROR FATAL en onEditInstalled: " + error.message);
     Logger.log("Stack trace: " + error.stack);
     try {
-      logChange(TIPOS_CAMBIO.ERROR_SISTEMA, 'Error en onEditInstalled: ' + error.message, 'Sistema');
+      logChange('ERROR_SISTEMA', 'Error en onEditInstalled: ' + error.message, 'Sistema');
     } catch (logError) {
       Logger.log("No se pudo registrar el error en Logs: " + logError.message);
     }
-  } finally {
-    if (lock && lock.hasLock()) {
-      lock.releaseLock();
-    }
   }
-}
-
-/**
- * Registra una edición masiva (multi-celda: pegado, relleno, borrado de rango) con el
- * mayor detalle posible: columnas afectadas, vista previa de los valores NUEVOS, y
- * NoOrden relacionados si la hoja es 'Ordenes'. Los valores ANTERIORES no están
- * disponibles para ediciones múltiples — es una limitación real de la API de onEdit de
- * Sheets (e.oldValue solo existe para edición de 1 celda), así que se deja explícito en
- * la descripción en vez de omitirlo en silencio (que es lo que pasaba antes).
- * @param {Range} editedRange - Rango editado (e.range)
- * @param {Sheet} sheet - Hoja afectada
- * @param {string} sheetName - Nombre de la hoja
- * @param {string} userIdentity - Identidad ya resuelta del editor (ver resolveEditorIdentity_)
- */
-function logMassEdit_(editedRange, sheet, sheetName, userIdentity) {
-  var rangeA1 = editedRange.getA1Notation();
-  var numRows = editedRange.getNumRows();
-  var numCols = editedRange.getNumColumns();
-  var startCol = editedRange.getColumn();
-  var startRow = editedRange.getRow();
-  var totalCeldas = numRows * numCols;
-
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colNames = [];
-  for (var c = 0; c < numCols; c++) {
-    var idx = startCol + c - 1;
-    var name = (idx < headers.length && headers[idx]) ? headers[idx].toString().trim() : ('col ' + (idx + 1));
-    colNames.push(name);
-  }
-  var columnasUnicas = colNames.filter(function(v, i) { return colNames.indexOf(v) === i; });
-
-  // Vista previa compacta de los valores NUEVOS: si son pocas celdas, columna=valor;
-  // si el rango es grande, describir tamaño/columnas en vez de volcar todo el contenido.
-  var valorNuevoPreview;
-  if (totalCeldas <= 6) {
-    var newValues = editedRange.getValues();
-    var pares = [];
-    for (var r = 0; r < numRows; r++) {
-      for (var c2 = 0; c2 < numCols; c2++) {
-        var val = newValues[r][c2];
-        pares.push(colNames[c2] + "=" + (val === '' || val === null || val === undefined ? "(vacío)" : val));
-      }
-    }
-    valorNuevoPreview = pares.join(', ');
-  } else {
-    valorNuevoPreview = totalCeldas + " celda(s) en " + numRows + " fila(s) x " + numCols + " columna(s) (vista previa omitida por tamaño)";
-  }
-
-  // Si la hoja es Ordenes, listar los NoOrden de las filas afectadas para poder filtrar
-  // el log por orden concreta, no solo por rango de celdas.
-  var ordenRef = '';
-  if (sheetName === 'Ordenes') {
-    var colNoOrden = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', false);
-    if (colNoOrden) {
-      var noOrdenValues = sheet.getRange(startRow, colNoOrden, numRows, 1).getValues();
-      var noOrdenList = [];
-      for (var rr = 0; rr < noOrdenValues.length; rr++) {
-        var v = noOrdenValues[rr][0];
-        if (v !== '' && v !== null && v !== undefined) noOrdenList.push(v.toString().trim());
-      }
-      var noOrdenUnicos = noOrdenList.filter(function(v, i) { return noOrdenList.indexOf(v) === i; });
-      ordenRef = noOrdenUnicos.length > 20
-        ? noOrdenUnicos.slice(0, 20).join(', ') + ' y ' + (noOrdenUnicos.length - 20) + ' más'
-        : noOrdenUnicos.join(', ');
-    }
-  }
-
-  var massEditDesc = "Edición masiva de " + totalCeldas + " celda(s) en el rango " + rangeA1 + " de la hoja " + sheetName +
-    ". Columnas afectadas: " + columnasUnicas.join(', ') +
-    ". Valores anteriores no disponibles (limitación de la API de Sheets para ediciones múltiples).";
-  var logTypeMass = (sheetName === 'RegistroNovedad') ? TIPOS_CAMBIO.EDICION_MASIVA_NOVEDAD : TIPOS_CAMBIO.EDICION_MASIVA;
-
-  logChange(logTypeMass, massEditDesc, userIdentity, {
-    ordenRef: ordenRef,
-    campo: columnasUnicas.join(', '),
-    valorNuevo: valorNuevoPreview
-  });
 }
 
 /**
  * Registra un cambio en la hoja Logs.
- * @param {string} tipoCambio - Tipo de cambio (ver TIPOS_CAMBIO en Config.gs)
+ * @param {string} tipoCambio - Tipo de cambio (ej: EDICION_CELDA, CARGA_DOCUMENTO)
  * @param {string} descripcion - Descripción del cambio
  * @param {string} userIdentity - Identidad del usuario (formato: UserID - NombreCorto)
- * @param {Object} [opts] - Detalle estructurado opcional, retrocompatible (si se omite,
- *   esas columnas quedan vacías, igual que antes de que existieran).
- * @param {string} [opts.ordenRef] - NoOrden(es) relacionados con el cambio
- * @param {string} [opts.campo] - Nombre(s) de columna/campo afectado(s)
- * @param {string} [opts.valorAnterior] - Valor previo (si se conoce)
- * @param {string} [opts.valorNuevo] - Valor nuevo
- * @param {string} [opts.correlationId] - ID compartido entre varios logChange() de una misma operación
  */
-function logChange(tipoCambio, descripcion, userIdentity, opts) {
-  opts = opts || {};
+function logChange(tipoCambio, descripcion, userIdentity) {
+  var dictTipos = {
+    'GENERACION_PDF_FINAL': 'Generación de PDF',
+    'EDICION_MASIVA': 'Edición Masiva',
+    'ASIGNACION_PENDIENTE_OA': 'Asignación a Pendiente (OA)',
+    'EDICION_CELDA': 'Edición de Celda',
+    'CARGA_DOCUMENTO': 'Carga de Documento',
+    'ERROR_SISTEMA': 'Error del Sistema',
+    'REGISTRO_NOVEDAD': 'Registro de Novedad',
+    'VIOLACION_PERMISO': 'Violación de Permisos',
+    'RESET_CARGA_OA': 'Reinicio de Carga (OA)',
+    'RESET_CARGA_COA': 'Reinicio de Carga (COA)',
+    'ASIGNACION_PENDIENTE_COA': 'Asignación a Pendiente (COA)',
+    'INICIALIZACION': 'Inicialización del Sistema',
+    'EDICION_MANUAL_NOVEDAD': 'Edición de Novedad',
+    'EDICION_MASIVA_NOVEDAD': 'Edición Masiva de Novedades',
+    'BYPASS_ADMIN_ACTIVADO': 'Bypass de Integridad Activado',
+    'BYPASS_ADMIN_CERRADO': 'Bypass de Integridad Cerrado',
+    'EDICION_ADMIN_BYPASS': 'Edición Admin (bajo bypass)'
+  };
+  var tipoNatural = dictTipos[tipoCambio] ? dictTipos[tipoCambio] : tipoCambio;
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetLogs = ss.getSheetByName('Logs');
-
+  
   if (!sheetLogs) {
     Logger.log("⚠️ Hoja Logs no existe. Creando hoja Logs.");
     sheetLogs = ss.insertSheet('Logs');
-    sheetLogs.getRange(1, 1, 1, REQUIRED_SHEETS.Logs.length).setValues([REQUIRED_SHEETS.Logs]);
+    sheetLogs.getRange(1, 1, 1, 4).setValues([['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio']]);
   }
-
+  
   var timestamp = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd HH:mm:ss");
   var user = userIdentity || "Sistema";
-
-  sheetLogs.appendRow([
-    timestamp,
-    user,
-    tipoCambio,
-    descripcion,
-    opts.ordenRef || '',
-    opts.campo || '',
-    opts.valorAnterior || '',
-    opts.valorNuevo || '',
-    opts.correlationId || ''
-  ]);
-  Logger.log("✓ " + tipoCambio + " registrado en Logs");
+  
+  sheetLogs.appendRow([timestamp, user, tipoNatural, descripcion]);
+  Logger.log("✓ " + tipoNatural + " registrado en Logs");
 }
 
 /**
- * Resuelve una identidad de usuario legible ("UserID - NombreCorto") a partir de un
- * correo de sesión, con el mismo formato que usa el resto del sistema
- * (getUserIdentityStringByUserId_ en Auth.gs). Pensada para los triggers onEdit/onChange,
- * donde antes se usaba un placeholder fijo aunque el email sí estuviera disponible.
- * @param {Object} e - Objeto de evento (onEdit/onChange), puede ser undefined
- * @returns {string} Identidad legible, o un mensaje honesto si de verdad no hay email disponible
+ * Función manual ejecutada desde el menú para forzar la actualización del estado
+ * de los documentos en base a lo que realmente hay en Drive.
+ * Se aplica a las filas seleccionadas o a todas si solo hay una celda seleccionada.
+ *
+ * [FASE 1 REFACTOR] Cuando USE_NEW_ROUTER === true, delega a ModDrive.forzarActualizacion().
  */
-function resolveEditorIdentity_(e) {
-  var email = (e && e.user && e.user.getEmail) ? e.user.getEmail() : '';
-  if (!email) return "Editor no identificado (permiso de email no disponible)";
-
-  // CACHING: Evitar llamadas repetitivas a la hoja Usuarios en ediciones rápidas
-  var cache = CacheService.getScriptCache();
-  var cacheKey = 'userIdentity_' + email;
-  var cachedIdentity = cache.get(cacheKey);
-  if (cachedIdentity) return cachedIdentity;
-
-  var user = getUserRecordByEmail_(email);
-  var identity = email;
-  
-  if (user && user.userId) {
-    try {
-      // getUserIdentityStringByUserId_ está en Auth.gs
-      if (typeof getUserIdentityStringByUserId_ !== 'undefined') {
-        identity = getUserIdentityStringByUserId_(user.userId);
-      } else {
-        identity = user.userId + (user.nombreCorto ? ' - ' + user.nombreCorto : '');
-      }
-    } catch (err) {
-      identity = user.userId;
-    }
-  }
-
-  // Guardar en caché por 15 minutos (900 segundos)
-  cache.put(cacheKey, identity, 900);
-  
-  return identity;
-}
-
-/**
- * Revierte una edición manual (defensa en profundidad) restaurando el valor previo y registrándola.
- * Solo restaura celdas individuales (e.oldValue existe); en ediciones múltiples/pegado registra sin
- * restaurar por celda. Las escrituras de la app son programáticas y no llegan aquí.
- * @param {Range} range - Rango editado manualmente
- * @param {Object} e - Objeto de evento onEdit
- * @param {string} sheetName - Nombre de la hoja
- * @param {string} motivo - Motivo de la reversión (para el log)
- */
-function revertManualEdit_(range, e, sheetName, motivo) {
-  try {
-    if (e && e.oldValue !== undefined) {
-      range.setValue(e.oldValue);
-    } else if (e && e.value !== undefined) {
-      // Era una celda vacía y se escribió algo
-      range.clearContent();
-    } else {
-      // Edición múltiple, pegado, o borrado.
-      range.clearContent();
-      Logger.log("revertManualEdit_: edición múltiple o sin oldValue en " + sheetName + " (" + motivo + "), se limpió la celda. El usuario debe usar Ctrl+Z si sobreescribió datos.");
-    }
-  } catch (err) {
-    Logger.log("revertManualEdit_ error al restaurar: " + err.message);
+function forzarActualizacionEstadoDocumentos() {
+  if (typeof USE_NEW_ROUTER !== 'undefined' && USE_NEW_ROUTER === true) {
+    return ModDrive.forzarActualizacion();
   }
   try {
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      "Edición revertida (" + motivo + "). Estos datos solo se modifican vía la aplicación.",
-      "⛔ Modificación no permitida",
-      6
-    );
-  } catch (err) {}
-  try {
-    logChange(TIPOS_CAMBIO.REVERSION_EDICION_MANUAL, 'Edición manual revertida en ' + range.getA1Notation() + ' de ' + sheetName + ' (' + motivo + ')', resolveEditorIdentity_(e), { campo: motivo });
-  } catch (err) {}
-}
-
-/**
- * Trigger instalable de cambios ESTRUCTURALES (no de contenido de celda): inserción o
- * eliminación de filas/columnas, borrado/duplicado de hojas, etc. `onEdit` nunca dispara
- * para estos casos — antes de este trigger, borrar una fila completa de 'Ordenes' (por
- * ejemplo) no dejaba ningún rastro en Logs. `onChange` no expone qué rango/valores
- * cambiaron (la API de Sheets no lo provee para este tipo de evento), así que el detalle
- * se limita al tipo de cambio, la hoja activa y quién lo hizo.
- */
-function onChangeInstalled(e) {
-  try {
-    if (!e || !e.changeType) return;
-
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var activeSheet = ss.getActiveSheet();
-    var sheetName = activeSheet ? activeSheet.getName() : '(desconocida)';
-
-    // Ediciones de contenido normales (EDIT) ya las cubre onEditInstalled con mucho más
-    // detalle; aquí solo interesan los tipos verdaderamente estructurales.
-    if (e.changeType === 'EDIT') return;
-
-    var descripcion = "Cambio estructural (" + e.changeType + ") detectado en la hoja activa: " + sheetName;
-    logChange(TIPOS_CAMBIO.CAMBIO_ESTRUCTURAL, descripcion, resolveEditorIdentity_(e), { campo: e.changeType });
-  } catch (error) {
-    Logger.log("ERROR FATAL en onChangeInstalled: " + error.message);
-    try {
-      logChange(TIPOS_CAMBIO.ERROR_SISTEMA, 'Error en onChangeInstalled: ' + error.message, 'Sistema');
-    } catch (logError) {
-      Logger.log("No se pudo registrar el error en Logs: " + logError.message);
+    var sheet = ss.getActiveSheet();
+    
+    if (sheet.getName() !== 'Ordenes') {
+      SpreadsheetApp.getUi().alert('Esta función solo se puede usar en la hoja Ordenes.');
+      return;
     }
+    
+    var selection = sheet.getActiveRange();
+    var startRow = selection.getRow();
+    var numRows = selection.getNumRows();
+    var maxRows = sheet.getLastRow();
+    var soloPendientes = false;
+    
+    // Si seleccionaron toda la hoja (o solo 1 celda), preguntar si quieren procesar todo
+    if (numRows === 1 || startRow === 1) {
+      var ui = SpreadsheetApp.getUi();
+      var respuesta = ui.alert(
+        'Confirmación',
+        '¿Desea escanear SOLO las órdenes Pendientes? (Recomendado y rápido).\n\nSeleccione "No" para forzar el escaneo de toda la hoja.',
+        ui.ButtonSet.YES_NO_CANCEL
+      );
+      
+      if (respuesta === ui.Button.CANCEL || respuesta === ui.Button.CLOSE) return;
+      if (respuesta === ui.Button.YES) soloPendientes = true;
+      
+      startRow = 2; // Ignorar encabezado
+      numRows = maxRows - 1;
+    }
+    
+    if (numRows < 1) return;
+    
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colStatusIdx = getColumnIndexByNameCaseInsensitive(headers, 'STATUS', false);
+    
+    var statusValues = [];
+    if (colStatusIdx && soloPendientes) {
+      statusValues = sheet.getRange(startRow, colStatusIdx, numRows, 1).getValues();
+    }
+    
+    SpreadsheetApp.getActiveSpreadsheet().toast("Escaneando filas en Drive...", "Sistema QMS", 5);
+    
+    var actualizadas = 0;
+    var saltadas = 0;
+    for (var r = 0; r < numRows; r++) {
+      var currentRow = startRow + r;
+      if (currentRow > maxRows) break;
+      
+      if (soloPendientes && colStatusIdx) {
+        var st = statusValues[r][0] ? statusValues[r][0].toString().trim() : "";
+        if (st === "Impreso" || st === "Reimpreso" || st === "Anulada") {
+          saltadas++;
+          continue;
+        }
+      }
+      
+      actualizarEstadoDocumentosEnHoja(sheet, currentRow, headers);
+      actualizadas++;
+    }
+    
+    var msg = "✅ " + actualizadas + " filas validadas.";
+    if (saltadas > 0) msg += " (Saltadas " + saltadas + " ya impresas)";
+    SpreadsheetApp.getActiveSpreadsheet().toast(msg, "Sistema QMS", 8); 
+  } catch (e) {
+    Logger.log("Error en forzarActualizacionEstadoDocumentos: " + e.message);
+    SpreadsheetApp.getUi().alert("Error", "Ocurrió un error al validar: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }

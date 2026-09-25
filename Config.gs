@@ -92,7 +92,7 @@ var STATIC_TEMPLATE_CHUNK_SIZE_ = 80000;
 // Estructura requerida de hojas y columnas
 const REQUIRED_SHEETS = {
   'templates': ['Clave', 'Valor', 'Type', 'NombreTemplate', 'Description', 'FormOrder', 'FileFolderLink'],
-  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'AdjuntoCOA', 'AdjuntoOA', 'EstadoCarga', 'ConsecutivoImp', 'NoPags', 'Reimpresion', 'TotalPags', 'ImpresoPor', 'Reimpreso', 'HistorialImpresion', 'STATUS', 'VerifLote', 'VerifCant. Disponible', 'VerifExp', 'CantDispAFecha', 'Decision'],
+  'Ordenes': ['Proceso', 'Codigo', 'Descripcion', 'Lote', 'Exp', 'Cantidad', 'NoAnalisis', 'NoOrden', 'Fabricante', 'EstadoDocumentos', 'ConsecutivoImp', 'NoPags', 'Reimpresion', 'TotalPags', 'ImpresoPor', 'Reimpreso', 'HistorialImpresion', 'STATUS', 'VerifLote', 'VerifCant. Disponible', 'VerifExp', 'CantDispAFecha', 'Decision'],
   'Usuarios': ['UserID', 'Nombre Completo', 'NombreCorto', 'Email', 'Rol', 'Clave', 'Estado', 'IntentosFallidos'],
   'Logs': ['Fecha', 'Usuario', 'TipoCambio', 'DescripcionCambio', 'OrdenRef', 'CampoAfectado', 'ValorAnterior', 'ValorNuevo', 'CorrelationId'],
   'RegistroNovedad': ['FechaNovedad', 'NoOrden', 'Codigo', 'TipoNovedad', 'Comentario', 'TotalPags', 'NoPagDevueltas', 'RealizadoPor', 'STATUS'],
@@ -193,3 +193,10 @@ function procesarAgregarPlantilla(params) {
     return { status: 'success', message: 'Plantilla agregada exitosamente.' };
   }
 }
+
+const VALORES_ESTADO_DOCUMENTOS = {
+  FALTAN_AMBOS: "?? Faltan Ambos",
+  FALTA_OA: "?? Falta OA",
+  FALTA_COA: "?? Falta COA",
+  LISTOS: "?? Listos para Imprimir"
+};

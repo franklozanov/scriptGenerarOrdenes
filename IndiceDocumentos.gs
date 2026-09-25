@@ -1,50 +1,49 @@
-/* eslint-disable */
 // ============================================================
 // MODULE: IndiceDocumentos
-// Descripci├│n: Espejo local (├¡ndice materializado) de las carpetas
+// Descripción: Espejo local (índice materializado) de las carpetas
 //              de Drive DOC_ORDENES (OA) y DOC_ANALISIS (COA).
-//              Convierte la validaci├│n de EstadoDocumentos de un
+//              Convierte la validación de EstadoDocumentos de un
 //              escaneo lento por-orden a un lookup O(1) en memoria.
 //
 //              - Fuente de verdad durable: hoja oculta 'IndiceDocumentos'
-//              - Memo por ejecuci├│n para no releer la hoja en cada onEdit
-//              - Refresco: horario + al subir un doc + on-demand (men├║)
+//              - Memo por ejecución para no releer la hoja en cada onEdit
+//              - Refresco: horario + al subir un doc + on-demand (menú)
 // Prioridad de Carga: depende de Helpers, Config y PrintLogic (getPrintConfig_)
 // ============================================================
 
 /**
- * Convierte un nombre de archivo o un valor de celda en una clave can├│nica
- * comparable. Se usa TANTO al construir el ├¡ndice (desde nombres de archivo)
- * COMO al consultarlo (desde el valor de la celda) ÔÇö ambos lados producen la
+ * Convierte un nombre de archivo o un valor de celda en una clave canónica
+ * comparable. Se usa TANTO al construir el índice (desde nombres de archivo)
+ * COMO al consultarlo (desde el valor de la celda) — ambos lados producen la
  * misma clave y se elimina el match difuso (contains).
  *
- * COA ÔÇö el archivo trae varios tokens: "COA 2026-0220 k1548 a26ns036.pdf".
- *       La clave es el patr├│n de an├ílisis A├æO-SECUENCIA (2026-0220), que es
+ * COA — el archivo trae varios tokens: "COA 2026-0220 k1548 a26ns036.pdf".
+ *       La clave es el patrón de análisis AÑO-SECUENCIA (2026-0220), que es
  *       exactamente lo que guarda la columna NoAnalisis.
  *   "COA 2026-0220 k1548 a26ns036.pdf" -> "2026-0220"
  *   "2026-0220" (celda NoAnalisis)     -> "2026-0220"
  *
- * OA ÔÇö n├║mero de orden de 4 cifras, opcionalmente con prefijo "OA":
+ * OA — número de orden de 4 cifras, opcionalmente con prefijo "OA":
  *   "0042.pdf"   -> "42"
  *   "OA0042.pdf" -> "42"
- *   42 (n├║mero)  -> "42"
+ *   42 (número)  -> "42"
  *
  * @param {*} raw - Nombre de archivo o valor de celda (NoOrden / NoAnalisis)
- * @returns {string} Clave can├│nica ("" si no hay contenido)
+ * @returns {string} Clave canónica ("" si no hay contenido)
  */
 function normalizarClaveDoc_(raw) {
   var s = String(raw == null ? '' : raw).trim().toLowerCase();
-  s = s.replace(/\.pdf$/, ''); // quitar extensi├│n (si viene de un filename)
+  s = s.replace(/\.pdf$/, ''); // quitar extensión (si viene de un filename)
 
-  // COA: extraer el patr├│n A├æO-SECUENCIA (ej. 2026-0220) de donde sea que est├®
+  // COA: extraer el patrón AÑO-SECUENCIA (ej. 2026-0220) de donde sea que esté
   // dentro del nombre. Cubre tanto el filename multi-token como el valor de celda.
   var mAnalisis = s.match(/\d{4}-\d{4}/);
   if (mAnalisis) return mAnalisis[0];
 
-  // OA: n├║mero de orden, con prefijo "oa" opcional y sin espacios.
+  // OA: número de orden, con prefijo "oa" opcional y sin espacios.
   s = s.replace(/^(oa|coa)/, '').replace(/\s+/g, '');
   if (s !== '' && /^\d+$/.test(s)) {
-    return String(parseInt(s, 10)); // can├│nico entero (mata ceros a la izquierda)
+    return String(parseInt(s, 10)); // canónico entero (mata ceros a la izquierda)
   }
   return s; // fallback defensivo
 }
@@ -54,12 +53,12 @@ var IndiceDocs = {
   NOMBRE_HOJA: 'IndiceDocumentos',
   PROP_LAST_REFRESH: 'INDICE_DOCS_LAST_REFRESH',
 
-  // Memo por ejecuci├│n (se reinicia en cada invocaci├│n del script). null = no cargado.
+  // Memo por ejecución (se reinicia en cada invocación del script). null = no cargado.
   _mem: null,
 
   /**
-   * Obtiene (o crea) la hoja oculta del ├¡ndice. La columna Clave (B) se fuerza
-   * a formato texto para que "2026-0015" o "0042" no sufran coerci├│n de Sheets.
+   * Obtiene (o crea) la hoja oculta del índice. La columna Clave (B) se fuerza
+   * a formato texto para que "2026-0015" o "0042" no sufran coerción de Sheets.
    */
   _obtenerHoja: function() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -75,7 +74,7 @@ var IndiceDocs = {
 
   /**
    * Lista los PDFs de una carpeta y los mapea a [tipo, clave, fileId, nombre, fecha].
-   * Deduplica por clave (conserva el primero). Tolera folderId vac├¡o o inv├ílido.
+   * Deduplica por clave (conserva el primero). Tolera folderId vacío o inválido.
    */
   _listarCarpeta: function(folderId, tipo) {
     var filas = [];
@@ -85,7 +84,7 @@ var IndiceDocs = {
     try {
       folder = DriveApp.getFolderById(folderId);
     } catch (e) {
-      Logger.log('IndiceDocs: carpeta ' + tipo + ' (' + folderId + ') inv├ílida: ' + e.message);
+      Logger.log('IndiceDocs: carpeta ' + tipo + ' (' + folderId + ') inválida: ' + e.message);
       return filas;
     }
 
@@ -105,16 +104,16 @@ var IndiceDocs = {
   },
 
   /**
-   * Reconstruye el ├¡ndice completo desde las dos carpetas de Drive.
-   * A ~300 archivos toma segundos. Escritura at├│mica (clear + un solo setValues)
-   * protegida por lock para que un lector concurrente no vea el ├¡ndice a medias.
+   * Reconstruye el índice completo desde las dos carpetas de Drive.
+   * A ~300 archivos toma segundos. Escritura atómica (clear + un solo setValues)
+   * protegida por lock para que un lector concurrente no vea el índice a medias.
    *
    * @returns {{oa:number, coa:number}} Conteo indexado por tipo.
    */
   reconstruir: function() {
     var lock = LockService.getScriptLock();
     if (!lock.tryLock(30000)) {
-      Logger.log('IndiceDocs: reconstrucci├│n ya en curso, se omite.');
+      Logger.log('IndiceDocs: reconstrucción ya en curso, se omite.');
       return { oa: -1, coa: -1 };
     }
     try {
@@ -152,15 +151,15 @@ var IndiceDocs = {
   },
 
   /**
-   * Carga el ├¡ndice a memoria como { OA: {clave->fileId}, COA: {clave->fileId} }.
-   * Memoizado por ejecuci├│n.
+   * Carga el índice a memoria como { OA: {clave->fileId}, COA: {clave->fileId} }.
+   * Memoizado por ejecución.
    */
   cargar: function() {
     if (this._mem) return this._mem;
 
     var idx = { OA: {}, COA: {} };
-    // Lectura sin efectos colaterales: si la hoja no existe a├║n (antes del primer
-    // rebuild), devolvemos ├¡ndice vac├¡o sin crearla. La crean reconstruir()/agregar().
+    // Lectura sin efectos colaterales: si la hoja no existe aún (antes del primer
+    // rebuild), devolvemos índice vacío sin crearla. La crean reconstruir()/agregar().
     var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(this.NOMBRE_HOJA);
     var last = sh ? sh.getLastRow() : 0;
     if (sh && last >= 2) {
@@ -179,7 +178,7 @@ var IndiceDocs = {
 
   /**
    * Agrega (o actualiza) una entrada de forma incremental. Para el hook de subida:
-   * refleja al instante un doc reci├®n cargado sin esperar el rebuild horario.
+   * refleja al instante un doc recién cargado sin esperar el rebuild horario.
    *
    * @param {string} tipo - 'OA' o 'COA'
    * @param {string} fileId - ID del archivo en Drive
@@ -203,7 +202,7 @@ var IndiceDocs = {
   },
 
   /**
-   * Elimina una entrada del ├¡ndice de forma incremental.
+   * Elimina una entrada del índice de forma incremental.
    *
    * @param {string} tipo - 'OA' o 'COA'
    * @param {string} nombre - Nombre del archivo (para derivar la clave)
@@ -231,8 +230,8 @@ var IndiceDocs = {
   },
 
   /**
-   * Devuelve el fileId de un documento por tipo+clave, o null si no est├í indexado.
-   * Bonus: permite a la impresi├│n hacer getFileById directo (sin buscar en la carpeta).
+   * Devuelve el fileId de un documento por tipo+clave, o null si no está indexado.
+   * Bonus: permite a la impresión hacer getFileById directo (sin buscar en la carpeta).
    */
   obtenerFileId: function(tipo, clave) {
     var idx = this.cargar();
@@ -240,37 +239,37 @@ var IndiceDocs = {
     return (idx[tipo] && idx[tipo][k] !== undefined) ? idx[tipo][k] : null;
   },
 
-  /** Invalida el memo por ejecuci├│n (tras un rebuild). */
+  /** Invalida el memo por ejecución (tras un rebuild). */
   invalidarMem: function() {
     this._mem = null;
   }
 };
 
-// --- WRAPPERS P├ÜBLICOS (men├║ / trigger por tiempo llaman por nombre de funci├│n) ---
+// --- WRAPPERS PÚBLICOS (menú / trigger por tiempo llaman por nombre de función) ---
 
 /**
- * Reconstruye el ├¡ndice de documentos. Invocable desde el men├║ y el trigger horario.
+ * Reconstruye el índice de documentos. Invocable desde el menú y el trigger horario.
  */
 function reconstruirIndiceDocumentos() {
   var r = IndiceDocs.reconstruir();
-  if (r.oa < 0) return; // reconstrucci├│n concurrente omitida
+  if (r.oa < 0) return; // reconstrucción concurrente omitida
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      '├ìndice de documentos actualizado: ' + r.oa + ' OA, ' + r.coa + ' COA.',
+      'Índice de documentos actualizado: ' + r.oa + ' OA, ' + r.coa + ' COA.',
       'Sistema QMS', 6
     );
-  } catch (e) { /* sin UI disponible (ejecuci├│n por trigger): silencioso */ }
+  } catch (e) { /* sin UI disponible (ejecución por trigger): silencioso */ }
 }
 
 /**
- * Crea el disparador horario que mantiene el ├¡ndice fresco.
+ * Crea el disparador horario que mantiene el índice fresco.
  * Idempotente: no duplica si ya existe.
  */
 function setupIndiceDocsTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
     if (triggers[i].getHandlerFunction() === 'reconstruirIndiceDocumentos') {
-      Logger.log('ÔÜá´©Å Disparador reconstruirIndiceDocumentos ya existe');
+      Logger.log('⚠️ Disparador reconstruirIndiceDocumentos ya existe');
       return;
     }
   }
@@ -278,5 +277,5 @@ function setupIndiceDocsTrigger() {
     .timeBased()
     .everyHours(1)
     .create();
-  Logger.log('Ô£ô Disparador horario reconstruirIndiceDocumentos creado');
+  Logger.log('✓ Disparador horario reconstruirIndiceDocumentos creado');
 }

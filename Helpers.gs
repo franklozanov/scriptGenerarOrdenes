@@ -84,47 +84,12 @@ function setCellValueByColumnName(sheet, rowIndex, columnName, value) {
  * @param {string} estadoOA - Estado de la Orden de Acondicionamiento ("Pendiente" o "âœ… Cargado")
  * @returns {string} Estado consolidado
  */
-function calcularEstadoCarga(estadoCOA, estadoOA) {
-  var coa = estadoCOA ? estadoCOA.toString().trim() : "";
-  var oa = estadoOA ? estadoOA.toString().trim() : "";
-  
-  var coaCargado = (coa === VALORES_DOCUMENTO.CARGADO);
-  var oaCargado = (oa === VALORES_DOCUMENTO.CARGADO);
-  
-  if (coaCargado && oaCargado) {
-    return VALORES_ESTADO_CARGA.CARGADOS;
-  } else if (coaCargado && !oaCargado) {
-    return VALORES_ESTADO_CARGA.PENDIENTE_OA;
-  } else if (!coaCargado && oaCargado) {
-    return VALORES_ESTADO_CARGA.PENDIENTE_COA;
-  } else {
-    return VALORES_ESTADO_CARGA.PENDIENTE_AMBOS;
-  }
-}
-
 /**
  * Actualiza el estado consolidado de carga en una fila especÃ­fica.
  * @param {Sheet} sheet - Hoja de cÃ¡lculo 'Ordenes'
  * @param {number} rowIndex - NÃºmero de fila (base-1)
  * @param {Array} headers - Array de encabezados de la hoja
  */
-function actualizarEstadoCarga(sheet, rowIndex, headers) {
-  var colCOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoCOA', false);
-  var colOAIdx = getColumnIndexByNameCaseInsensitive(headers, 'AdjuntoOA', false);
-  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoCarga', false);
-  
-  if (!colCOAIdx || !colOAIdx || !colEstadoIdx) {
-    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoCarga");
-    return;
-  }
-  
-  var estadoCOA = sheet.getRange(rowIndex, colCOAIdx).getValue();
-  var estadoOA = sheet.getRange(rowIndex, colOAIdx).getValue();
-  
-  var estadoConsolidado = calcularEstadoCarga(estadoCOA, estadoOA);
-  sheet.getRange(rowIndex, colEstadoIdx).setValue(estadoConsolidado);
-}
-
 /**
  * Extrae el ID de Google Drive a partir de una URL compartida.
  * Si el parÃ¡metro ya es un ID (no contiene 'http'), lo devuelve tal cual.
@@ -241,4 +206,55 @@ function verificarDocumentosEnDrive(noOrden, noAnalisis) {
 
 function normalizarClaveDoc_(clave) {
   return String(clave).trim().toLowerCase();
+}
+
+
+function verificarDocumentosEnDrive(noOrden, noAnalisis) {
+  var noOrdenStr = noOrden ? String(noOrden).trim() : "";
+  var noAnalisisStr = noAnalisis ? String(noAnalisis).trim() : "";
+
+  if (!noOrdenStr && !noAnalisisStr) {
+    return { tieneOA: false, tieneCOA: false };
+  }
+
+  var idx = IndiceDocs.cargar();
+  var tieneOA = noOrdenStr ? (idx.OA[normalizarClaveDoc_(noOrdenStr)] !== undefined) : false;
+  var tieneCOA = noAnalisisStr ? (idx.COA[normalizarClaveDoc_(noAnalisisStr)] !== undefined) : false;
+
+  return { tieneOA: tieneOA, tieneCOA: tieneCOA };
+}
+
+function normalizarClaveDoc_(clave) {
+  return String(clave).trim().toLowerCase();
+}
+
+function calcularEstadoDocumentos(tieneOA, tieneCOA) {
+  if (tieneOA && tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.LISTOS;
+  } else if (tieneOA && !tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.FALTA_COA;
+  } else if (!tieneOA && tieneCOA) {
+    return VALORES_ESTADO_DOCUMENTOS.FALTA_OA;
+  } else {
+    return VALORES_ESTADO_DOCUMENTOS.FALTAN_AMBOS;
+  }
+}
+
+function actualizarEstadoDocumentosEnHoja(sheet, rowIndex, headers) {
+  var colNoOrdenIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoOrden', true);
+  var colNoAnalisisIdx = getColumnIndexByNameCaseInsensitive(headers, 'NoAnalisis', false);
+  var colEstadoIdx = getColumnIndexByNameCaseInsensitive(headers, 'EstadoDocumentos', false);
+  
+  if (!colNoOrdenIdx || !colEstadoIdx) {
+    Logger.log("ADVERTENCIA: No se encontraron las columnas necesarias para actualizar EstadoDocumentos");
+    return;
+  }
+  
+  var noOrden = sheet.getRange(rowIndex, colNoOrdenIdx).getValue();
+  var noAnalisis = colNoAnalisisIdx ? sheet.getRange(rowIndex, colNoAnalisisIdx).getValue() : null;
+  
+  var res = verificarDocumentosEnDrive(noOrden, noAnalisis);
+  var nuevoEstado = calcularEstadoDocumentos(res.tieneOA, res.tieneCOA);
+  
+  sheet.getRange(rowIndex, colEstadoIdx).setValue(nuevoEstado);
 }

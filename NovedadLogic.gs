@@ -423,9 +423,9 @@ function procesarCargaOrdenesMasivas(params, userId) {
     var colNoAnalisis = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoAnalisis', false);
     var colNoOrden = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoOrden', false);
     var colFabricante = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'Fabricante', false);
-    var colAdjuntoCOA = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'AdjuntoCOA', false);
-    var colAdjuntoOA = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'AdjuntoOA', false);
-    var colEstadoCarga = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'EstadoCarga', false);
+    
+    
+    
     var colConsecutivoImp = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'ConsecutivoImp', false);
     var colImpresoPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'ImpresoPor', false);
     var colStatus = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
@@ -685,10 +685,10 @@ function procesarAutorizacionQA(params, userId) {
     var headersOrdenes = sheetOrdenes.getRange(1, 1, 1, sheetOrdenes.getLastColumn()).getValues()[0];
     var colNoOrden = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'NoOrden', false);
     var colStatus = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'STATUS', false);
-    var colEstadoCarga = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'EstadoCarga', false);
+    
     var colSolicitadaPor = getColumnIndexByNameCaseInsensitive(headersOrdenes, 'SolicitadaPor', false);
     
-    if (!colNoOrden || !colStatus || !colEstadoCarga || !colSolicitadaPor) {
+    if (!colNoOrden || !colStatus || !colEstadoDocs || !colSolicitadaPor) {
       var faltantes = [];
       if (!colNoOrden) faltantes.push('NoOrden');
       if (!colStatus) faltantes.push('STATUS');
