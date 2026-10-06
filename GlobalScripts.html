@@ -1,4 +1,4 @@
-<!-- ============================================================
+﻿<!-- ============================================================
      GLOBALSCRIPTS.HTML - JavaScript Compartido
      Descripción: Funciones JS comunes para todos los modales
      FASE 6: Design System
@@ -446,6 +446,7 @@
     let startX = 0;
     let startY = 0;
     let rafId = null;
+    let lastResizeTime = 0;
 
     function startResize(e) {
       // Solo activar con clic izquierdo
@@ -497,8 +498,12 @@
         const newHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + deltaY));
         
         try {
-          google.script.host.setWidth(newWidth);
-          google.script.host.setHeight(newHeight);
+          const now = Date.now();
+          if (now - lastResizeTime > 150) { 
+            google.script.host.setWidth(newWidth);
+            google.script.host.setHeight(newHeight);
+            lastResizeTime = now;
+          }
         } catch (err) {
           console.error('Error al redimensionar:', err);
         }
@@ -508,6 +513,18 @@
     }
 
     function stopResize(e) {
+      // Configurar el tamanio final al soltar
+      if (isResizing && e) {
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        const finalWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + deltaX));
+        const finalHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + deltaY));
+        try {
+          google.script.host.setWidth(finalWidth);
+          google.script.host.setHeight(finalHeight);
+        } catch (err) {}
+      }
+
       // Forzar detención inmediata
       isResizing = false;
       
@@ -547,3 +564,14 @@
     });
   }
 </script>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  /* global lucide */
+  lucide.createIcons();
+</script>
+
+
+
+
+
