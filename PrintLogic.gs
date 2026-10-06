@@ -27,7 +27,7 @@ function openPrintDialog() {
   template.ordenesValidas = JSON.stringify(getOrdenesValidasParaImpresion());
   
   var html = template.evaluate()
-    .setWidth(550).setHeight(700);
+    .setWidth(850).setHeight(700);
   SpreadsheetApp.getUi().showModelessDialog(html, ' ');
 }
 
