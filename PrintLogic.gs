@@ -24,7 +24,7 @@ function openPrintDialog() {
   var template = HtmlService.createTemplateFromFile('Index');
   template.spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
   var html = template.evaluate()
-    .setWidth(550).setHeight(700);
+    .setWidth(850).setHeight(700);
   SpreadsheetApp.getUi().showModelessDialog(html, ' ');
 }
 

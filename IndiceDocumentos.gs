@@ -202,34 +202,31 @@ var IndiceDocs = {
   },
 
   /**
-   * Elimina una entrada del índice de manera incremental. Para el hook de borrado:
-   * refleja al instante que un doc fue enviado a la papelera.
+   * Elimina una entrada del índice de forma incremental.
    *
    * @param {string} tipo - 'OA' o 'COA'
-   * @param {string} claveDoc - Clave (NoOrden o NoAnalisis)
+   * @param {string} nombre - Nombre del archivo (para derivar la clave)
    */
-  eliminar: function(tipo, claveDoc) {
-    var clave = normalizarClaveDoc_(claveDoc);
+  eliminar: function(tipo, nombre) {
+    var clave = normalizarClaveDoc_(nombre);
     if (clave === '' || (tipo !== 'OA' && tipo !== 'COA')) return;
 
     var idx = this.cargar();
-    if (idx[tipo][clave] === undefined) {
-      return; // No existe
+    if (idx[tipo] && idx[tipo][clave] !== undefined) {
+      delete idx[tipo][clave];
     }
 
-    // Borrar de la hoja oculta
     var sh = this._obtenerHoja();
-    var data = sh.getDataRange().getValues();
-    // Búsqueda lineal, asumiendo max un par de miles de registros (rápido en V8)
-    for (var i = 1; i < data.length; i++) {
+    var last = sh.getLastRow();
+    if (last < 2) return;
+    
+    var data = sh.getRange(2, 1, last - 1, 2).getValues(); // Tipo, Clave
+    for (var i = 0; i < data.length; i++) {
       if (data[i][0] === tipo && String(data[i][1]) === clave) {
-        sh.deleteRow(i + 1); // +1 porque data es 0-indexed y hojas son 1-indexed
+        sh.deleteRow(i + 2);
         break;
       }
     }
-    
-    // Borrar del memo
-    delete idx[tipo][clave];
   },
 
   /**
