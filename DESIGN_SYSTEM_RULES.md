@@ -80,6 +80,63 @@ Modal Individual (Solo overrides específicos)
 
 ---
 
+### **Regla #4: Política de Cero Emojis en UI (Zero-Emoji Policy) e Iconografía SVG**
+
+> 🚫 **PROHIBICIÓN ESTRICTA:** Queda terminantemente prohibido el uso de caracteres emojis Unicode (tales como 🚀, ✅, ⚠️, ❌, 👤, 🔄, 📦, etc.) en elementos de la interfaz de usuario: títulos, botones, badges, mensajes de estado, alertas, modales o tooltips.
+
+- **Motivo Técnico / UX:** Los emojis renderizan de forma dispar e inconsistente según el sistema operativo (Windows, macOS, iOS, Android, Linux), rompen la altura de línea (*line-height*), carecen de control sobre paleta de color y comprometen la sobriedad requerida en un entorno regulado de calidad farmacéutica / QMS.
+- **Estándar Obligatorio:** Toda iconografía debe implementarse mediante **vectores SVG limpios inline**:
+  - Trazo consistente: `stroke="currentColor"`, `fill="none"`, `stroke-width="2"` a `2.2"`, `stroke-linecap="round"`, `stroke-linejoin="round"`.
+  - Dimensiones controladas: `width="13-16" height="13-16"`, `flex-shrink: 0`.
+  - Iconos aprobados: Spinner animado para carga, Check para éxito, Alert-Triangle para advertencias, Circle-X/Alert-Circle para errores, User para identidad, Refresh-CW para sincronización.
+
+---
+
+### **Regla #5: Arquitectura de Tres Zonas en Modales (3-Zone Modal Layout)**
+
+Los modales interactivos complejos (como el Panel de Impresión) deben implementar un layout vertical de tres zonas en `flex-direction: column` con `overflow: hidden` en el contenedor padre:
+
+1. **Header Fijo (`.modal-header`):**
+   - Siempre visible en la parte superior (`flex-shrink: 0`).
+   - Contiene el título del modal y componentes sutiles de contexto global, como el chip de identidad del usuario activo (`.user-header-chip`).
+2. **Cuerpo Scrollable (`.modal-body`):**
+   - Área central con desplazamiento independiente (`flex: 1 1 auto; overflow-y: auto; overflow-x: hidden`).
+   - Barra de desplazamiento delgada y sutil (`8px` con esquinas redondeadas).
+   - Contiene los campos del formulario y listas de elementos.
+3. **Footer Fijo y Docked (`.modal-footer`):**
+   - Anclado permanentemente al fondo (`flex-shrink: 0; box-shadow: 0 -4px 14px rgba(0,0,0,0.04)`).
+   - Contiene los botones de acción principal (ej. "Generar PDF Combinado") y el contenedor centralizado de estatus (`#status`).
+   - **Beneficio UX:** El usuario nunca pierde de vista las acciones principales ni los mensajes de feedback, sin importar la longitud de la lista.
+
+---
+
+### **Regla #6: Estados Inline Centralizados (Pill Badges) y Ocultamiento Total (:empty)**
+
+1. **No Banners Invasivos Superiores:** Se prohíbe el uso de cajas de alerta superiores (`#preloadBanner`) que empujen el contenido hacia abajo (*Cumulative Layout Shift* - CLS) cuando el usuario interactúa con inputs.
+2. **Centralización en Footer:** Todos los estados de precarga, validación y feedback deben converger en un único pill badge (`#status`) en el footer.
+3. **Regla de Ocultamiento Total (`:empty`):**
+   ```css
+   #status:empty,
+   .status-pill:empty {
+     display: none !important;
+     margin: 0 !important;
+     padding: 0 !important;
+     border: none !important;
+   }
+   ```
+   Si no hay mensaje activo (ej. input vacío o longitud < 3), el contenedor no debe mostrar marcos vacíos, placeholders ni sombras fantasma.
+
+---
+
+### **Regla #7: Uniformidad de Botones de Acción en Filas y Listas**
+
+- En listas o tablas donde cada fila tiene controles o botones de acción complementaria (ej. "Actualizar", "Llevar a 0", "Diagnosticar"), los botones deben tener:
+  - Idéntica altura, padding, radio de borde y tipografía.
+  - El contenedor de controles debe usar `display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0;` para evitar que títulos largos deformen o achiquen los botones.
+  - La etiqueta de la fila debe tener `flex: 1; word-wrap: break-word;` para fluir adecuadamente.
+
+---
+
 ## 🎨 Paleta de Colores Centralizada
 
 **SIEMPRE usar variables CSS definidas en Theme.html:**
@@ -347,6 +404,83 @@ Modal Individual (Solo overrides específicos)
   background: #e3f2fd;
   color: #1565c0;
   border-left: 4px solid var(--color-info);
+}
+
+/* Status Pill Badges (Modern Inline Feedback) */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.status-pill:empty {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.status-pill-loading {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.status-pill-success {
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-pill-warning {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.status-pill-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.status-pill-info {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+/* User Header Chip (Sutil en Header) */
+.user-header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.2s ease;
+}
+
+.user-header-chip svg {
+  flex-shrink: 0;
+  color: #166534;
 }
 ```
 

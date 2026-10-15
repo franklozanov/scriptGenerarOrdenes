@@ -22,6 +22,10 @@ Checklist obligatorio para cualquier cambio en este proyecto de Google Apps Scri
 - **B4. Un solo bloque `<script>` de lógica, preferentemente al final del `<body>`.** Evitar `<script>` inline complejo en el `<head>` (rompió el arranque en el pasado). `pdf-lib` se carga con `<script src>` simple.
 - **B5. Componer estilos y utilidades vía `<?!= ... ?>`.** `Theme.html` (CSS) y `GlobalScripts.html` (JS) se inyectan server-side; no duplicar.
 - **B6. `showModelessDialog` para modales operativos** (no bloquean la hoja); `showModalDialog` solo para el de identidad. Título en blanco (`' '`) para no duplicar la barra nativa.
+- **B7. CERO EMOJIS en la UI (Zero-Emoji Policy).** Queda estrictamente prohibido usar caracteres emojis en botones, títulos, badges o mensajes. Usar siempre vectores SVG inline limpios con `stroke="currentColor"`.
+- **B8. Layout de 3 zonas en modales complejos.** `.modal-header` (fijo con título y chip de usuario sutil), `.modal-body` (scrollable con scrollbar slim) y `.modal-footer` (docked abajo con botones de acción principal y feedback).
+- **B9. Cero banners superiores invasivos.** Eliminar cajas superiores que causen *Cumulative Layout Shift*. Centralizar feedback en `#status` usando `.status-pill` con `#status:empty { display: none !important; }`.
+- **B10. Uniformidad en controles de fila.** Contenedor de acciones con `justify-content: flex-end; flex-shrink: 0; gap: 8px;` y títulos con `word-wrap: break-word;` para evitar deformaciones o botones aplastados.
 
 ---
 
@@ -61,3 +65,6 @@ Checklist obligatorio para cualquier cambio en este proyecto de Google Apps Scri
 - **F2. `getInitialData` NO precarga base64** (siempre `null`) para no bloquear la UI; los PDFs se bajan lazy/on-demand.
 - **F3. Plantillas estáticas cacheadas en chunks** (6h TTL) para evitar re-descargas de Drive.
 - **F4. Búsqueda de orden con `debounce(600ms)`** y control de race condition (descartar respuestas obsoletas).
+- **F5. Sincronización ligera de versiones en cliente.** Al hacer foco en la ventana (`window.focus`), consultar `getTemplatesVersion()` para invalidar caché local sin obligar a reiniciar el modal si un administrador cambió configuraciones.
+- **F6. Validación defensiva de valores numéricos.** Usar `safeCopiesValue(copias)` al procesar entradas del usuario para evitar `NaN`, `null` o fórmulas mal evaluadas en el cliente.
+

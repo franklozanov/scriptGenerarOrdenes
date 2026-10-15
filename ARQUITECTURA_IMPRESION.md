@@ -10,8 +10,8 @@ Detalle técnico profundo de `Index.html` + `PrintLogic.gs` + `Cache.gs` + `Trac
 
 | Capa | Archivo | Piezas clave |
 |---|---|---|
-| UI / cliente | `Index.html` | `window.onload`, `startBackgroundStaticPreload`, `preloadOrderData`, `run`, `processPdfGeneration`, `updateGoButtonState` |
-| Servidor — datos | `Cache.gs` | `getInitialData`, `getStaticTemplateBase64`, caché chunked |
+| UI / cliente | `Index.html` | Layout 3 zonas (`.modal-header`, `.modal-body`, `.modal-footer`), chip de usuario (`userHeaderChip`), sincronización (`refreshTemplatesFromSheet`), precarga dinámica (`preloadOrderData`), generación PDF (`run`, `processPdfGeneration`), feedback inline (`updateGoButtonState`, `.status-pill`) |
+| Servidor — datos | `Cache.gs` | `getInitialData`, `getTemplatesVersion`, `refreshTemplatesCache`, `getStaticTemplateBase64`, caché chunked con validación de versión |
 | Servidor — impresión | `PrintLogic.gs` | `fetchOrderData`, `saveFinalUnifiedPDF`, `processAndSavePdfBackgroundForUser`, wrappers `*ForUser` |
 | Servidor — trazabilidad | `Traceability.gs` | `internalUpdateTraceability`, `onEditInstalled`, `logChange` |
 | Config | `Config.gs` | `STATIC_TEMPLATE_KEYS_`, `REQUIRED_SHEETS`, `VALORES_STATUS` |
@@ -27,11 +27,13 @@ let preloadState = {           // máquina de estados de la precarga dinámica p
   orderNo, status,             // status: 'idle' | 'loading' | 'ready' | 'error'
   data, pdfsByKey, errors
 };
+window.currentTemplatesVersion = null; // rastreador de versión para invalidación silenciosa de caché
 ```
 
 - `globalTemplates` viene de `getInitialData()` (un solo round-trip).
 - `preloadedStaticPdfs` se llena en background (`startBackgroundStaticPreload`) y/o on-demand.
 - `preloadState` rastrea la búsqueda de los PDFs **dinámicos** de la orden tecleada.
+- `window.currentTemplatesVersion` almacena el timestamp/hash de la hoja `Plantillas`. Al enfocar la ventana (`window.focus`), consulta `getTemplatesVersion()` y recarga si el servidor fue actualizado.
 
 ---
 
@@ -39,18 +41,19 @@ let preloadState = {           // máquina de estados de la precarga dinámica p
 
 `getInitialData()` (Cache.gs L81) devuelve en una sola llamada:
 ```
-{ templates, users, webAppUrl, activeEmail, savedProfileIdx }
+{ templates, users, webAppUrl, activeEmail, savedProfileIdx, version }
 ```
 Cacheado en `ScriptCache` bajo `initialData_v2` por **600 s**. **Optimización clave (Fase 6):** el `base64` de las plantillas **siempre se envía como `null`** — no se precarga en el servidor para no bloquear la UI; se descarga on-demand/lazy.
 
 En el success handler del cliente:
-1. Guarda `globalTemplates`; si alguna plantilla trae `base64` (no debería, por la optimización), la vuelca a `preloadedStaticPdfs`.
+1. Guarda `globalTemplates` y fija `window.currentTemplatesVersion`.
 2. Renderiza `#tplList`: una fila por plantilla con contador (−/input/+). Defaults: `1` general, `0` para `TPL_ESTUCHADO`/`TPL_TERMO`, `2` para `TPL_CONTROLES`. `hasAccess===false` → fila en rojo/itálica, controles `disabled`.
 3. **Resuelve identidad** por `activeEmail` contra la hoja Usuarios:
-   - **1 match** → `onUserValidated()` (fija `window.currentUserIdentity = "userId - nombreCompleto"`, muestra badge), oculta loader, dispara `startBackgroundStaticPreload()`.
-   - **>1 match** sin `savedProfileIdx` → selector de perfil; al confirmar → `saveUserProfileSelection(idx)` → valida.
-   - **0 match** → reemplaza el `body` por "Acceso Denegado".
+   - **1 match** → `onUserValidated()`: actualiza el chip en el header fijo (`#userHeaderChip`), oculta el selector/input de usuario del cuerpo del formulario (ahorro de espacio vertical), oculta loader, dispara `startBackgroundStaticPreload()`.
+   - **>1 match** sin `savedProfileIdx` → selector de perfil modal; al confirmar → `saveUserProfileSelection(idx)` → valida y activa header chip.
+   - **0 match** → reemplaza la vista por pantalla limpia de "Acceso Denegado".
 4. Cablea `#orderNo`: `debounce(600ms)` → `preloadOrderData()` con ≥3 caracteres; Enter simula click en Generar.
+5. Cablea `window.focus`: verifica si `getTemplatesVersion()` difiere de `currentTemplatesVersion` y actualiza silenciosamente si un administrador cambió IDs en Drive/Sheets.
 
 ---
 
@@ -95,9 +98,18 @@ Al teclear el No. de orden, `fetchOrderData(orderNo)` (PrintLogic.gs L170):
 
 **Control de race condition (cliente):** al llegar la respuesta, se compara el `orderNo` actual del input contra el de la respuesta; si difieren, se descarta (el usuario ya cambió de orden). Aplica en success y failure.
 
+**Feedback visual centralizado en el footer (`#status`):**
+- Se eliminó el banner invasivo superior (`#preloadBanner`) para evitar desplazamientos bruscos de pantalla (*Cumulative Layout Shift*).
+- Todo el feedback se emite a través de un pill badge (`.status-pill`) anclado en el footer:
+  - `loading`: Spinner SVG rotatorio ("Buscando documentos de la orden...").
+  - `ready` con alertas: Triángulo SVG ("Orden lista con alertas en validación").
+  - `ready` sin alertas: Check SVG verde ("Documentos listos para impresión").
+  - `error`: Circle-X SVG rojo ("Falta: [Nombre de Documento]" o detalle del error del servidor).
+- Si `orderNo` se borra o tiene < 3 caracteres, `#status` se vacía y se oculta automáticamente (`:empty { display: none !important; }`).
+
 `isPreloadReadyForOrder()` → true solo si `status==='ready'` **y** existen `pdfsByKey.DOC_ORDENES` **y** `DOC_ANALISIS`.
 
-`updateGoButtonState()` habilita el botón "Generar" solo con: **orden lista + usuario válido + ≥1 copia**.
+`updateGoButtonState()` habilita el botón "Generar" solo con: **orden lista + usuario válido + ≥1 copia**. Preserva los estados visuales de error/carga sin sobreescribirlos prematuramente.
 
 ---
 
@@ -180,6 +192,10 @@ En julio 2026 el modal empezó a colgarse / fallar. La cadena de causas y correc
 | 1 | El PDF se abría pero **no se guardaba** en Drive ni se actualizaba el consecutivo | `if (!newWindow \|\| newWindow.closed \|\| typeof newWindow.closed === 'undefined')` daba **falso positivo** cross-origin y hacía `return`, saltándose `processAndSavePdfBackgroundForUser` | Detectar bloqueo **solo** por `window.open()===null`; disparar el guardado **siempre** |
 | 2 | "No se pudo obtener el PDF de la plantilla … (DOC_ORDENES)" | Se clasificaba estática = `type !== 'Dynamic'` (valor inexistente); `DOC_ORDENES`/`DOC_ANALISIS` (Type=`Folder`) se trataban como estáticas y se intentaba bajarlas con un ID de carpeta | Estática = `type === 'Estatica'`; las Dinamica van al payload |
 | 3 | Modal colgado / `SyntaxError` en `document.write` | Intentos previos de "arreglar" añadieron un `<script>` inline en el `<head>`, carga async de pdf-lib, watchdog y overlay que rompían el arranque | Se reconstruyó `Index.html` sobre la última versión buena y se re-aplicó **solo** la precarga estática |
+| 4 | Modificaciones a IDs de plantillas en la hoja no se reflejaban en el modal | Caché `initialData_v2` mantenía IDs viejos por 10 min y clientes no sabían cuándo invalidar | Sistema de versionamiento con `TEMPLATES_VERSION_KEY`, endpoint `getTemplatesVersion()`, botón "Actualizar Plantillas" e invalidación al cambiar fileId |
+| 5 | Botones de control aplastados o desalineados en filas de plantillas | Flexbox sin `flex-shrink: 0` y títulos largos ocupando todo el ancho horizontal | `word-wrap: break-word` en nombres de plantilla y `.tpl-actions` con `justify-content: flex-end; flex-shrink: 0; gap: 8px;` |
+| 6 | Banners superiores invasivos y placeholders vacíos con emojis | `#preloadBanner` empujaba el contenido verticalmente y `#status` dejaba marcos vacíos visibles | Layout de 3 zonas (header, body scrollable, footer docked), `#status:empty { display: none !important; }` y política estricta de cero emojis con SVGs |
+| 7 | Error NaN o tipos inválidos al leer copias de plantillas | Inputs vacíos o cadenas no numéricas provocaban fallas en la inyección de pdf-lib | Función `safeCopiesValue(copias)` garantiza fallback seguro a cadena numérica ("1" o "0") |
 | — | (medida preventiva) | Sin `<meta charset>`, GAS puede corromper acentos/emojis al reinyectar el HTML | Añadido `<meta charset="UTF-8">` como primer elemento del `<head>` |
 
 **Lección general:** el `document.write` que aparece en el stack trace (`userCodeAppPanel`, `mae_html_user_bin...js`) es **de Google**, no nuestro. `node --check`/jsdom leen UTF-8 por defecto y no reproducen problemas de encoding del navegador. Ante un cuelgue, comparar contra la última versión buena (`git`) en lugar de parchear a ciegas.
@@ -190,7 +206,9 @@ En julio 2026 el modal empezó a colgarse / fallar. La cadena de causas y correc
 
 | Función (pública) | Firma | Devuelve |
 |---|---|---|
-| `getInitialData()` | — | `{templates, users, webAppUrl, activeEmail, savedProfileIdx}` |
+| `getInitialData()` | — | `{templates, users, webAppUrl, activeEmail, savedProfileIdx, version}` |
+| `getTemplatesVersion()` | — | `version` (string timestamp/hash) |
+| `refreshTemplatesCache()` | — | `{templates, users, ...}` (fuerza lectura fresca de la hoja) |
 | `getStaticTemplateBase64(key, fileId)` | key, fileId | `base64` (string) |
 | `fetchOrderData(orderNo)` | orderNo | `{status, ready, orderNo, noAnalisis, formData, coords, pdfs, errors}` |
 | `saveUserProfileSelection(idx)` | idx | — (cachea 6h) |
