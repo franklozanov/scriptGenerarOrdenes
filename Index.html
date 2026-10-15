@@ -356,46 +356,87 @@
       .success-text { color: #059669; }
       .warning-text { color: #b45309; }
       .info-text { color: #1976d2; }
-      .preload-banner {
-        display: none;
-        margin-bottom: 16px;
-        padding: 12px 16px;
-        border-radius: 10px;
-        font-size: 13px;
-        font-weight: 500;
-        line-height: 1.5;
-        word-wrap: break-word;
-        transition: all 0.3s ease;
+      /* Layout de tres zonas: Header Fijo, Cuerpo con Scroll, Footer Fijo */
+      .card {
+        display: flex;
+        flex-direction: column;
+        padding: 0 !important;
+        overflow: hidden !important;
+        height: 100%;
+        box-sizing: border-box;
       }
-      .preload-banner.info {
-        display: block;
-        color: #1976d2;
-        background: #e3f2fd;
-        border: 1.5px solid #90caf9;
-        box-shadow: 0 2px 4px rgba(25, 118, 210, 0.1);
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 20px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        flex-shrink: 0;
+        z-index: 2;
       }
-      .preload-banner.success {
-        display: block;
-        color: #059669;
-        background: #ecfdf5;
-        border: 1.5px solid #a7f3d0;
-        box-shadow: 0 2px 4px rgba(5, 150, 105, 0.1);
+      .modal-header-title {
+        font-size: 14.5px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.2px;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
-      .preload-banner.error {
-        display: block;
-        color: #dc2626;
-        background: #fef2f2;
-        border: 1.5px solid #fecaca;
-        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);
+      .user-header-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #334155;
+        max-width: 220px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.2s ease;
       }
-      .preload-banner.warning {
-        display: block;
-        color: #b45309;
-        background: #fffbeb;
-        border: 1.5px solid #fde68a;
-        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+      .user-header-chip svg {
+        flex-shrink: 0;
+        color: #166534;
       }
-      .hint { 
+      .modal-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 16px 20px 12px 20px;
+      }
+      .modal-body::-webkit-scrollbar {
+        width: 8px;
+      }
+      .modal-body::-webkit-scrollbar-track {
+        background: #f8fafc;
+      }
+      .modal-body::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .modal-footer {
+        flex-shrink: 0;
+        padding: 12px 20px 14px 20px;
+        background: #ffffff;
+        border-top: 1px solid #f1f5f9;
+        box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.04);
+        z-index: 2;
+      }
+      .modal-footer button#goBtn {
+        margin-top: 0 !important;
+      }
+      .modal-footer #status {
+        margin-top: 8px !important;
+      }
+.hint { 
         font-size: 12px; 
         color: #64748b; 
         font-weight: 400; 
@@ -523,7 +564,23 @@
         <div style="font-size: 14px; color: #64748b; font-weight: 600;">Cargando panel...</div>
       </div>
 
-      <div id="preloadBanner" class="preload-banner"></div>
+      <!-- HEADER FIJO -->
+      <div class="modal-header">
+        <div class="modal-header-title">
+          <span>Panel de Impresión</span>
+        </div>
+        <div id="userHeaderChip" class="user-header-chip" style="display: none;" title="Usuario conectado">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span id="userHeaderName"></span>
+        </div>
+      </div>
+
+      <!-- CUERPO CON SCROLL -->
+      <div class="modal-body">
+
 
       <div class="section">
         <div class="section-title">Datos de la Orden</div>
@@ -588,8 +645,13 @@
         </div>
       </div>
 
-      <button id="goBtn" onclick="run()" disabled>Generar PDF Combinado</button>
-      <div id="status"></div>
+      </div>
+
+      <!-- PIE FIJO -->
+      <div class="modal-footer">
+        <button id="goBtn" onclick="run()" disabled>Generar PDF Combinado</button>
+        <div id="status"></div>
+      </div>
     </div>
     
     <!-- Custom Confirm Modal -->
@@ -647,18 +709,6 @@
       }
 
       // Función debounce() ahora viene de GlobalScripts.html
-
-      function setPreloadBanner(type, message) {
-        const banner = document.getElementById('preloadBanner');
-        if (!banner) return;
-        if (!message) {
-          banner.className = 'preload-banner';
-          banner.innerHTML = '';
-          return;
-        }
-        banner.className = 'preload-banner ' + type;
-        banner.innerHTML = message;
-      }
 
       function clearStatus() {
         const status = document.getElementById('status');
@@ -727,33 +777,23 @@
         const errors = response.errors || [];
         
         if (errors.length === 0 && warnings.length === 0) {
-          setPreloadBanner('success', 'Orden lista para impresión');
-        } else {
-          let html = '<b>Novedades encontradas:</b><br><ul style="margin: 4px 0 0 20px; padding: 0; line-height: 1.4;">';
-          
-          errors.forEach(err => {
-            let msg = err.message;
-            if (err.key) {
-               msg = 'Falta Documento: <b>' + getTemplateFriendlyName(err.key) + '</b>';
-            }
-            html += '<li>' + msg + '</li>';
-          });
-          
-          warnings.forEach(w => {
-            let msg = w.message;
-            if (w.key === 'DECISION_FORMULA_ALERT' || w.key === 'STATUS_FORMULA_ALERT') {
-               msg = 'Alerta en validación: <b>' + w.message + '</b>';
-            }
-            html += '<li>' + msg + '</li>';
-          });
-          
-          html += '</ul>';
-          
-          if (errors.length > 0) {
-            setPreloadBanner('error', html);
-          } else {
-            setPreloadBanner('warning', html);
+          setStatusMessage('success', 'Documentos listos para impresión');
+        } else if (errors.length > 0) {
+          const firstErr = errors[0];
+          let errMsg = firstErr.message || 'Falta documento requerido';
+          if (firstErr.key) {
+            errMsg = 'Falta: ' + getTemplateFriendlyName(firstErr.key);
           }
+          if (errors.length > 1) {
+            errMsg += ' (+' + (errors.length - 1) + ' pendientes)';
+          }
+          setStatusMessage('error', errMsg);
+        } else {
+          let warnMsg = 'Orden lista con alertas en validación';
+          if (warnings.length === 1 && warnings[0].message) {
+            warnMsg = warnings[0].message;
+          }
+          setStatusMessage('warning', warnMsg);
         }
         
         updateGoButtonState();
@@ -790,20 +830,29 @@
         const isEnabled = isOrderReady && isUserValid && hasCopies;
         btn.disabled = !isEnabled;
 
-        // Feedback visual si el orden está listo pero el botón sigue bloqueado
-        if (isOrderReady && !isEnabled && !status.innerText.includes("Impresión registrada")) {
+        if (status && status.innerText.includes("Impresión registrada")) {
+          return;
+        }
+
+        if (preloadState.status === 'loading') {
+          return;
+        }
+
+        if (preloadState.status === 'error') {
+          return;
+        }
+
+        if (isOrderReady) {
           if (!isUserValid) {
             setStatusMessage('warning', 'Seleccione un usuario válido de la lista');
           } else if (!hasCopies) {
             setStatusMessage('warning', 'Seleccione al menos 1 copia para imprimir');
-          }
-        } else if (isOrderReady && isEnabled) {
-          if (preloadState.data && preloadState.data.warnings && preloadState.data.warnings.length > 0) {
+          } else if (preloadState.data && preloadState.data.warnings && preloadState.data.warnings.length > 0) {
             setStatusMessage('warning', 'Orden lista con alertas en validación');
           } else {
             setStatusMessage('success', 'Documentos listos para impresión');
           }
-        } else if (!isOrderReady && preloadState.status !== 'loading' && !status.innerText.includes("Impresión registrada")) {
+        } else if (preloadState.status === 'idle') {
           clearStatus();
         }
       }
@@ -845,7 +894,6 @@
         const currentOrderNo = orderNo.trim();
         if (!currentOrderNo) {
           resetPreloadState();
-          setPreloadBanner('', '');
           return;
         }
         
@@ -869,7 +917,6 @@
         
         // Show subtle status message
         const status = document.getElementById('status');
-        setPreloadBanner('info', 'Buscando documentos de la orden...');
         if (status && !status.innerText.includes("Impresión registrada")) {
           setStatusMessage('loading', 'Buscando documentos de la orden...');
         }
@@ -890,19 +937,6 @@
             
             console.log(`✓ Datos precargados para orden ${currentOrderNo}`);
             renderPreloadResult(response);
-            
-            // Update status to show data is ready
-            if (status && !status.innerText.includes("Impresión registrada")) {
-              if (response.ready) {
-                if (response.warnings && response.warnings.length > 0) {
-                  setStatusMessage('warning', 'Orden lista con alertas en validación');
-                } else {
-                  setStatusMessage('success', 'Documentos listos para impresión');
-                }
-              } else {
-                setStatusMessage('error', 'Faltan documentos requeridos');
-              }
-            }
           })
           .withFailureHandler(error => {
             // Race condition control: only accept error if it matches current orderNo
@@ -919,8 +953,6 @@
             updateGoButtonState();
             
             console.error(`Error precargando orden ${currentOrderNo}:`, error.message);
-            setPreloadBanner('error', `Error: ${error.message}`);
-            
             // Show error in status
             if (status) {
               setStatusMessage('error', `Error: ${error.message}`);
@@ -1182,15 +1214,24 @@
             function onUserValidated(userObj) {
               window.currentUserIdentity = userObj.userId + " - " + userObj.nombreCompleto;
               
-              // Ocultar select y mostrar badge
-              const userContainer = document.getElementById('userName').parentElement;
-              userContainer.innerHTML = `<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
-                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                <span>Ingresaste como: <strong>${userObj.nombreCompleto}</strong></span>
-              </div>`;
+              // Mostrar usuario en el chip del header
+              const chip = document.getElementById('userHeaderChip');
+              const chipName = document.getElementById('userHeaderName');
+              if (chip && chipName) {
+                chipName.innerText = userObj.nombreCompleto;
+                chip.setAttribute('title', `${userObj.nombreCompleto} (${userObj.email || userObj.userId})`);
+                chip.style.display = 'inline-flex';
+              }
+
+              // Ocultar campo de usuario del cuerpo del formulario
+              const userNameInput = document.getElementById('userName');
+              if (userNameInput) {
+                const userField = userNameInput.closest('.field');
+                if (userField) {
+                  userField.style.display = 'none';
+                }
+              }
+              
               updateGoButtonState();
             }
 
@@ -1207,7 +1248,6 @@
                 preloadOrderData(value);
               } else {
                 resetPreloadState();
-                setPreloadBanner('', '');
                 clearStatus();
               }
             }, 600);
@@ -1216,11 +1256,9 @@
               const val = e.target.value.trim();
               if (val.length < 3) {
                 resetPreloadState();
-                setPreloadBanner('', '');
                 clearStatus();
               } else if (preloadState.orderNo && preloadState.orderNo !== val) {
                 resetPreloadState();
-                setPreloadBanner('', '');
                 clearStatus();
               }
               updateGoButtonState();
@@ -1607,7 +1645,6 @@
               
               document.getElementById('orderNo').value = '';
               resetPreloadState();
-              setPreloadBanner('', '');
               document.getElementById('orderNo').focus();
 
               btn.innerText = "Generar PDF Combinado";
@@ -1708,17 +1745,17 @@
       
       function continueWithPrint(orderNo, config, btn, status, userName, userId, printType) {
         if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
-          setPreloadBanner('info', 'Aún se están preparando los documentos. Espere a que aparezca "Documentos listos para impresión".');
           setStatusMessage('loading', 'Esperando documentos dinámicos...');
           return;
         }
 
         if (!isPreloadReadyForOrder(orderNo)) {
-          const messages = (preloadState.orderNo === orderNo && preloadState.errors.length)
-            ? preloadState.errors.map(err => err.message).join('<br>')
-            : 'Ingrese un No. de Orden válido y espere a que DOC_ORDENES y DOC_ANALISIS estén listos.';
-          setPreloadBanner('error', messages);
-          setStatusMessage('error', 'Proceso bloqueado: faltan documentos requeridos.');
+          let errMsg = 'Proceso bloqueado: faltan documentos requeridos.';
+          if (preloadState.orderNo === orderNo && preloadState.errors.length) {
+            const firstErr = preloadState.errors[0];
+            errMsg = firstErr.key ? ('Falta: ' + getTemplateFriendlyName(firstErr.key)) : firstErr.message;
+          }
+          setStatusMessage('error', errMsg);
           return;
         }
 
