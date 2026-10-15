@@ -492,14 +492,9 @@
               <label style="margin-bottom: 2px; display: block;">Cantidad de Copias</label>
               <div class="hint" style="margin-bottom: 0;">Ajuste el número de copias para cada plantilla</div>
             </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <button id="refreshTemplatesBtn" type="button" onclick="refreshTemplatesFromSheet()" title="Sincronizar plantillas con la hoja de cálculo" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
-                <span id="refreshTemplatesIcon" style="font-size: 0.85rem;">🔄</span> <span id="refreshTemplatesText">Sincronizar</span>
-              </button>
-              <button id="toggleValuesBtn" type="button" onclick="toggleTemplateValues()" style="padding: 4px 12px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none; margin-right: 2px;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
-                <span style="font-size: 0.85rem;">0️⃣</span> <span id="toggleValuesText">Llevar a 0</span>
-              </button>
-            </div>
+            <button id="toggleValuesBtn" type="button" onclick="toggleTemplateValues()" style="padding: 4px 12px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none; margin-right: 2px;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
+              <span style="font-size: 0.85rem;">🔄</span> <span id="toggleValuesText">Llevar a 0</span>
+            </button>
           </div>
           <div id="tplList" class="tpl-container"></div>
         </div>
@@ -874,14 +869,14 @@
           const noAccess = t.hasAccess === false;
           const rowStyle = noAccess ? 'opacity: 0.5;' : '';
           const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
-          const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2;">${t.description}</div>` : '';
+          const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${t.description}">${t.description}</div>` : '';
           return `
             <div class="tpl-row" style="${rowStyle} display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
-              <div style="display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px;">
-                <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b;">${t.name}</span>
+              <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; margin-right: 12px;">
+                <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.name}</span>
                 ${descriptionHtml}
               </div>
-              <div class="counter-control" style="flex-shrink: 0;">
+              <div class="counter-control" style="flex-shrink: 0; width: 110px;">
                 <button type="button" class="counter-btn" tabindex="-1" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
                 <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
                 <button type="button" class="counter-btn" tabindex="-1" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
