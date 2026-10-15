@@ -612,7 +612,7 @@
             // Reemplazar input por badge
             var userContainer = uploadUserName.parentElement;
             userContainer.innerHTML = '<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">' +
-              '<span style="font-size: 1.2em;">👤</span>' +
+              '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
               '<span>Ingresaste como: <strong>' + userObj.nombreCompleto + '</strong></span>' +
             '</div>';
             
@@ -634,7 +634,7 @@
               overlay.classList.remove('hidden');
               overlay.innerHTML = 
                 '<div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:\'Inter\',sans-serif; color:#0f172a;">' +
-                  '<div style="font-size:2rem; margin-bottom:12px;">👥</div>' +
+                  '<div style="width: 50px; height: 50px; margin: 0 auto 14px; border-radius: 50%; background: #eff6ff; border: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: center; color: #1d4ed8;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>' +
                   '<h3 style="margin:0 0 8px 0; font-size:1rem;">Selecciona tu perfil</h3>' +
                   '<p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>' +
                   '<select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white; color:#0f172a;">' + optionsHtml + '</select>' +
@@ -653,7 +653,7 @@
           } else {
              document.body.innerHTML = 
                '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: \'Inter\', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">' +
-                 '<div style="font-size: 48px; margin-bottom: 16px;">🚫</div>' +
+                 '<div style="width: 54px; height: 54px; margin: 0 auto 16px; border-radius: 50%; background: #fef2f2; border: 1px solid #fecaca; display: flex; align-items: center; justify-content: center; color: #dc2626;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></div>' +
                  '<h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>' +
                  '<p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>' + (myEmail || 'Desconocido') + '</strong> no tiene un usuario asignado en el sistema.</p>' +
                  '<div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">Por favor, solicita al administrador que cree tu usuario en la hoja de <strong>Usuarios</strong>.</div>' +

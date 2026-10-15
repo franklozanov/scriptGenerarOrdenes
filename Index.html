@@ -295,40 +295,67 @@
       }
 
       #status { 
-        margin-top: 16px; 
-        font-size: 13px; 
-        text-align: center; 
-        font-weight: 500; 
-        min-height: 20px;
-        padding: 12px 16px;
-        border-radius: 10px;
-        word-wrap: break-word;
-        transition: all 0.3s ease;
+        margin-top: 14px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        min-height: 0;
+        padding: 0;
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        transition: all 0.25s ease;
       }
-      .error-text { 
-        color: #dc2626; 
-        background: #fef2f2;
-        border: 1.5px solid #fecaca;
-        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);
+      #status:empty {
+        display: none !important;
       }
-      .success-text { 
-        color: #059669; 
-        background: #ecfdf5;
-        border: 1.5px solid #a7f3d0;
-        box-shadow: 0 2px 4px rgba(5, 150, 105, 0.1);
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12.5px;
+        font-weight: 500;
+        line-height: 1.4;
+        max-width: 100%;
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+        animation: statusFadeIn 0.2s ease;
       }
-      .warning-text { 
-        color: #b45309; 
+      @keyframes statusFadeIn {
+        from { opacity: 0; transform: translateY(-2px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .status-pill-loading, .status-pill-info {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+      }
+      .status-pill-success {
+        background: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+      }
+      .status-pill-warning {
         background: #fffbeb;
-        border: 1.5px solid #fde68a;
-        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+        color: #b45309;
+        border: 1px solid #fde68a;
       }
-      .info-text { 
-        color: #1976d2; 
-        background: #e3f2fd;
-        border: 1.5px solid #90caf9;
-        box-shadow: 0 2px 4px rgba(25, 118, 210, 0.1);
+      .status-pill-error {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
       }
+      .status-pill svg {
+        flex-shrink: 0;
+      }
+      .error-text { color: #dc2626; }
+      .success-text { color: #059669; }
+      .warning-text { color: #b45309; }
+      .info-text { color: #1976d2; }
       .preload-banner {
         display: none;
         margin-bottom: 16px;
@@ -569,7 +596,13 @@
     <div id="customConfirmModal" class="custom-modal-overlay" style="display: none;">
       <div class="custom-modal-content">
         <div class="custom-modal-header">
-          <span class="custom-modal-icon">⚠️</span>
+          <span class="custom-modal-icon" style="display: flex; align-items: center; justify-content: center; color: #dc2626;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </span>
           <h2>ALERTA DE VALIDACIÓN</h2>
         </div>
         <div class="custom-modal-body">
@@ -627,8 +660,40 @@
         banner.innerHTML = message;
       }
 
+      function clearStatus() {
+        const status = document.getElementById('status');
+        if (status) {
+          status.className = '';
+          status.innerHTML = '';
+        }
+      }
+
+      function setStatusMessage(type, message) {
+        const status = document.getElementById('status');
+        if (!status) return;
+        if (!message) {
+          clearStatus();
+          return;
+        }
+        let iconSvg = '';
+        if (type === 'loading') {
+          iconSvg = '<svg class="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.2"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>';
+        } else if (type === 'success') {
+          iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+        } else if (type === 'warning') {
+          iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        } else if (type === 'error') {
+          iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        } else if (type === 'info') {
+          iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+        }
+        status.className = 'status-pill status-pill-' + (type || 'info');
+        status.innerHTML = iconSvg + '<span>' + message + '</span>';
+      }
+
       function resetPreloadState() {
         preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] };
+        clearStatus();
         updateGoButtonState();
       }
 
@@ -662,9 +727,9 @@
         const errors = response.errors || [];
         
         if (errors.length === 0 && warnings.length === 0) {
-          setPreloadBanner('success', '✅ Orden lista para impresión');
+          setPreloadBanner('success', 'Orden lista para impresión');
         } else {
-          let html = '⚠️ <b>Novedades encontradas:</b><br><ul style="margin: 4px 0 0 20px; padding: 0; line-height: 1.4;">';
+          let html = '<b>Novedades encontradas:</b><br><ul style="margin: 4px 0 0 20px; padding: 0; line-height: 1.4;">';
           
           errors.forEach(err => {
             let msg = err.message;
@@ -728,20 +793,18 @@
         // Feedback visual si el orden está listo pero el botón sigue bloqueado
         if (isOrderReady && !isEnabled && !status.innerText.includes("Impresión registrada")) {
           if (!isUserValid) {
-            status.innerText = "⚠️ Seleccione un usuario válido de la lista";
-            status.className = "error-text";
+            setStatusMessage('warning', 'Seleccione un usuario válido de la lista');
           } else if (!hasCopies) {
-            status.innerText = "⚠️ Seleccione al menos 1 copia para imprimir";
-            status.className = "error-text";
+            setStatusMessage('warning', 'Seleccione al menos 1 copia para imprimir');
           }
         } else if (isOrderReady && isEnabled) {
           if (preloadState.data && preloadState.data.warnings && preloadState.data.warnings.length > 0) {
-            status.innerText = "⚠️ Imprimir con alertas";
-            status.className = "warning-text";
+            setStatusMessage('warning', 'Orden lista con alertas en validación');
           } else {
-            status.innerText = "✅ Documentos completos";
-            status.className = "success-text";
+            setStatusMessage('success', 'Documentos listos para impresión');
           }
+        } else if (!isOrderReady && preloadState.status !== 'loading' && !status.innerText.includes("Impresión registrada")) {
+          clearStatus();
         }
       }
 
@@ -806,10 +869,9 @@
         
         // Show subtle status message
         const status = document.getElementById('status');
-        setPreloadBanner('info', '🔍 Buscando documentos de la orden...');
+        setPreloadBanner('info', 'Buscando documentos de la orden...');
         if (status && !status.innerText.includes("Impresión registrada")) {
-          status.innerText = "🔍 Buscando datos de la orden...";
-          status.className = "info-text";
+          setStatusMessage('loading', 'Buscando documentos de la orden...');
         }
         
         google.script.run
@@ -833,15 +895,12 @@
             if (status && !status.innerText.includes("Impresión registrada")) {
               if (response.ready) {
                 if (response.warnings && response.warnings.length > 0) {
-                  status.innerText = "⚠️ Imprimir con alertas";
-                  status.className = "warning-text";
+                  setStatusMessage('warning', 'Orden lista con alertas en validación');
                 } else {
-                  status.innerText = "✅ Documentos completos";
-                  status.className = "success-text";
+                  setStatusMessage('success', 'Documentos listos para impresión');
                 }
               } else {
-                status.innerText = "⚠️ Faltan documentos requeridos";
-                status.className = "error-text";
+                setStatusMessage('error', 'Faltan documentos requeridos');
               }
             }
           })
@@ -860,12 +919,11 @@
             updateGoButtonState();
             
             console.error(`Error precargando orden ${currentOrderNo}:`, error.message);
-            setPreloadBanner('error', `⚠️ Error: ${error.message}`);
+            setPreloadBanner('error', `Error: ${error.message}`);
             
             // Show error in status
             if (status) {
-              status.innerText = `⚠️ Error: ${error.message}`;
-              status.className = "error-text";
+              setStatusMessage('error', `Error: ${error.message}`);
             }
           })
           .fetchOrderData(currentOrderNo);
@@ -1127,7 +1185,10 @@
               // Ocultar select y mostrar badge
               const userContainer = document.getElementById('userName').parentElement;
               userContainer.innerHTML = `<div style="padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.2em;">👤</span> 
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
                 <span>Ingresaste como: <strong>${userObj.nombreCompleto}</strong></span>
               </div>`;
               updateGoButtonState();
@@ -1136,9 +1197,7 @@
             // --- INICIO INICIALIZACIÓN UI ---
             const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
             if (noAccessCount > 0) {
-              const status = document.getElementById('status');
-              status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
-              status.className = "error-text";
+              setStatusMessage('warning', `${noAccessCount} plantilla(s) sin acceso. Use "Diagnosticar Plantillas".`);
             }
 
             // Add event listener for background preloading on orderNo input
@@ -1149,13 +1208,20 @@
               } else {
                 resetPreloadState();
                 setPreloadBanner('', '');
+                clearStatus();
               }
             }, 600);
             
             orderNoInput.addEventListener('input', (e) => {
-              if (preloadState.orderNo && preloadState.orderNo !== e.target.value.trim()) {
+              const val = e.target.value.trim();
+              if (val.length < 3) {
                 resetPreloadState();
                 setPreloadBanner('', '');
+                clearStatus();
+              } else if (preloadState.orderNo && preloadState.orderNo !== val) {
+                resetPreloadState();
+                setPreloadBanner('', '');
+                clearStatus();
               }
               updateGoButtonState();
               debouncedPreload(e.target.value);
@@ -1201,7 +1267,14 @@
                 ).join('');
                 loader.innerHTML = `
                   <div style="background:white; border-radius:12px; padding:28px 24px; max-width:360px; width:90%; box-shadow:0 4px 24px rgba(0,0,0,0.12); text-align:center; font-family:'Inter',sans-serif;">
-                    <div style="font-size:2rem; margin-bottom:12px;">👥</div>
+                    <div style="width: 50px; height: 50px; margin: 0 auto 14px; border-radius: 50%; background: #eff6ff; border: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: center; color: #1d4ed8;">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                    </div>
                     <h3 style="margin:0 0 8px 0; color:#0f172a; font-size:1rem;">Selecciona tu perfil</h3>
                     <p style="margin:0 0 16px 0; color:#64748b; font-size:0.85rem;">Tu correo tiene múltiples perfiles. ¿Con cuál deseas ingresar?</p>
                     <select id="profileSelect" style="width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.9rem; margin-bottom:16px; background:white;">
@@ -1227,7 +1300,12 @@
                // Bloquear UI
                document.body.innerHTML = `
                  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Inter', sans-serif; background-color: #f8fafc; padding: 20px; text-align: center;">
-                   <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
+                   <div style="width: 54px; height: 54px; margin: 0 auto 16px; border-radius: 50%; background: #fef2f2; border: 1px solid #fecaca; display: flex; align-items: center; justify-content: center; color: #dc2626;">
+                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                       <circle cx="12" cy="12" r="10"/>
+                       <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                     </svg>
+                   </div>
                    <h2 style="color: #0f172a; margin: 0 0 12px 0;">Acceso Denegado</h2>
                    <p style="color: #475569; margin: 0 0 24px 0; max-width: 400px; line-height: 1.5;">El correo <strong>${myEmail || 'Desconocido'}</strong> no tiene un usuario asignado en el sistema.</p>
                    <div style="background: #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 0.9em; border-left: 4px solid #94a3b8;">
@@ -1250,7 +1328,7 @@
       // PDF generation processing function (extracted for reuse)
       async function processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status) {
         try {
-          status.innerText = "⏳ Paso 2/4: Preparando motor PDF...";
+          setStatusMessage('loading', 'Paso 2/4: Preparando motor PDF...');
 
           // Merge dynamic templates from payload with preloaded static templates.
           // Respetamos el orden y las copias de config. Usamos un for-of para poder
@@ -1288,7 +1366,7 @@
               if (base64) {
                 console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
               } else {
-                status.innerText = `⏳ Descargando plantilla: ${templateMeta.name}...`;
+                setStatusMessage('loading', `Descargando plantilla: ${templateMeta.name}...`);
                 console.log(`⏳ Descargando estática on-demand: ${cfg.key} (ID: ${cfg.fileId})`);
                 base64 = await new Promise((resolve, reject) => {
                   google.script.run
@@ -1334,7 +1412,7 @@
           let templatesPrintedInfo = [];
 
           for (const item of payload.pdfs) {
-            status.innerText = `⏳ Paso 3/4: Procesando ${item.key}...`;
+            setStatusMessage('loading', `Paso 3/4: Procesando ${item.key}...`);
             let pagesForThisTemplate = 0;
 
             const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
@@ -1454,7 +1532,7 @@
             drawVisualText(footerRightText, width - 130, 20, 8);
           });
 
-          status.innerText = "⏳ Paso 4/4: Optimizando PDF para impresión...";
+          setStatusMessage('loading', 'Paso 4/4: Optimizando PDF para impresión...');
 
           // OPTIMIZACIÓN FINAL: Aplanar todos los formularios del documento unificado
           try {
@@ -1492,8 +1570,7 @@
 
           const blobURL = URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }));
           
-          status.innerText = "✅ PDF listo en memoria. Haga clic en 'Ver PDF Generado' para abrirlo y guardarlo.";
-          status.className = "success-text";
+          setStatusMessage('success', "PDF listo en memoria. Haga clic en 'Ver PDF Generado' para abrirlo.");
           
           // Ocultar botón original y mostrar el botón-enlace "Ver PDF Generado"
           btn.style.display = 'none';
@@ -1537,20 +1614,16 @@
               btn.onclick = run;
               updateGoButtonState();
 
-              status.innerText = "⏳ Guardando PDF en segundo plano...";
-              status.className = "info-text";
+              setStatusMessage('loading', 'Guardando PDF en segundo plano...');
               setTimeout(() => {
-                if (status.innerText.includes("Guardando PDF en segundo plano")) {
-                  status.innerText = '';
-                }
+                clearStatus();
               }, 3000);
             }, 50);
           };
 
         } catch (pdfError) {
           alert("Error generando PDF: " + pdfError.message);
-          status.innerText = "❌ Error: " + pdfError.message;
-          status.className = "error-text";
+          setStatusMessage('error', 'Error: ' + pdfError.message);
           btn.innerText = "Generar PDF Combinado";
           btn.onclick = run;
           btn.disabled = false;
@@ -1635,26 +1708,23 @@
       
       function continueWithPrint(orderNo, config, btn, status, userName, userId, printType) {
         if (preloadState.status === 'loading' && preloadState.orderNo === orderNo) {
-          setPreloadBanner('info', '⏳ Aún se están preparando los documentos. Espere a que aparezca “Documentos listos para impresión”.');
-          status.innerText = "⏳ Esperando documentos dinámicos...";
-          status.className = "info-text";
+          setPreloadBanner('info', 'Aún se están preparando los documentos. Espere a que aparezca "Documentos listos para impresión".');
+          setStatusMessage('loading', 'Esperando documentos dinámicos...');
           return;
         }
 
         if (!isPreloadReadyForOrder(orderNo)) {
           const messages = (preloadState.orderNo === orderNo && preloadState.errors.length)
-            ? preloadState.errors.map(err => '⚠️ ' + err.message).join('<br>')
-            : '⚠️ Ingrese un No. de Orden válido y espere a que DOC_ORDENES y DOC_ANALISIS estén listos.';
+            ? preloadState.errors.map(err => err.message).join('<br>')
+            : 'Ingrese un No. de Orden válido y espere a que DOC_ORDENES y DOC_ANALISIS estén listos.';
           setPreloadBanner('error', messages);
-          status.innerText = "Proceso bloqueado: faltan documentos requeridos.";
-          status.className = "error-text";
+          setStatusMessage('error', 'Proceso bloqueado: faltan documentos requeridos.');
           return;
         }
 
         btn.disabled = true;
 
-        status.innerText = "⏳ Paso 2/4: Preparando motor PDF (datos precargados)...";
-        status.className = "info-text";
+        setStatusMessage('loading', 'Paso 2/4: Preparando motor PDF (datos precargados)...');
         console.log(`✓ Usando documentos dinámicos precargados para orden ${orderNo}`);
         const payload = buildPayloadFromPreload(config);
         processPdfGeneration(payload, config, orderNo, userName, userId, printType, btn, status);
