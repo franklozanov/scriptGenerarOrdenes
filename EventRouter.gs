@@ -79,7 +79,8 @@ function runNewEventRouter(e) {
 
     // 2. Manejo especial de hojas no-Ordenes
     if (evt.sheetName === 'templates') {
-      clearInitialDataCache();
+      var targetSsId = (sheet && sheet.getParent) ? sheet.getParent().getId() : null;
+      clearInitialDataCache(targetSsId);
       logChange('ACTUALIZACION_PLANTILLAS', 'Se detectó modificación en la hoja de plantillas. Caché limpiado automáticamente.', evt.userIdentity);
       return;
     }

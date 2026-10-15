@@ -81,8 +81,9 @@ function diagnosticarPlantillas() {
   report += "\nPLANTILLAS ESTÁTICAS:\n";
   
   for (var i = 1; i < tplData.length; i++) {
-    var key = tplData[i][0] ? tplData[i][0].toString().trim() : "";
-    var value = tplData[i][1] ? tplData[i][1].toString().trim() : "";
+    var key = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
+    var rawValue = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
+    var value = (typeof extractDriveId_ === "function") ? extractDriveId_(rawValue) : rawValue;
     
     if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
       if (value) {

@@ -81,6 +81,80 @@ function registrarStaticTemplateCacheada_(key, fileId) {
 }
 
 /**
+ * Extrae el ID de Drive limpio si el usuario o una fórmula ingresó una URL completa.
+ * Ignora strings que comienzan con '#' (errores de fórmulas de Sheets).
+ * @private
+ */
+function extractDriveId_(value) {
+  if (value === null || value === undefined) return "";
+  var str = value.toString().trim();
+  if (str === "" || str.indexOf("#") === 0) return "";
+  
+  var urlMatch = str.match(/\/(?:file\/d|folders|document\/d|spreadsheets\/d)\/([a-zA-Z0-9_-]+)/i) || 
+                 str.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+  if (urlMatch && urlMatch[1]) {
+    return urlMatch[1];
+  }
+  return str;
+}
+
+/**
+ * Normaliza el tipo de plantilla manejando mayúsculas, minúsculas y acentos.
+ * @private
+ */
+function normalizarTipoPlantilla_(rawType) {
+  if (!rawType) return "Estatica";
+  var s = rawType.toString().trim().toLowerCase();
+  s = s.normalize ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : s.replace(/á/g, "a").replace(/é/g, "e").replace(/í/g, "i").replace(/ó/g, "o").replace(/ú/g, "u");
+  if (s === "estatica" || s === "static") return "Estatica";
+  if (s === "dinamica" || s === "dynamic") return "Dinamica";
+  if (s === "coordinate" || s === "coordenada" || s === "coordenadas") return "Coordinate";
+  if (s === "config" || s === "configuracion") return "Config";
+  return rawType.toString().trim();
+}
+
+/**
+ * Normaliza el estado de la plantilla manejando fórmulas booleanas o texto variado.
+ * @private
+ */
+function normalizarEstadoPlantilla_(rawEstado) {
+  if (rawEstado === null || rawEstado === undefined) return "Inactiva";
+  if (typeof rawEstado === "boolean") return rawEstado ? "Activa" : "Inactiva";
+  var s = rawEstado.toString().trim().toLowerCase();
+  if (s.indexOf("#") === 0) return "Inactiva";
+  if (s === "activa" || s === "activo" || s === "true" || s === "1" || s === "si" || s === "sí") {
+    return "Activa";
+  }
+  return "Inactiva";
+}
+
+/**
+ * Resuelve la instancia del Spreadsheet activo o por ID de forma tolerante a fallos.
+ * @private
+ */
+function getSpreadsheetInstance_(spreadsheetId) {
+  var ss = null;
+  if (spreadsheetId) {
+    try { ss = SpreadsheetApp.openById(spreadsheetId); } catch(e) {}
+  }
+  if (!ss) {
+    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
+  }
+  if (!ss) {
+    try {
+      var savedId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+      if (savedId) ss = SpreadsheetApp.openById(savedId);
+    } catch(e) {}
+  }
+  if (ss) {
+    try {
+      PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', ss.getId());
+    } catch(e) {}
+  }
+  return ss;
+}
+
+/**
  * Public wrapper para obtener el base64 de una plantilla estática desde el cliente.
  */
 function getStaticTemplateBase64(key, fileId) {
@@ -91,12 +165,13 @@ function getStaticTemplateBase64(key, fileId) {
  * Obtiene el base64 de una plantilla estática (desde caché o Drive).
  */
 function getStaticTemplateBase64_(key, fileId) {
-  var cached = getCachedStaticTemplateBase64_(key, fileId);
+  var cleanFileId = extractDriveId_(fileId);
+  var cached = getCachedStaticTemplateBase64_(key, cleanFileId);
   if (cached) return cached;
 
-  var file = DriveApp.getFileById(fileId);
+  var file = DriveApp.getFileById(cleanFileId);
   var base64 = Utilities.base64Encode(file.getBlob().getBytes());
-  cacheStaticTemplateBase64_(key, fileId, base64);
+  cacheStaticTemplateBase64_(key, cleanFileId, base64);
   return base64;
 }
 
@@ -118,11 +193,9 @@ function getInitialData(spreadsheetId) {
       }
     } catch(e) {}
     
-    var ss;
-    if (spreadsheetId) {
-      ss = SpreadsheetApp.openById(spreadsheetId);
-    } else {
-      ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getSpreadsheetInstance_(spreadsheetId);
+    if (!ss) {
+      throw new Error("No se pudo obtener acceso a la hoja de cálculo. Por favor intente recargar el documento.");
     }
     
     var currentSignature = "";
@@ -152,6 +225,9 @@ function getInitialData(spreadsheetId) {
             // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí para no bloquear la UI.
             // Se descargarán asíncronamente o en Lazy Load durante la impresión.
             t.base64 = null;
+            if (t.copias === undefined || t.copias === null || isNaN(t.copias)) {
+              t.copias = 1;
+            }
           }
           if (!parsedData.webAppUrl) {
             try { parsedData.webAppUrl = getWebAppUrl(); } catch(urlErr) { parsedData.webAppUrl = ''; }
@@ -250,28 +326,37 @@ function getInitialData(spreadsheetId) {
       if (colCopiasIdx) colCopiasIdx = colCopiasIdx - 1;
       
       for (var k = 1; k < tplData.length; k++) {
-        var key = tplData[k][colClaveIdx] ? tplData[k][colClaveIdx].toString().trim() : "";
-        var value = tplData[k][colValorIdx] ? tplData[k][colValorIdx].toString().trim() : "";
-        var typeVal = (colTypeIdx !== undefined && colTypeIdx !== null && tplData[k][colTypeIdx]) ? tplData[k][colTypeIdx].toString().trim() : "Estatica";
-        var descriptionVal = (colDescriptionIdx !== undefined && colDescriptionIdx !== null && tplData[k][colDescriptionIdx]) ? tplData[k][colDescriptionIdx].toString().trim() : "";
-        var formOrderRaw = (colFormOrderIdx !== undefined && colFormOrderIdx !== null && tplData[k][colFormOrderIdx]) ? tplData[k][colFormOrderIdx] : 999;
+        var rawKey = tplData[k][colClaveIdx];
+        var key = rawKey ? rawKey.toString().trim() : "";
+        if (!key || key.indexOf("#") === 0) continue; // Ignorar filas vacías o con fórmulas con error
+
+        var rawValue = tplData[k][colValorIdx];
+        var value = extractDriveId_(rawValue);
+        var rawType = (colTypeIdx !== undefined && colTypeIdx !== null && tplData[k][colTypeIdx]) ? tplData[k][colTypeIdx].toString().trim() : "Estatica";
+        var typeVal = normalizarTipoPlantilla_(rawType);
+        var rawDescription = (colDescriptionIdx !== undefined && colDescriptionIdx !== null && tplData[k][colDescriptionIdx]) ? tplData[k][colDescriptionIdx].toString().trim() : "";
+        var descriptionVal = (rawDescription.indexOf("#") === 0) ? "" : rawDescription;
+
+        var formOrderRaw = (colFormOrderIdx !== undefined && colFormOrderIdx !== null && tplData[k][colFormOrderIdx] !== "") ? tplData[k][colFormOrderIdx] : 999;
         var formOrderVal = parseInt(formOrderRaw, 10);
         if (isNaN(formOrderVal)) formOrderVal = 999;
         
-        var estadoVal = (colEstadoIdx !== undefined && colEstadoIdx !== null && tplData[k][colEstadoIdx]) ? tplData[k][colEstadoIdx].toString().trim() : "";
+        var rawEstado = (colEstadoIdx !== undefined && colEstadoIdx !== null && tplData[k][colEstadoIdx] !== "") ? tplData[k][colEstadoIdx] : "";
+        var estadoVal = normalizarEstadoPlantilla_(rawEstado);
+
         var copiasRaw = (colCopiasIdx !== undefined && colCopiasIdx !== null && tplData[k][colCopiasIdx] !== "") ? tplData[k][colCopiasIdx] : 1;
         var copiasVal = parseInt(copiasRaw, 10);
         if (isNaN(copiasVal) || copiasVal < 0) copiasVal = 1;
       
-        if (key && key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
+        if (key !== "Clave" && key !== "DOC_ORDENES" && key !== "DOC_ANALISIS" && key !== "DOC_COMPLETO" && key.indexOf("COORD_") === -1 && key !== "TPL_ORDEN") {
           var displayName = key;
           var hasAccess = true;
           var base64 = null;
           
           if (colNombreTemplateIdx !== undefined && colNombreTemplateIdx !== null && k > 0 && tplData[k][colNombreTemplateIdx]) {
-            var nombreTemplateValue = tplData[k][colNombreTemplateIdx].toString().trim();
-            if (nombreTemplateValue) {
-              displayName = nombreTemplateValue;
+            var rawNombre = tplData[k][colNombreTemplateIdx].toString().trim();
+            if (rawNombre && rawNombre.indexOf("#") !== 0) {
+              displayName = rawNombre;
             }
           }
           
@@ -314,9 +399,9 @@ function getInitialData(spreadsheetId) {
           var displayName = "Orden (Dinámico)";
           
           if (colNombreTemplateIdx !== undefined && colNombreTemplateIdx !== null && k > 0 && tplData[k][colNombreTemplateIdx]) {
-            var nombreTemplateValue = tplData[k][colNombreTemplateIdx].toString().trim();
-            if (nombreTemplateValue) {
-              displayName = nombreTemplateValue;
+            var rawNombre = tplData[k][colNombreTemplateIdx].toString().trim();
+            if (rawNombre && rawNombre.indexOf("#") !== 0) {
+              displayName = rawNombre;
             }
           }
           
@@ -327,9 +412,9 @@ function getInitialData(spreadsheetId) {
           var displayName = "Cert. Análisis (Dinámico)";
           
           if (colNombreTemplateIdx !== undefined && colNombreTemplateIdx !== null && k > 0 && tplData[k][colNombreTemplateIdx]) {
-            var nombreTemplateValue = tplData[k][colNombreTemplateIdx].toString().trim();
-            if (nombreTemplateValue) {
-              displayName = nombreTemplateValue;
+            var rawNombre = tplData[k][colNombreTemplateIdx].toString().trim();
+            if (rawNombre && rawNombre.indexOf("#") !== 0) {
+              displayName = rawNombre;
             }
           }
           
@@ -337,9 +422,11 @@ function getInitialData(spreadsheetId) {
         }
       }
       
-      // Ordenar plantillas por formOrder numérico
+      // Ordenar plantillas por formOrder numérico seguro (evita NaN)
       templates.sort(function(a, b) {
-        return a.formOrder - b.formOrder;
+        var orderA = (typeof a.formOrder === 'number' && !isNaN(a.formOrder)) ? a.formOrder : 999;
+        var orderB = (typeof b.formOrder === 'number' && !isNaN(b.formOrder)) ? b.formOrder : 999;
+        return orderA - orderB;
       });
       
       if (accessErrors.length > 0) {
@@ -432,8 +519,9 @@ function eliminarChunksPlantillaEstatica_(cache, key, fileId) {
 /**
  * Limpia el caché de datos iniciales y plantillas estáticas en todo el sistema.
  * Invalida llaves de ScriptCache, chunks de PDFs y actualiza el timestamp de versión.
+ * @param {string} [spreadsheetId] ID del spreadsheet opcional
  */
-function clearInitialDataCache() {
+function clearInitialDataCache(spreadsheetId) {
   var cache = CacheService.getScriptCache();
   // 1. Limpiar llaves de datos iniciales y configuración
   cache.remove('initialData_v1');
@@ -460,7 +548,7 @@ function clearInitialDataCache() {
 
   // 3. Leer todas las llaves y fileIds directamente de la hoja templates
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getSpreadsheetInstance_(spreadsheetId);
     var tplSheet = ss ? ss.getSheetByName('templates') : null;
     if (tplSheet) {
       var data = tplSheet.getDataRange().getValues();
@@ -472,11 +560,13 @@ function clearInitialDataCache() {
         colValorIdx = (colValorIdx ? colValorIdx - 1 : 1);
 
         for (var i = 1; i < data.length; i++) {
-          var key = data[i][colClaveIdx] ? data[i][colClaveIdx].toString().trim() : "";
-          var fileId = data[i][colValorIdx] ? data[i][colValorIdx].toString().trim() : "";
-          if (key) {
-            eliminarChunksPlantillaEstatica_(cache, key, fileId);
-            // Limpieza defensiva por si hubo entradas guardadas como 'noId'
+          var rawKey = data[i][colClaveIdx];
+          var key = rawKey ? rawKey.toString().trim() : "";
+          var rawFileId = data[i][colValorIdx] ? data[i][colValorIdx].toString().trim() : "";
+          var fileId = extractDriveId_(rawFileId);
+          if (key && key.indexOf("#") !== 0) {
+            if (fileId) eliminarChunksPlantillaEstatica_(cache, key, fileId);
+            if (rawFileId && rawFileId !== fileId) eliminarChunksPlantillaEstatica_(cache, key, rawFileId);
             eliminarChunksPlantillaEstatica_(cache, key, 'noId');
           }
         }
@@ -500,13 +590,17 @@ function clearInitialDataCache() {
  * Función para menú o ejecución manual: fuerza la recarga completa del caché de plantillas.
  */
 function forzarRecargaPlantillas() {
-  clearInitialDataCache();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ssId = ss ? ss.getId() : null;
+  clearInitialDataCache(ssId);
   try {
-    getInitialData();
+    getInitialData(ssId);
   } catch(e) {
     Logger.log("Error en pre-warm tras forzar recarga: " + e.message);
   }
-  SpreadsheetApp.getActiveSpreadsheet().toast('✅ Caché de plantillas limpiado y sincronizado.', 'Plantillas', 5);
+  if (ss) {
+    ss.toast('✅ Caché de plantillas limpiado y sincronizado.', 'Plantillas', 5);
+  }
 }
 
 /**
@@ -515,8 +609,13 @@ function forzarRecargaPlantillas() {
  * @returns {Object} Datos iniciales frescos
  */
 function forzarRecargaPlantillasCliente(spreadsheetId) {
-  clearInitialDataCache();
-  return getInitialData(spreadsheetId);
+  try {
+    clearInitialDataCache(spreadsheetId);
+    return getInitialData(spreadsheetId);
+  } catch (err) {
+    Logger.log("Error en forzarRecargaPlantillasCliente: " + err.message);
+    throw new Error("No se pudo sincronizar las plantillas: " + err.message);
+  }
 }
 
 /**

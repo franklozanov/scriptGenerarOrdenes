@@ -532,10 +532,30 @@
     <?!= HtmlService.createHtmlOutputFromFile('GlobalScripts').getContent(); ?>
 
     <script>
+      const SPREADSHEET_ID = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
       let globalTemplates = [];
       let preloadedStaticPdfs = {}; // Store preloaded static template objects { base64, fileId }
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
       window.currentTemplatesVersion = null;
+
+      function isStaticTemplate(t) {
+        if (!t || !t.type) return false;
+        const s = t.type.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return s === 'estatica' || s === 'static';
+      }
+
+      function isActiveTemplate(t) {
+        if (!t) return false;
+        if (t.key === 'DOC_COMPLETO' || (t.type && t.type.toString().toLowerCase().includes('coord'))) return false;
+        const estado = (t.estado || '').toString().trim().toLowerCase();
+        return estado === 'activa' || estado === 'activo' || estado === 'true' || estado === '1';
+      }
+
+      function safeCopiesValue(copias) {
+        if (copias == null || copias === "" || isNaN(copias)) return "1";
+        const num = parseInt(copias, 10);
+        return (isNaN(num) || num < 0) ? "1" : String(num);
+      }
 
       // Función debounce() ahora viene de GlobalScripts.html
 
@@ -619,7 +639,7 @@
       }
 
       function hasAnyCopiesSelected() {
-        const activeTemplates = globalTemplates.filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+        const activeTemplates = (globalTemplates || []).filter(isActiveTemplate);
         return activeTemplates.some(t => {
           const input = document.getElementById('val_' + t.key);
           return input && (parseInt(input.value) || 0) > 0;
@@ -678,8 +698,8 @@
         // Solo las plantillas estáticas reales son Type === 'Estatica' (un PDF fijo).
         // Las Dinamica (DOC_ORDENES/DOC_ANALISIS dinámicas, DOC_COMPLETO destino) y
         // las Coordinate NO se precargan aquí.
-        const staticTemplates = globalTemplates.filter(t =>
-          t.type === 'Estatica' && t.hasAccess && t.fileId
+        const staticTemplates = (globalTemplates || []).filter(t =>
+          isStaticTemplate(t) && t.hasAccess && t.fileId
         );
         if (staticTemplates.length === 0) return;
         console.log(`🚀 Precargando ${staticTemplates.length} plantillas estáticas en segundo plano...`);
@@ -840,10 +860,10 @@
       }
 
       function renderTemplatesList(templates, preserveValues = false) {
-        const activeTemplates = (templates || []).filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+        const activeTemplates = (templates || []).filter(isActiveTemplate);
         
         document.getElementById('tplList').innerHTML = activeTemplates.map(t => {
-          let defVal = t.copias !== undefined ? t.copias.toString() : "1";
+          let defVal = safeCopiesValue(t.copias);
           if (preserveValues) {
             const existingInput = document.getElementById('val_' + t.key);
             if (existingInput && existingInput.value !== "") {
@@ -928,14 +948,14 @@
               }
             }
           })
-          .forzarRecargaPlantillasCliente('<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>');
+          .forzarRecargaPlantillasCliente(SPREADSHEET_ID);
       }
 
       let templatesZeroed = false;
 
       function toggleTemplateValues() {
         const btn = document.getElementById('toggleValuesBtn');
-        const activeTemplates = globalTemplates.filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+        const activeTemplates = (globalTemplates || []).filter(isActiveTemplate);
         
         if (!templatesZeroed) {
           // Llevar todo a cero
@@ -952,7 +972,7 @@
           activeTemplates.forEach(t => {
             const input = document.getElementById('val_' + t.key);
             if (input && !input.disabled) {
-              input.value = t.copias !== undefined ? t.copias.toString() : "1";
+              input.value = safeCopiesValue(t.copias);
             }
           });
           templatesZeroed = false;
@@ -1168,7 +1188,7 @@
           }
         }).withFailureHandler(e => {
           document.getElementById('loader').innerHTML = `<span class="error-text">Error al cargar: ${e.message}</span>`;
-        }).getInitialData('<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>');
+        }).getInitialData(SPREADSHEET_ID);
       };
 
       // PDF generation processing function (extracted for reuse)
@@ -1187,7 +1207,7 @@
           //                        DOC_COMPLETO es solo carpeta destino y se omite.
           for (const cfg of config) {
             const templateMeta = globalTemplates.find(t => t.key === cfg.key);
-            const isStatic = templateMeta && templateMeta.type === 'Estatica';
+            const isStatic = templateMeta && isStaticTemplate(templateMeta);
 
             if (cfg.key === 'DOC_COMPLETO') {
               // DOC_COMPLETO es solo carpeta de destino, no plantilla - omitir
@@ -1485,7 +1505,7 @@
         const config = [];
         globalTemplates.forEach(t => {
           let copies = 0;
-          if (t.estado === "Activa" && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate') {
+          if (isActiveTemplate(t)) {
              const input = document.getElementById('val_' + t.key);
              copies = input ? (parseInt(input.value) || 0) : 0;
           }

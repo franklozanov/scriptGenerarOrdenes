@@ -385,7 +385,7 @@ function preparePrintPayload(orderNo, templateConfig) {
   }
   
   for (var i = 1; i < tplData.length; i++) {
-    var k = tplData[i][colClaveIdx].toString().trim();
+    var k = tplData[i][colClaveIdx] ? tplData[i][colClaveIdx].toString().trim() : "";
     var v = tplData[i][colValorIdx] ? tplData[i][colValorIdx].toString().trim() : "";
     if (k === "DOC_ORDENES") folderId = v;
     if (k === "DOC_ANALISIS") folderAnalysisId = v;
