@@ -23,6 +23,7 @@ function onOpen() {
   // 2. Menú de Configuración General
   var configMenu = SpreadsheetApp.getUi().createMenu('⚙️ Configuración')
     .addItem('📊 Diagnosticar Plantillas', 'diagnosticarPlantillas')
+    .addItem('🔄 Forzar Recarga de Plantillas', 'forzarRecargaPlantillas')
     .addItem('🔍 Diagnosticar ConsecutivoImp', 'diagnosticarConsecutivoImp')
     .addItem('🗂️ Reconstruir índice de documentos', 'reconstruirIndiceDocumentos')
     .addSeparator()

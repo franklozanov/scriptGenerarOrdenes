@@ -492,9 +492,14 @@
               <label style="margin-bottom: 2px; display: block;">Cantidad de Copias</label>
               <div class="hint" style="margin-bottom: 0;">Ajuste el número de copias para cada plantilla</div>
             </div>
-            <button id="toggleValuesBtn" type="button" onclick="toggleTemplateValues()" style="padding: 4px 12px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none; margin-right: 2px;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
-              <span style="font-size: 0.85rem;">🔄</span> <span id="toggleValuesText">Llevar a 0</span>
-            </button>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button id="refreshTemplatesBtn" type="button" onclick="refreshTemplatesFromSheet()" title="Sincronizar plantillas con la hoja de cálculo" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
+                <span id="refreshTemplatesIcon" style="font-size: 0.85rem;">🔄</span> <span id="refreshTemplatesText">Sincronizar</span>
+              </button>
+              <button id="toggleValuesBtn" type="button" onclick="toggleTemplateValues()" style="padding: 4px 12px; font-size: 0.75rem; font-weight: 600; background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; outline: none; margin-right: 2px;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#334155'; this.style.borderColor='#94a3b8';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569'; this.style.borderColor='#cbd5e1';">
+                <span style="font-size: 0.85rem;">0️⃣</span> <span id="toggleValuesText">Llevar a 0</span>
+              </button>
+            </div>
           </div>
           <div id="tplList" class="tpl-container"></div>
         </div>
@@ -528,8 +533,9 @@
 
     <script>
       let globalTemplates = [];
-      let preloadedStaticPdfs = {}; // Store preloaded static template base64 strings
+      let preloadedStaticPdfs = {}; // Store preloaded static template objects { base64, fileId }
       let preloadState = { orderNo: null, status: 'idle', data: null, pdfsByKey: {}, errors: [] }; // Background preloading state
+      window.currentTemplatesVersion = null;
 
       // Función debounce() ahora viene de GlobalScripts.html
 
@@ -678,12 +684,13 @@
         if (staticTemplates.length === 0) return;
         console.log(`🚀 Precargando ${staticTemplates.length} plantillas estáticas en segundo plano...`);
         staticTemplates.forEach(t => {
-          if (preloadedStaticPdfs[t.key]) return; // ya en memoria
+          const cached = preloadedStaticPdfs[t.key];
+          if (cached && (cached.fileId === t.fileId || cached === t.fileId)) return; // ya en memoria con el ID correcto
           google.script.run
             .withSuccessHandler(base64 => {
               if (base64) {
-                preloadedStaticPdfs[t.key] = base64;
-                console.log(`✓ [Background] Precargada: ${t.key}`);
+                preloadedStaticPdfs[t.key] = { base64: base64, fileId: t.fileId };
+                console.log(`✓ [Background] Precargada: ${t.key} (ID: ${t.fileId})`);
               }
             })
             .withFailureHandler(err => {
@@ -832,6 +839,98 @@
         updateGoButtonState();
       }
 
+      function renderTemplatesList(templates, preserveValues = false) {
+        const activeTemplates = (templates || []).filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
+        
+        document.getElementById('tplList').innerHTML = activeTemplates.map(t => {
+          let defVal = t.copias !== undefined ? t.copias.toString() : "1";
+          if (preserveValues) {
+            const existingInput = document.getElementById('val_' + t.key);
+            if (existingInput && existingInput.value !== "") {
+              defVal = existingInput.value;
+            }
+          }
+          
+          const noAccess = t.hasAccess === false;
+          const rowStyle = noAccess ? 'opacity: 0.5;' : '';
+          const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
+          const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2;">${t.description}</div>` : '';
+          return `
+            <div class="tpl-row" style="${rowStyle} display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
+              <div style="display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px;">
+                <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b;">${t.name}</span>
+                ${descriptionHtml}
+              </div>
+              <div class="counter-control" style="flex-shrink: 0;">
+                <button type="button" class="counter-btn" tabindex="-1" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
+                <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
+                <button type="button" class="counter-btn" tabindex="-1" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function refreshTemplatesFromSheet(silent = false) {
+        const btn = document.getElementById('refreshTemplatesBtn');
+        const icon = document.getElementById('refreshTemplatesIcon');
+        const text = document.getElementById('refreshTemplatesText');
+        if (!silent) {
+          if (btn) btn.disabled = true;
+          if (icon) icon.innerText = '⏳';
+          if (text) text.innerText = 'Sincronizando...';
+        }
+
+        // Limpiar memoria local de plantillas precargadas
+        preloadedStaticPdfs = {};
+
+        google.script.run
+          .withSuccessHandler(data => {
+            if (!silent) {
+              if (btn) btn.disabled = false;
+              if (icon) icon.innerText = '🔄';
+              if (text) text.innerText = 'Sincronizar';
+            }
+            if (data && data.templates) {
+              globalTemplates = data.templates;
+              window.currentTemplatesVersion = data.templatesVersion || '0';
+              renderTemplatesList(data.templates, true);
+              startBackgroundStaticPreload();
+              updateGoButtonState();
+
+              const noAccessCount = data.templates.filter(t => t.hasAccess === false).length;
+              const status = document.getElementById('status');
+              if (status) {
+                if (noAccessCount > 0) {
+                  status.innerHTML = `⚠️ ${noAccessCount} plantilla(s) sin acceso. Use el menú "Diagnosticar Plantillas" para más detalles.`;
+                  status.className = "error-text";
+                } else if (!silent) {
+                  status.innerText = "✅ Plantillas sincronizadas correctamente con la hoja.";
+                  status.className = "success-text";
+                  setTimeout(() => {
+                    if (status.innerText && status.innerText.indexOf("sincronizadas") !== -1) {
+                      status.innerText = "";
+                    }
+                  }, 4000);
+                }
+              }
+            }
+          })
+          .withFailureHandler(err => {
+            if (!silent) {
+              if (btn) btn.disabled = false;
+              if (icon) icon.innerText = '⚠️';
+              if (text) text.innerText = 'Error';
+              const status = document.getElementById('status');
+              if (status) {
+                status.innerText = "Error sincronizando plantillas: " + (err && err.message ? err.message : err);
+                status.className = "error-text";
+              }
+            }
+          })
+          .forzarRecargaPlantillasCliente('<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>');
+      }
+
       let templatesZeroed = false;
 
       function toggleTemplateValues() {
@@ -931,38 +1030,17 @@
           try {
             console.log('🚀 Inicializando modal - data recibida:', data);
             globalTemplates = data.templates;
+            window.currentTemplatesVersion = data.templatesVersion || '0';
 
             // Store preloaded static template base64 strings in memory
             data.templates.forEach(t => {
               if (t.base64) {
-                preloadedStaticPdfs[t.key] = t.base64;
-                console.log(`✓ Precargada en memoria: ${t.key}`);
+                preloadedStaticPdfs[t.key] = { base64: t.base64, fileId: t.fileId };
+                console.log(`✓ Precargada en memoria: ${t.key} (ID: ${t.fileId})`);
               }
             });
 
-            const activeTemplates = data.templates.filter(t => t.estado === 'Activa' && t.key !== 'DOC_COMPLETO' && t.type !== 'Coordinate');
-            
-            document.getElementById('tplList').innerHTML = activeTemplates.map(t => {
-              let defVal = t.copias !== undefined ? t.copias.toString() : "1";
-              
-              const noAccess = t.hasAccess === false;
-              const rowStyle = noAccess ? 'opacity: 0.5;' : '';
-              const nameStyle = noAccess ? 'color: #dc2626; font-style: italic;' : '';
-              const descriptionHtml = t.description ? `<div style="font-size: 0.75em; color: #64748b; margin-top: 2px; line-height: 1.2;">${t.description}</div>` : '';
-              return `
-                <div class="tpl-row" style="${rowStyle} display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
-                  <div style="display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px;">
-                    <span class="tpl-name" title="${t.name}" style="${nameStyle} font-weight: 500; color: #1e293b;">${t.name}</span>
-                    ${descriptionHtml}
-                  </div>
-                  <div class="counter-control" style="flex-shrink: 0;">
-                    <button type="button" class="counter-btn" tabindex="-1" onclick="decrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>−</button>
-                    <input type="text" class="counter-input" id="val_${t.key}" value="${defVal}" maxlength="3" ${noAccess ? 'disabled' : ''} oninput="validateCounter(this)">
-                    <button type="button" class="counter-btn" tabindex="-1" onclick="incrementCounter('${t.key}', ${noAccess})" ${noAccess ? 'disabled' : ''}>+</button>
-                  </div>
-                </div>
-              `;
-            }).join('');
+            renderTemplatesList(data.templates);
 
             // Guardar usuarios globalmente para acceder después
             window.globalUsers = data.users;
@@ -1012,6 +1090,18 @@
                 e.preventDefault();
                 document.getElementById('goBtn').click();
               }
+            });
+            // Sincronización automática silenciosa si la versión de plantillas cambió en el servidor
+            window.addEventListener('focus', () => {
+              if (!window.currentTemplatesVersion) return;
+              google.script.run
+                .withSuccessHandler(serverVersion => {
+                  if (serverVersion && serverVersion !== window.currentTemplatesVersion) {
+                    console.log(`🔄 Servidor tiene versión ${serverVersion} (local: ${window.currentTemplatesVersion}). Sincronizando plantillas...`);
+                    refreshTemplatesFromSheet(true);
+                  }
+                })
+                .getTemplatesVersion();
             });
             // --- FIN INICIALIZACIÓN UI ---
 
@@ -1106,13 +1196,24 @@
             }
 
             if (isStatic) {
-              // Estática: usar la precargada en background, o descargarla on-demand.
-              let base64 = preloadedStaticPdfs[cfg.key];
+              // Estática: usar la precargada en background si coincide el fileId, o descargarla on-demand.
+              let cached = preloadedStaticPdfs[cfg.key];
+              let base64 = null;
+              if (cached) {
+                if (typeof cached === 'string') {
+                  base64 = cached;
+                } else if (cached.fileId === cfg.fileId) {
+                  base64 = cached.base64;
+                } else {
+                  console.log(`⚠️ Plantilla ${cfg.key} en memoria tenía fileId '${cached.fileId}' pero se requiere '${cfg.fileId}'. Se descargará la versión actualizada.`);
+                }
+              }
+
               if (base64) {
                 console.log(`✓ Usando plantilla estática precargada: ${cfg.key}`);
               } else {
                 status.innerText = `⏳ Descargando plantilla: ${templateMeta.name}...`;
-                console.log(`⏳ Descargando estática on-demand: ${cfg.key}`);
+                console.log(`⏳ Descargando estática on-demand: ${cfg.key} (ID: ${cfg.fileId})`);
                 base64 = await new Promise((resolve, reject) => {
                   google.script.run
                     .withSuccessHandler(resolve)
@@ -1120,7 +1221,7 @@
                     .getStaticTemplateBase64(cfg.key, cfg.fileId);
                 });
                 if (!base64) throw new Error(`No se pudo obtener el PDF de la plantilla ${templateMeta.name} (${cfg.key}).`);
-                preloadedStaticPdfs[cfg.key] = base64;
+                preloadedStaticPdfs[cfg.key] = { base64: base64, fileId: cfg.fileId };
               }
               finalPdfs.push({ key: cfg.key, base64: base64, copies: cfg.copies });
             } else {

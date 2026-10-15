@@ -49,8 +49,34 @@ function cacheStaticTemplateBase64_(key, fileId, base64) {
       cache.put(prefix + i, base64.substring(i * STATIC_TEMPLATE_CHUNK_SIZE_, (i + 1) * STATIC_TEMPLATE_CHUNK_SIZE_), STATIC_TEMPLATE_CACHE_TTL_);
     }
     cache.put(prefix + 'meta', JSON.stringify({ chunkCount: chunkCount }), STATIC_TEMPLATE_CACHE_TTL_);
+    registrarStaticTemplateCacheada_(key, fileId);
   } catch (e) {
     Logger.log("Error cacheando plantilla estática " + key + ": " + e.message);
+  }
+}
+
+/**
+ * Registra la tupla (key, fileId) en ScriptProperties para permitir su posterior
+ * limpieza quirúrgica cuando se modifiquen o eliminen plantillas.
+ */
+function registrarStaticTemplateCacheada_(key, fileId) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty('CACHED_STATIC_KEYS');
+    var list = raw ? JSON.parse(raw) : [];
+    var exists = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].key === key && list[i].fileId === fileId) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) {
+      list.push({ key: key, fileId: fileId });
+      props.setProperty('CACHED_STATIC_KEYS', JSON.stringify(list));
+    }
+  } catch (e) {
+    Logger.log("Error registrando clave estática cacheada: " + e.message);
   }
 }
 
@@ -110,10 +136,17 @@ function getInitialData(spreadsheetId) {
       Logger.log("Error leyendo templates para firma: " + e.message);
     }
 
+    var currentVersion = "";
+    try {
+      currentVersion = PropertiesService.getScriptProperties().getProperty('TEMPLATES_VERSION') || '0';
+    } catch(e) {
+      currentVersion = '0';
+    }
+
     if (cached) {
       try { 
         var parsedData = JSON.parse(cached); 
-        if (parsedData.templateSignature === currentSignature && currentSignature !== "") {
+        if (parsedData.templatesVersion === currentVersion && parsedData.templateSignature === currentSignature && currentSignature !== "") {
           for (var i = 0; i < parsedData.templates.length; i++) {
             var t = parsedData.templates[i];
             // FASE 6 OPTIMIZACIÓN: NO precargar el base64 aquí para no bloquear la UI.
@@ -125,9 +158,10 @@ function getInitialData(spreadsheetId) {
           }
           parsedData.activeEmail = activeEmail;
           parsedData.savedProfileIdx = savedProfileIdx;
+          parsedData.templatesVersion = currentVersion;
           return parsedData; 
         } else {
-          Logger.log("Firma de caché diferente o ausente. Se reconstruirá el caché de plantillas.");
+          Logger.log("Firma o versión de caché diferente o ausente. Se reconstruirá el caché de plantillas.");
         }
       } catch (e) {
         Logger.log("Error parsing cached data: " + e.message);
@@ -321,9 +355,22 @@ function getInitialData(spreadsheetId) {
 
     var webAppUrl = '';
     try { webAppUrl = getWebAppUrl(); } catch(e) { webAppUrl = ''; }
-    var result = { users: users, templates: templates, webAppUrl: webAppUrl, activeEmail: activeEmail, savedProfileIdx: savedProfileIdx };
+    var result = { 
+      users: users, 
+      templates: templates, 
+      webAppUrl: webAppUrl, 
+      activeEmail: activeEmail, 
+      savedProfileIdx: savedProfileIdx,
+      templatesVersion: currentVersion 
+    };
     
-    var dataToCache = { users: users, templates: [], webAppUrl: webAppUrl, templateSignature: currentSignature };
+    var dataToCache = { 
+      users: users, 
+      templates: [], 
+      webAppUrl: webAppUrl, 
+      templateSignature: currentSignature,
+      templatesVersion: currentVersion 
+    };
     for (var idx = 0; idx < templates.length; idx++) {
       var t = templates[idx];
       dataToCache.templates.push({ key: t.key, fileId: t.fileId, name: t.name, description: t.description, type: t.type, formOrder: t.formOrder, estado: t.estado, copias: t.copias, hasAccess: t.hasAccess });
@@ -358,37 +405,129 @@ function saveUserProfileSelection(idx) {
 }
 
 /**
- * Limpia el caché de datos iniciales y plantillas estáticas.
+ * Elimina los chunks y metadata de una plantilla estática en CacheService.
+ * @private
+ */
+function eliminarChunksPlantillaEstatica_(cache, key, fileId) {
+  try {
+    var prefix = getStaticTemplateCachePrefix_(key, fileId);
+    var meta = cache.get(prefix + 'meta');
+    if (meta) {
+      try {
+        var parsedMeta = JSON.parse(meta);
+        var chunkCount = parsedMeta.chunkCount || 0;
+        for (var j = 0; j < chunkCount; j++) {
+          cache.remove(prefix + j);
+        }
+      } catch (err) {
+        Logger.log("Error parseando meta de " + prefix + ": " + err.message);
+      }
+      cache.remove(prefix + 'meta');
+    }
+  } catch (e) {
+    Logger.log("Error eliminando chunks de " + key + " (" + fileId + "): " + e.message);
+  }
+}
+
+/**
+ * Limpia el caché de datos iniciales y plantillas estáticas en todo el sistema.
+ * Invalida llaves de ScriptCache, chunks de PDFs y actualiza el timestamp de versión.
  */
 function clearInitialDataCache() {
   var cache = CacheService.getScriptCache();
+  // 1. Limpiar llaves de datos iniciales y configuración
   cache.remove('initialData_v1');
   cache.remove('initialData_v2');
   cache.remove('initialData_v3');
   cache.remove('initialData_v4');
   cache.remove('printConfig_v1');
-  // Leer todas las llaves directamente de la hoja de Google Sheets
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tplSheet = ss.getSheetByName('templates');
-  if (tplSheet) {
-    var data = tplSheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      var key = data[i][0]; // Columna A: Clave
-      if (key) {
-        var prefix = getStaticTemplateCachePrefix_(key.toString().trim());
-        var meta = cache.get(prefix + 'meta');
-        if (meta) {
-          try {
-            var parsedMeta = JSON.parse(meta);
-            for (var j = 0; j < parsedMeta.chunkCount; j++) {
-              cache.remove(prefix + j);
-            }
-          } catch (e) {
-            Logger.log("Error limpiando caché estático " + key + ": " + e.message);
-          }
-        }
-        cache.remove(prefix + 'meta');
+
+  var props = PropertiesService.getScriptProperties();
+
+  // 2. Limpiar todos los chunks registrados previamente en ScriptProperties
+  try {
+    var raw = props.getProperty('CACHED_STATIC_KEYS');
+    if (raw) {
+      var list = JSON.parse(raw);
+      for (var k = 0; k < list.length; k++) {
+        eliminarChunksPlantillaEstatica_(cache, list[k].key, list[k].fileId);
       }
     }
+    props.deleteProperty('CACHED_STATIC_KEYS');
+  } catch (e) {
+    Logger.log("Error limpiando CACHED_STATIC_KEYS: " + e.message);
+  }
+
+  // 3. Leer todas las llaves y fileIds directamente de la hoja templates
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var tplSheet = ss ? ss.getSheetByName('templates') : null;
+    if (tplSheet) {
+      var data = tplSheet.getDataRange().getValues();
+      if (data.length > 1) {
+        var headers = data[0];
+        var colClaveIdx = getColumnIndexByNameCaseInsensitive(headers, 'Clave', false);
+        var colValorIdx = getColumnIndexByNameCaseInsensitive(headers, 'Valor', false);
+        colClaveIdx = (colClaveIdx ? colClaveIdx - 1 : 0);
+        colValorIdx = (colValorIdx ? colValorIdx - 1 : 1);
+
+        for (var i = 1; i < data.length; i++) {
+          var key = data[i][colClaveIdx] ? data[i][colClaveIdx].toString().trim() : "";
+          var fileId = data[i][colValorIdx] ? data[i][colValorIdx].toString().trim() : "";
+          if (key) {
+            eliminarChunksPlantillaEstatica_(cache, key, fileId);
+            // Limpieza defensiva por si hubo entradas guardadas como 'noId'
+            eliminarChunksPlantillaEstatica_(cache, key, 'noId');
+          }
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("Error leyendo hoja templates para limpiar caché: " + e.message);
+  }
+
+  // 4. Actualizar versión/timestamp de plantillas para invalidar memoria de clientes abiertos
+  try {
+    var newVersion = String(Date.now());
+    props.setProperty('TEMPLATES_VERSION', newVersion);
+    Logger.log("TEMPLATES_VERSION actualizada a: " + newVersion);
+  } catch (e) {
+    Logger.log("Error actualizando TEMPLATES_VERSION: " + e.message);
+  }
+}
+
+/**
+ * Función para menú o ejecución manual: fuerza la recarga completa del caché de plantillas.
+ */
+function forzarRecargaPlantillas() {
+  clearInitialDataCache();
+  try {
+    getInitialData();
+  } catch(e) {
+    Logger.log("Error en pre-warm tras forzar recarga: " + e.message);
+  }
+  SpreadsheetApp.getActiveSpreadsheet().toast('✅ Caché de plantillas limpiado y sincronizado.', 'Plantillas', 5);
+}
+
+/**
+ * Invalida el caché de plantillas y retorna los datos frescos directamente al cliente modal.
+ * @param {string} spreadsheetId ID del spreadsheet opcional
+ * @returns {Object} Datos iniciales frescos
+ */
+function forzarRecargaPlantillasCliente(spreadsheetId) {
+  clearInitialDataCache();
+  return getInitialData(spreadsheetId);
+}
+
+/**
+ * Retorna la versión actual de las plantillas (timestamp) para que los modales abiertos
+ * detecten cambios sin necesidad de descargar todo el payload.
+ * @returns {string} Timestamp de la versión actual
+ */
+function getTemplatesVersion() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty('TEMPLATES_VERSION') || '0';
+  } catch (e) {
+    return '0';
   }
 }
